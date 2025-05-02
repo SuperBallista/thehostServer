@@ -1,0 +1,13 @@
+// user/user.module.ts (수정)
+import { Module } from '@nestjs/common';
+import { UserService } from './user.service';
+import { UserCacheService } from './user-cache.service';
+import { RedisModule } from '../redis/redis.module';
+import { DatabaseModule } from '../database/database.module'; 
+
+@Module({
+  imports: [RedisModule, DatabaseModule],
+  providers: [UserService, UserCacheService],
+  exports: [UserService, UserCacheService],
+})
+export class UserModule {}
