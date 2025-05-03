@@ -38,5 +38,9 @@ export const configuration = (): any => ({
   // Google 관련 환경변수 추가
   googleClientId: process.env.GOOGLE_CLIENT_ID,
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  googleRedirectUrl: process.env.GOOGLE_REDIRECT_URL
+  googleRedirectUrl: process.env.GOOGLE_REDIRECT_URL,
+});
+
+export default () => ({
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
 });

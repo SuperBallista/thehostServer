@@ -8,3 +8,12 @@ export interface UserDto {
     ivNickname: string;
     lastConnectedAt: Date;
   }
+
+  export interface CreateUserInput {
+    oauthId: string;
+    provider: string;
+    nicknameHash: string;
+    encryptedNickname: string;
+    iv: string;
+  }
+  

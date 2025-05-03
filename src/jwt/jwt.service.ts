@@ -71,4 +71,30 @@ export class JwtService {
       throw new Error('Invalid refresh token');
     }
   }
+
+  async generateTempToken(oauthId: string, provider: string): Promise<string> {
+    const tempTokenExpireMinutes = 10; // 10분짜리 임시 토큰
+  
+    const payload = {
+      oauthId,
+      provider,
+    };
+  
+    return this.jwtService.signAsync(payload, {
+      secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+      expiresIn: `${tempTokenExpireMinutes}m`,
+    });
+  }
+  
+  async parseTempToken(tokenStr: string): Promise<{ oauthId: string; provider: string }> {
+    try {
+      const payload = await this.jwtService.verifyAsync<{ oauthId: string; provider: string }>(tokenStr, {
+        secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+      });
+      return payload;
+    } catch (error) {
+      throw new Error('Invalid temp token');
+    }
+  }
+  
 }

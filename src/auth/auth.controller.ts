@@ -1,16 +1,17 @@
 // auth/auth.controller.ts
-import { Controller, Get, Post, Req, Res, Query, UseGuards, HttpStatus, Redirect } from '@nestjs/common';
+import { Controller, Get, Post, Req, Res, Query, UseGuards, HttpStatus, Redirect, Body } from '@nestjs/common';
 import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
-import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../jwt/guards/jwt-auth.guard';
+import { ConfigService } from '@nestjs/config';
+import { changeNicknameInfo } from './auth.type';
 
 @Controller('auth')
 export class AuthController {
 
   constructor(
     private readonly authService: AuthService,
-    private readonly configService: ConfigService,
+    private readonly configSerivce: ConfigService 
   ) {
    
   }
@@ -25,33 +26,22 @@ export class AuthController {
   @Get('google/callback')
   async googleCallback(
     @Query('code') code: string,
-    @Query('remember') remember = '30',
     @Res() res: Response,
   ) {
-    const expireDays = parseInt(remember);
-    
-    try {
-      const result = await this.authService.handleGoogleCallback(code, expireDays);
-      
-      // 리프레시 토큰 쿠키 설정
-      res.cookie('refresh_token', result.refreshToken, {
+      const {refreshToken , url } = await this.authService.authCallbackFlow(code)
+  
+      // ✅ 기존 계정인 경우: 리프레시 토큰 쿠키 설정
+      res.cookie('refresh_token', refreshToken, {
         httpOnly: true,
-        secure: !this.configService.get<string>('localTest'),
+        secure: !this.configSerivce.get<string>('localTest'),
         sameSite: 'strict',
-        expires: new Date(Date.now() + expireDays * 24 * 60 * 60 * 1000),
+        expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       });
-
-      // 리다이렉트 (프론트엔드로)
-      return res.redirect(
-        `http://localhost:3000?token=${result.accessToken}&new=${result.isNew}&nickname=${encodeURIComponent(result.nickname)}&id=${result.userId}`
-      );
-    } catch (error) {
-      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-        message: error.message,
-      });
-    }
+  
+      // ✅ 기존 유저: 닉네임 유무와 관계없이 로비 이동
+      return res.redirect(url)
   }
-
+  
   @Post('refresh')
   async refreshToken(@Req() req: Request, @Res() res: Response) {
       const { token, user } = await this.authService.handleRefreshToken(req);
@@ -78,8 +68,26 @@ export class AuthController {
       path: '/',
       expires: new Date(Date.now() - 3600000),
       httpOnly: true,
-      secure: !this.configService.get<string>('localTest'),
+      secure: this.configSerivce.get<string>('localTest') !== 'true',
       sameSite: 'strict',
     });
   }
+
+    @Post('nickname')
+    async setNickname(
+      @Res() res: Response,
+      @Body() body: changeNicknameInfo
+    ){
+     const {fullNickname, accessToken, refreshToken} = await this.authService.createNewNickname(body)
+
+      res.cookie('refresh_token', refreshToken, {
+        httpOnly: true,
+        secure: this.configSerivce.get<string>('LOCAL') !== 'true',
+        sameSite: 'strict',
+        path: '/',
+      });
+
+      return {fullNickname, token: accessToken}
+    }
+
 }

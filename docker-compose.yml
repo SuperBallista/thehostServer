@@ -6,3 +6,5 @@ services:
     container_name: hostgame-redis
     ports:
       - "6379:6379"
+
+

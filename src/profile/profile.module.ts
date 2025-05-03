@@ -5,7 +5,6 @@ import { ProfileService } from './profile.service';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from '../database/database.module';
 import { RedisModule } from '../redis/redis.module';
-import { TagService } from 'src/profile/tag/tag.service';
 import { EncryptionService } from 'src/common/utils/encryption.service';
 import { JwtModule } from 'src/jwt/jwt.module';
 
@@ -17,7 +16,7 @@ import { JwtModule } from 'src/jwt/jwt.module';
     JwtModule
   ],
   controllers: [ProfileController],
-  providers: [ProfileService, TagService, EncryptionService],
-  exports: [ProfileService, TagService ],
+  providers: [ProfileService, EncryptionService],
+  exports: [ProfileService ],
 })
 export class ProfileModule {}

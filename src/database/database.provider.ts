@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import * as mysql from 'mysql2/promise';
 
 @Injectable()
-export class DatabaseService implements OnModuleInit, OnModuleDestroy {
+export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
   private connection: mysql.Connection;
 
   constructor(private configService: ConfigService) {}

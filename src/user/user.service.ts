@@ -1,138 +1,113 @@
-// user/user.service.ts
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { DatabaseService } from '../database/database.provider';
-import { RedisService } from '../redis/redis.service';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { UserCacheService } from './user-cache.service';
 import { UserDto } from './dto/user.dto';
-
-export interface IUserService {
-  findOrCreateUser(
-    oauthId: string, 
-    provider: string, 
-    name: string, 
-    email: string, 
-    picture: string
-  ): Promise<{ user: UserDto; isNew: boolean }>;
-}
+import { UserRepository } from './user.repository';
+import { EncryptionService } from 'src/common/utils/encryption.service';
+import { TagService } from './tag/tag.service';
 
 @Injectable()
-export class UserService implements IUserService {
+export class UserService {
   constructor(
-    private readonly databaseService: DatabaseService,
-    private readonly userCacheService: UserCacheService,
+    private readonly userRepository: UserRepository,
+    private readonly userCache: UserCacheService,
+    private readonly encryptionService: EncryptionService,
   ) {}
 
-  async findOrCreateUser(
-    oauthId: string, 
-    provider: string, 
-    nicknameHash: string = '', 
-    encryptedNickname: string = '', 
-    iv: string = ''
-  ): Promise<{ user: UserDto; isNew: boolean }> {
-    // 사용자 조회 쿼리
-    const query = `
-      SELECT id, nickname_hash, encrypted_nickname, iv_nickname, last_connected_at 
-      FROM users 
-      WHERE oauth_provider = ? AND oauth_id = ?
-    `;
-    
-    try {
-      const result = await this.databaseService.query(query, [provider, oauthId]);
-      
-      // 사용자가 없는 경우 생성
-      if (!result || result.length === 0) {
-        const now = new Date();
-        
-        const insertResult = await this.databaseService.query(
-          `INSERT INTO users (oauth_provider, oauth_id, nickname_hash, encrypted_nickname, iv_nickname, created_at, last_connected_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [provider, oauthId, nicknameHash, encryptedNickname, iv, now, now]
-        );
-        
-        const userId = insertResult.insertId;
-        
-        const newUser: UserDto = {
-          id: userId.toString(),
-          oAuthProvider: provider,
-          oAuthId: oauthId,
-          nicknameHash: nicknameHash,
-          encryptedNickname: encryptedNickname,
-          ivNickname: iv,
-          lastConnectedAt: now,
-        };
-        
-        // 사용자 생성 후 캐시에 저장
-        await this.userCacheService.setUser(userId, newUser);
-        
-        return { user: newUser, isNew: true };
-      }
-      
-      // 기존 사용자 반환
-      const user = result[0];
-      const userId = parseInt(user.id);
-      
-      const userDto: UserDto = {
-        id: user.id.toString(),
-        oAuthProvider: provider,
-        oAuthId: oauthId,
-        nicknameHash: user.nickname_hash,
-        encryptedNickname: user.encrypted_nickname,
-        ivNickname: user.iv_nickname,
-        lastConnectedAt: user.last_connected_at,
-      };
-      
-      // 캐시에 저장
-      await this.userCacheService.setUser(userId, userDto);
-      
-      return { user: userDto, isNew: false };
-    } catch (error) {
-      throw new Error(`Failed to find or create user: ${error.message}`);
+  // ✅ 1. 계정 조회
+  async findUserByOAuthId(oauthId: string, provider: string): Promise<UserDto | null> {
+    // Redis 캐시 확인
+    const cached = await this.userCache.getUserByOAuth(provider, oauthId);
+    if (cached) return cached;
+
+    // DB 조회
+    const user = await this.userRepository.findByOAuthId(provider, oauthId);
+    if (user) {
+      await this.userCache.setUser(Number(user.id), user);
+      return user;
     }
+
+    return null;
   }
+
+  // ✅ 2. 계정 생성
+  async createUser(
+    oauthId: string,
+    provider: string,
+    nicknameHash: string,
+    encryptedNickname: string,
+    iv: string,
+  ): Promise<UserDto> {
+    const now = new Date();
+
+    const insertId = await this.userRepository.insertUser({
+      oauthId,
+      provider,
+      nicknameHash,
+      encryptedNickname,
+      iv,
+    });
+
+    const newUser: UserDto = {
+      id: insertId,
+      oAuthProvider: provider,
+      oAuthId: oauthId,
+      nicknameHash,
+      encryptedNickname,
+      ivNickname: iv,
+      lastConnectedAt: now,
+    };
+
+    await this.userCache.setUser(insertId, newUser);
+    return newUser;
+  }
+
 
   async findById(userId: number): Promise<UserDto> {
-    // 1. 먼저 Redis 캐시에서 사용자 조회
-    const cachedUser = await this.userCacheService.getUser(userId);
-    if (cachedUser) {
-      return cachedUser;
-    }
+    const cached = await this.userCache.getUser(userId);
+    if (cached) return cached;
 
-    // 2. 캐시에 없으면 데이터베이스에서 조회
-    const query = `
-      SELECT 
-        id, 
-        oauth_provider, 
-        oauth_id, 
-        nickname_hash, 
-        encrypted_nickname, 
-        iv_nickname, 
-        last_connected_at 
-      FROM users 
-      WHERE id = ?
-    `;
-    
-    const result = await this.databaseService.query(query, [userId]);
-    
-    if (!result || result.length === 0) {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
       throw new HttpException('해당 계정을 찾을 수 없습니다', HttpStatus.NOT_FOUND);
     }
-    
-    const user = result[0];
-    
-    // UserDto 객체로 변환
-    const userDto: UserDto = {
-      id: user.id.toString(),
-      oAuthProvider: user.oauth_provider,
-      oAuthId: user.oauth_id,
-      nicknameHash: user.nickname_hash,
-      encryptedNickname: user.encrypted_nickname,
-      ivNickname: user.iv_nickname,
-      lastConnectedAt: user.last_connected_at,
-    };
-    
-    // 조회 결과를 캐시에 저장
-    await this.userCacheService.setUser(userId, userDto);
-    
-    return userDto;
+
+    await this.userCache.setUser(userId, user);
+    return user;
   }
+
+  // user.service.ts
+async cacheTemporaryUser(provider: string, oauthId: string): Promise<void> {
+  const redisClient = this.userCache.getClient(); // 내부에 redisService.getClient() 래핑돼 있으면 좋음
+  const key = `temp_user:${provider}:${oauthId}`;
+
+  const data = {
+    oauth_id: oauthId,
+    provider,
+    created_at: new Date().toISOString(),
+  };
+
+  await redisClient.hset(key, data);
+  await redisClient.expire(key, 60 * 30); // 30분 유효
+}
+
+async getTemporaryUser(provider: string, oauthId: string): Promise<{ oauth_id: string; provider: string } | null> {
+  const redisClient = this.userCache.getClient();
+  const key = `temp_user:${provider}:${oauthId}`;
+
+  const result = await redisClient.hgetall(key);
+  if (!result || Object.keys(result).length === 0) {
+    return null;
+  }
+
+  return {
+    oauth_id: result.oauth_id,
+    provider: result.provider,
+  };
+}
+ async addNewAccount(oauthId:string, provider:string, nickname:string){
+  const nickname_hash = await this.encryptionService.hashString(nickname)
+  const {encrypted, iv } = await this.encryptionService.encryptNickname(nickname)
+  await this.createUser(oauthId, provider, nickname_hash,encrypted,iv)
+      }
+
 }
