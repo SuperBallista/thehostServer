@@ -39,6 +39,8 @@ export const configuration = (): any => ({
   googleClientId: process.env.GOOGLE_CLIENT_ID,
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
   googleRedirectUrl: process.env.GOOGLE_REDIRECT_URL,
+
+  frontendUrl: process.env.FRONTEND_URL
 });
 
 export default () => ({

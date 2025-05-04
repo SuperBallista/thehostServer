@@ -2,7 +2,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
-import { ProfileModule } from './profile/profile.module';
 import { UserModule } from './user/user.module';
 import { RedisModule } from './redis/redis.module';
 import { AppController } from './app.controller';
@@ -21,7 +20,6 @@ import { configuration, validationSchema  } from './config/configuration';
     RedisModule,
     UserModule,
     AuthModule,
-    ProfileModule,
     DatabaseModule
   ],
   controllers: [AppController],

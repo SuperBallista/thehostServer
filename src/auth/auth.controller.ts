@@ -5,6 +5,8 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../jwt/guards/jwt-auth.guard';
 import { ConfigService } from '@nestjs/config';
 import { changeNicknameInfo } from './auth.type';
+import { CurrentUser } from 'src/jwt/decorators/current-user.decorator';
+import { UserTypeDecorater } from 'src/common/types/jwt.type';
 
 @Controller('auth')
 export class AuthController {
@@ -33,7 +35,7 @@ export class AuthController {
       // ✅ 기존 계정인 경우: 리프레시 토큰 쿠키 설정
       res.cookie('refresh_token', refreshToken, {
         httpOnly: true,
-        secure: !this.configSerivce.get<string>('localTest'),
+        secure: !this.configSerivce.get<boolean>('localTest'),
         sameSite: 'strict',
         expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       });
@@ -76,9 +78,10 @@ export class AuthController {
     @Post('nickname')
     async setNickname(
       @Res() res: Response,
+      @CurrentUser() user : UserTypeDecorater, 
       @Body() body: changeNicknameInfo
     ){
-     const {fullNickname, accessToken, refreshToken} = await this.authService.createNewNickname(body)
+     const {fullNickname, accessToken, refreshToken} = await this.authService.createNewNickname(body, user)
 
       res.cookie('refresh_token', refreshToken, {
         httpOnly: true,

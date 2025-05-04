@@ -107,7 +107,7 @@ async getTemporaryUser(provider: string, oauthId: string): Promise<{ oauth_id: s
  async addNewAccount(oauthId:string, provider:string, nickname:string){
   const nickname_hash = await this.encryptionService.hashString(nickname)
   const {encrypted, iv } = await this.encryptionService.encryptNickname(nickname)
-  await this.createUser(oauthId, provider, nickname_hash,encrypted,iv)
+   return await this.createUser(oauthId, provider, nickname_hash,encrypted,iv)
       }
 
 }

@@ -4,13 +4,12 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from 'src/jwt/jwt.service';
 import { Request } from 'express';
 import axios from 'axios';
-import { RedisService } from '../redis/redis.service';
 import { UserService } from '../user/user.service';
-import * as crypto from 'crypto';
 import { changeNicknameInfo, GoogleUserInfo } from './auth.type';
 import { UserDto } from 'src/user/dto/user.dto';
-import { EncryptionService } from 'src/common/utils/encryption.service';
 import { TagService } from 'src/user/tag/tag.service';
+import { UserTypeDecorater } from 'src/common/types/jwt.type';
+import { EncryptionService } from 'src/common/utils/encryption.service';
 
 
 @Injectable()
@@ -19,8 +18,8 @@ export class AuthService {
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly encryptSerivce: EncryptionService,
-    private readonly tagService: TagService
+    private readonly tagService: TagService,
+    private readonly encryptionService: EncryptionService
   ) {}
 
   getGoogleAuthUrl(): string {
@@ -75,11 +74,11 @@ async authCallbackFlow(code) {
     const existingUser = await this.userService.findUserByOAuthId(userInfo.id, 'google');
     const {userId, accessToken, refreshToken, tempToken, nickname} = await this.checkExistingAccount(existingUser,userInfo.id)
     const url = await this.makeUriData(accessToken, tempToken, nickname, userId);
-    return { url: '', refreshToken: '' }
+    return { url, refreshToken }
   }
 
 
-  private async authGetGoogleOauthId(code){
+  private async authGetGoogleOauthId(code) {
     const googleOAuthConfig = {
       clientID: this.configService.get<string>('googleClientId'),
       clientSecret: this.configService.get<string>('googleClientSecret'),
@@ -87,18 +86,31 @@ async authCallbackFlow(code) {
     };
   
     try {
-      // 1. Google OAuth 토큰 요청
-      const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
+      const { clientID, clientSecret, redirectUri } = googleOAuthConfig;
+      if (!clientID || !clientSecret || !redirectUri) {
+        throw new Error('Google OAuth 설정이 잘못되었습니다 (.env 확인)');
+      }
+      
+      const params = new URLSearchParams({
         code,
-        client_id: googleOAuthConfig.clientID,
-        client_secret: googleOAuthConfig.clientSecret,
-        redirect_uri: googleOAuthConfig.redirectUri,
+        client_id: clientID,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
         grant_type: 'authorization_code',
       });
+        
+      const tokenResponse = await axios.post(
+        'https://oauth2.googleapis.com/token',
+        params.toString(),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        }
+      );
   
       const accessToken = tokenResponse.data.access_token;
   
-      // 2. 사용자 정보 요청
       const userInfoResponse = await axios.get<GoogleUserInfo>(
         'https://www.googleapis.com/oauth2/v2/userinfo',
         {
@@ -107,11 +119,12 @@ async authCallbackFlow(code) {
       );
   
       return userInfoResponse.data;
-  } catch (error) {
-    throw new HttpException('서버 오류 :' + error, HttpStatus.INTERNAL_SERVER_ERROR)
+    } catch (error) {
+      console.error('구글 토큰 요청 실패:', error.response?.data || error.message);
+      throw new HttpException('Google 인증 실패', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
-  }
-
+  
 
   async checkExistingAccount(userData:UserDto | null, oauthId:string){
     if (userData) {
@@ -121,12 +134,14 @@ async authCallbackFlow(code) {
       const jwtAccessToken = await this.jwtService.generateAccessToken(userId, '');
       const jwtRefreshToken = await this.jwtService.generateRefreshToken(userId, '');
 
+      const nickname = await this.encryptionService.decryptNickname(userData.encryptedNickname,userData.ivNickname)
+
       return {
         userId,
-        nickname: '',
+        nickname,
         accessToken: jwtAccessToken,
         refreshToken: jwtRefreshToken,
-        tempToken: '',
+        tempToken: null,
       };
     }
     else {
@@ -169,24 +184,32 @@ async handleGetMe(req: Request): Promise<any> {
 }
 
 private async makeUriData(accessToken, tempToken, nickname, userId){
-  const frontendUrl = this.configService.get<string>('frontendUrl')
+  const frontendUrl = this.configService.get<string>('frontendUrl');
   if (tempToken){
-    return {url: `${frontendUrl}?token=${tempToken}`}
+    return `${frontendUrl}?token=${tempToken}`
   } else if (accessToken && nickname && userId){
-    return {url : `${frontendUrl}?token=${accessToken}&nickname=${nickname}&userId=${userId}`}
+    return `${frontendUrl}?token=${accessToken}&nickname=${nickname}&userId=${userId}`
   } else throw new HttpException('사용자 검색 처리 중 오류가 발생하였습니다', HttpStatus.INTERNAL_SERVER_ERROR)
 }
 
-async createNewNickname(Information:changeNicknameInfo){
+async createNewNickname(Information:changeNicknameInfo, user?: UserTypeDecorater){
   this.checkCorrectNickname(Information.nickname);
   const fullNickname = await this.createFullNickname(Information.nickname)
+  let userId
   if (Information.token){ 
   const { provider, oauthId } = await this.checkTempToken(Information.token)
-  await this.userService.addNewAccount(oauthId, provider, fullNickname)
+  const userData = await this.userService.addNewAccount(oauthId, provider, fullNickname)
+  userId = Number(userData.id)
   }
-  const refreshToken = await this.jwtService.generateRefreshToken(checkId?.id, fullNickname)
-
-  return {fullNickname: '', accessToken: '', refreshToken}
+  else if (user){
+  userId = Number(user.userId)
+  }
+  else {
+  throw new HttpException('사용자 정보가 없습니다', HttpStatus.UNAUTHORIZED)
+  }
+  const refreshToken = await this.jwtService.generateRefreshToken(userId, fullNickname)
+  const accessToken = await this.jwtService.generateAccessToken(userId, fullNickname)
+  return {fullNickname, accessToken, refreshToken}
 }
 
 private checkCorrectNickname(nickname){
