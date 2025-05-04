@@ -28,10 +28,10 @@ export class JwtService {
       nickname,
     };
     
-    return this.jwtService.signAsync(payload, {
+    return encodeURIComponent(await this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
       expiresIn: `${accessExpireMinutes}m`,
-    });
+    }));
   }
 
   async generateRefreshToken(userId: number, nickname: string): Promise<string> {
@@ -42,13 +42,14 @@ export class JwtService {
       nickname,
     };
     
-    return this.jwtService.signAsync(payload, {
+    return encodeURIComponent(await this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       expiresIn: `${refreshExpireDays}d`,
-    });
+    }));
   }
 
   async parseAccessToken(tokenStr: string): Promise<AuthClaims> {
+    tokenStr = decodeURIComponent(tokenStr)
     try {
       const payload = await this.jwtService.verifyAsync<AuthClaims>(tokenStr, {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
@@ -61,6 +62,7 @@ export class JwtService {
   }
 
   async parseRefreshToken(tokenStr: string): Promise<AuthClaims> {
+    tokenStr = decodeURIComponent(tokenStr)
     try {
       const payload = await this.jwtService.verifyAsync<AuthClaims>(tokenStr, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
@@ -80,13 +82,14 @@ export class JwtService {
       provider,
     };
   
-    return this.jwtService.signAsync(payload, {
+    return encodeURIComponent(await this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
       expiresIn: `${tempTokenExpireMinutes}m`,
-    });
+    }));
   }
   
   async parseTempToken(tokenStr: string): Promise<{ oauthId: string; provider: string }> {
+    tokenStr = decodeURIComponent(tokenStr)
     try {
       const payload = await this.jwtService.verifyAsync<{ oauthId: string; provider: string }>(tokenStr, {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),

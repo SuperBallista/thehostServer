@@ -184,6 +184,7 @@ async handleGetMe(req: Request): Promise<any> {
 }
 
 private async makeUriData(accessToken, tempToken, nickname, userId){
+  nickname = encodeURIComponent(nickname)
   const frontendUrl = this.configService.get<string>('frontendUrl');
   if (tempToken){
     return `${frontendUrl}?token=${tempToken}`
