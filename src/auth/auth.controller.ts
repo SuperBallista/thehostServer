@@ -13,7 +13,7 @@ export class AuthController {
 
   constructor(
     private readonly authService: AuthService,
-    private readonly configSerivce: ConfigService 
+    private readonly configService: ConfigService 
   ) {
    
   }
@@ -31,19 +31,20 @@ export class AuthController {
     @Res() res: Response,
   ) {
       const {refreshToken , url } = await this.authService.authCallbackFlow(code)
-  
+
+    if (refreshToken){
       // ✅ 기존 계정인 경우: 리프레시 토큰 쿠키 설정
       res.cookie('refresh_token', refreshToken, {
         httpOnly: true,
-        secure: !this.configSerivce.get<boolean>('localTest'),
+        secure: !this.configService.get<boolean>('localTest'),
         sameSite: 'strict',
         expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       });
-  
-      // ✅ 기존 유저: 닉네임 유무와 관계없이 로비 이동
+    }
+      // ✅ 기존 유저: 닉네임 유무와 관계없이
       return res.redirect(url)
-  }
-  
+}
+
   @Post('refresh')
   async refreshToken(@Req() req: Request, @Res() res: Response) {
       const { token, user } = await this.authService.handleRefreshToken(req);
@@ -70,27 +71,27 @@ export class AuthController {
       path: '/',
       expires: new Date(Date.now() - 3600000),
       httpOnly: true,
-      secure: this.configSerivce.get<string>('localTest') !== 'true',
+      secure: this.configService.get<string>('localTest') !== 'true',
       sameSite: 'strict',
     });
   }
 
-    @Post('nickname')
-    async setNickname(
-      @Res() res: Response,
-      @CurrentUser() user : UserTypeDecorater, 
-      @Body() body: changeNicknameInfo
-    ){
-     const {fullNickname, accessToken, refreshToken} = await this.authService.createNewNickname(body, user)
-
-      res.cookie('refresh_token', refreshToken, {
-        httpOnly: true,
-        secure: this.configSerivce.get<string>('LOCAL') !== 'true',
-        sameSite: 'strict',
-        path: '/',
-      });
-
-      return {fullNickname, token: accessToken}
-    }
-
+  @Post('nickname')
+  async setNickname(
+    @Res() res: Response,
+    @CurrentUser() user: UserTypeDecorater, 
+    @Body() body: changeNicknameInfo
+  ) {
+    const { url, refreshToken } = await this.authService.createNewNickname(body, user);
+  
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: this.configService.get<string>('LOCAL') !== 'true',
+      sameSite: 'strict',
+      path: '/',
+    });
+  
+    return res.json({ url });
+  }
+  
 }

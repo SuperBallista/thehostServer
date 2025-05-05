@@ -210,7 +210,8 @@ async createNewNickname(Information:changeNicknameInfo, user?: UserTypeDecorater
   }
   const refreshToken = await this.jwtService.generateRefreshToken(userId, fullNickname)
   const accessToken = await this.jwtService.generateAccessToken(userId, fullNickname)
-  return {fullNickname, accessToken, refreshToken}
+  const url = await this.makeUriData(accessToken, null, fullNickname, userId)
+  return {refreshToken, url}
 }
 
 private checkCorrectNickname(nickname){
