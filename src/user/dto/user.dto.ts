@@ -3,9 +3,10 @@ export interface UserDto {
     id: number;
     oAuthProvider: string;
     oAuthId: string;
-    nicknameHash: string;
-    encryptedNickname: string;
-    ivNickname: string;
+    nicknameHash?: string;
+    encryptedNickname?: string;
+    ivNickname?: string;
+    nickname?: string;
     lastConnectedAt: Date;
   }
 

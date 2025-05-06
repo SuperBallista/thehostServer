@@ -1,0 +1,11 @@
+{
+    "background": "#1F1F1F",              
+    "font": "#F5F5F5",                      
+    "default-title-background": "#B91C1C", 
+    "btn-default": "#DC2626",            
+    "btn-default-hover": "#B91C1C",   
+    "btn-cancel": "#4B5563",               
+    "btn-cancel-hover": "#374151",    
+    "btn-text": "#FFFFFF"             
+  }
+  

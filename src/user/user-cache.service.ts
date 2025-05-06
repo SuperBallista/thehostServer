@@ -2,10 +2,13 @@
 import { Injectable } from '@nestjs/common';
 import { RedisService } from '../redis/redis.service';
 import { UserDto } from './dto/user.dto';
+import { EncryptionService } from 'src/common/utils/encryption.service';
 
 @Injectable()
 export class UserCacheService {
-  constructor(private readonly redisService: RedisService) {}
+  constructor(private readonly redisService: RedisService,
+              private readonly encryptionService: EncryptionService
+  ) {}
 
   async getUser(userId: number): Promise<UserDto | null> {
     const redisClient = this.redisService.getClient();
@@ -21,9 +24,7 @@ export class UserCacheService {
       id: Number(result.id),
       oAuthProvider: result.oauth_provider,
       oAuthId: result.oauth_id,
-      nicknameHash: result.nickname_hash,
-      encryptedNickname: result.encrypted_nickname,
-      ivNickname: result.iv_nickname,
+      nickname: result.nickname,
       lastConnectedAt: new Date(result.last_connected_at),
     };
 
@@ -33,14 +34,20 @@ export class UserCacheService {
   async setUser(userId: number, user: UserDto): Promise<void> {
     const redisClient = this.redisService.getClient();
     const key = `user:${userId}`;
+    let nickname
+
+    if (!user.encryptedNickname||!user.ivNickname) {
+     nickname = user.nickname
+    } else {
+     nickname = this.encryptionService.decryptNickname(user.encryptedNickname, user.ivNickname)
+    }
+
   
     const data = {
       id: user.id.toString(),
       oauth_provider: user.oAuthProvider,
       oauth_id: user.oAuthId,
-      nickname_hash: user.nicknameHash,
-      encrypted_nickname: user.encryptedNickname,
-      iv_nickname: user.ivNickname,
+      nickname,
       last_connected_at: user.lastConnectedAt.toISOString(),
     };
   

@@ -3,7 +3,6 @@ import { UserCacheService } from './user-cache.service';
 import { UserDto } from './dto/user.dto';
 import { UserRepository } from './user.repository';
 import { EncryptionService } from 'src/common/utils/encryption.service';
-import { TagService } from './tag/tag.service';
 
 @Injectable()
 export class UserService {

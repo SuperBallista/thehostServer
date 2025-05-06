@@ -10,6 +10,7 @@ import { UserDto } from 'src/user/dto/user.dto';
 import { TagService } from 'src/user/tag/tag.service';
 import { UserTypeDecorater } from 'src/common/types/jwt.type';
 import { EncryptionService } from 'src/common/utils/encryption.service';
+import { UserCacheService } from 'src/user/user-cache.service';
 
 
 @Injectable()
@@ -19,7 +20,8 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly tagService: TagService,
-    private readonly encryptionService: EncryptionService
+    private readonly encryptionService: EncryptionService,
+    private readonly userCacheService: UserCacheService
   ) {}
 
   getGoogleAuthUrl(): string {
@@ -73,6 +75,7 @@ async authCallbackFlow(code) {
    const userInfo = await this.authGetGoogleOauthId(code)
     const existingUser = await this.userService.findUserByOAuthId(userInfo.id, 'google');
     const {userId, accessToken, refreshToken, tempToken, nickname} = await this.checkExistingAccount(existingUser,userInfo.id)
+    if (existingUser) await this.userCacheService.setUser(userId, existingUser)
     const url = await this.makeUriData(accessToken, tempToken, nickname, userId);
     return { url, refreshToken }
   }
@@ -129,12 +132,22 @@ async authCallbackFlow(code) {
   async checkExistingAccount(userData:UserDto | null, oauthId:string){
     if (userData) {
       const userId = Number(userData.id);
-  
-      // 4-1. 기존 사용자라면 Access/Refresh Token 발급
-      const jwtAccessToken = await this.jwtService.generateAccessToken(userId, '');
-      const jwtRefreshToken = await this.jwtService.generateRefreshToken(userId, '');
 
-      const nickname = await this.encryptionService.decryptNickname(userData.encryptedNickname,userData.ivNickname)
+      let nickname:string | undefined
+
+      const encryptedData = userData.encryptedNickname
+      const iv = userData.ivNickname
+
+      if (encryptedData&& iv) {
+        nickname = this.encryptionService.decryptNickname(encryptedData, iv)
+      }
+        nickname = nickname? nickname : userData.nickname? userData.nickname : '오류 발생'; 
+
+        if (!nickname) throw new HttpException('DB에 사용자 정보에 오류가 있습니다', HttpStatus.INTERNAL_SERVER_ERROR)
+
+      // 4-1. 기존 사용자라면 Access/Refresh Token 발급
+      const jwtAccessToken = await this.jwtService.generateAccessToken(userId, nickname);
+      const jwtRefreshToken = await this.jwtService.generateRefreshToken(userId, nickname);
 
       return {
         userId,

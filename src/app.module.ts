@@ -7,6 +7,7 @@ import { RedisModule } from './redis/redis.module';
 import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
 import { configuration, validationSchema  } from './config/configuration';
+import { SocketModule } from './socket/socket.module';
 
 @Module({
   imports: [
@@ -20,7 +21,8 @@ import { configuration, validationSchema  } from './config/configuration';
     RedisModule,
     UserModule,
     AuthModule,
-    DatabaseModule
+    DatabaseModule,
+    SocketModule
   ],
   controllers: [AppController],
   providers: [],

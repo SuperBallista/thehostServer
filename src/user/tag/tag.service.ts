@@ -1,36 +1,15 @@
 // profile/tag/tag.service.ts
 import { Injectable } from '@nestjs/common';
 import { RedisService } from '../../redis/redis.service';
+import { encodeBase32 } from 'src/utils/base32';
 
 @Injectable()
 export class TagService {
   // 상수 정의
   private readonly MAX_PER_TAG = 128;
-  private readonly BASE32_CHARSET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-  private readonly TAG_PADDING_WIDTH = 4;
 
   constructor(private readonly redisService: RedisService) {}
 
-  private encodeBase32(n: number): string {
-    if (n === 0) {
-      return '0';
-    }
-    
-    let result = '';
-    let num = n;
-    
-    while (num > 0) {
-      result = this.BASE32_CHARSET[num % 32] + result;
-      num = Math.floor(num / 32);
-    }
-    
-    // 패딩 추가
-    while (result.length < this.TAG_PADDING_WIDTH) {
-      result = '0' + result;
-    }
-    
-    return result;
-  }
 
   async generateTag(): Promise<string> {
     const redisClient = this.redisService.getClient();
@@ -63,7 +42,7 @@ export class TagService {
       
       // 새 태그 생성
       const cursor = await redisClient.incr('nickname-tag:cursor');
-      const tag = this.encodeBase32(cursor);
+      const tag = encodeBase32(cursor);
       
       // 태그 사용자 수 1로 시작
       await redisClient.set(`nickname-tag:${tag}`, '1');
