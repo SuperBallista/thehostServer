@@ -1,5 +1,5 @@
 // src/common/store/pageStore.ts
-import { get, writable } from 'svelte/store';
+import { writable } from 'svelte/store';
 import type { Room } from '../../page/lobby/lobby.type';
 
 export type Page =
@@ -12,10 +12,8 @@ export type Page =
   
 export const pageStore = writable<Page>('login');
 
-type location = 'lobby' | 'room' | 'game'
 
-export const locationState = writable<location>('lobby')
-
+export const locationState = writable<string>('lobby')
 
 
 export const currentRoom = writable<Room|null>(null);

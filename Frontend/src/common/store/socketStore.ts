@@ -4,7 +4,7 @@ import  io  from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { closeMessageBox, showMessageBox } from '../messagebox/customStore';
 import { authStore } from './authStore';
-import { locationState, currentRoom } from './pageStore';
+import { locationState, currentRoom, pageStore } from './pageStore';
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const wsHost = window.location.host;
@@ -18,19 +18,18 @@ export const socketStore = writable<Socket | null>(null);
 
 export const roomId = writable<string | null>(null);
 
+
 export function initSocket(): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (socket && socket.connected) {
-      socketStore.set(socket);
+    const current = get(socketStore);
+    if (current?.connected) {
       closeMessageBox();
-      return resolve(); // ✅ 이미 연결되어 있으면 즉시 resolve
+      return resolve();
     }
 
     socket = io(wsUrl, {
       auth: {
         token: get(authStore).token,
-        locationState: get(locationState),
-        currentRoom: get(currentRoom)
       },
       transports: ['websocket'],
       reconnection: false,
@@ -41,10 +40,27 @@ export function initSocket(): Promise<void> {
     socket.on('connect', () => {
       console.log('✅ Socket.IO 연결됨');
       reconnectAttempts = 0;
-      socket.emit('lobby:getRoomList'); // 최초 연결 시점에 목록 요청
-      resolve(); // ✅ 연결 완료 시 resolve
+    
+      socket.emit('location:restore'); // 👈 명시적 요청
+    
+      socket.on('location:restore', ({ state, roomInfo }) => {
+        console.log('📍 복원 위치:', state, roomInfo);
+        locationState.set(state);
+    
+        if (state === 'room' && roomInfo) {
+          currentRoom.set(roomInfo);
+          pageStore.set('room');
+        } else if (state === 'game') {
+          currentRoom.set(roomInfo);
+          pageStore.set('game');
+        } else {
+          pageStore.set('lobby');
+        }
+      });
+    
+      resolve(); // 연결 완료
     });
-
+    
     socket.on('disconnect', () => {
       console.warn('❌ Socket.IO 연결 종료됨');
       socketStore.set(null);
@@ -55,7 +71,7 @@ export function initSocket(): Promise<void> {
         reconnectTimeout = setTimeout(() => {
           reconnectAttempts++;
           console.log(`🔁 Socket 재연결 시도 (${reconnectAttempts})`);
-          initSocket().catch(() => {}); // 재연결 시 실패 무시
+          initSocket().catch((err) => console.error('재연결 실패:', err));
         }, delay);
       } else {
         showMessageBox('error', '연결 실패', '서버와 연결할 수 없습니다.');
@@ -64,7 +80,7 @@ export function initSocket(): Promise<void> {
 
     socket.on('connect_error', (err: Error) => {
       console.error('❗ Socket.IO 연결 오류:', err.message);
-      reject(err); // ✅ 연결 실패 시 reject
+      reject(err);
     });
 
     socket.on('message', (data: string) => {

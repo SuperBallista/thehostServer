@@ -24,14 +24,28 @@ export class LobbyGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleConnection(@ConnectedSocket() client: Socket) {
     try {
-      const { userId } = await this.connectionService.verifyAndTrackConnection(client);
-      console.log(`✅ 유저 ${userId} 연결됨`);
+      await this.connectionService.verifyAndTrackConnection(client); // 저장만
+      console.log(`✅ 유저 ${client.data.userId} 연결됨`);
     } catch (err) {
       console.warn(err);
       client.disconnect();
     }
   }
   
+  @SubscribeMessage('location:restore')
+async handleRestoreRequest(@ConnectedSocket() client: Socket) {
+  const userId = client.data.userId;
+  if (!userId) {
+    client.emit('location:restore', { state: 'lobby', roomInfo: null });
+    return;
+  }
+
+  const { state, roomInfo } = await this.connectionService.getLocationData(userId);
+  client.emit('location:restore', { state, roomInfo });
+}
+
+
+    
   async handleDisconnect(@ConnectedSocket() client: Socket) {
     await this.connectionService.handleDisconnect(client);
     console.log(`❌ 유저 ${client.data?.userId} 접속 해제`);
@@ -70,5 +84,7 @@ export class LobbyGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const roomList = await this.lobbyService.getRooms(page);
     client.emit('lobby:roomList', roomList);
   }
+
+  
     
   }
