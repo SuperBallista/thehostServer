@@ -19,7 +19,7 @@ export class ConnectionService {
     client.data.userId = payload.userId;
     client.data.nickname = payload.nickname;
   
-    await this.redisService.set(`online:${payload.userId}`, client.id, 300);
+    await this.redisService.set(`online:${payload.userId}`, client.id);
   
     // 기존 locationState를 Redis에서 가져옴
     const raw = await this.redisService.get(`locationState:${payload.userId}`);
@@ -43,15 +43,29 @@ export class ConnectionService {
     return { userId: payload.userId, state, roomInfo };
   }
 
-  
-  async handleDisconnect(client: Socket): Promise<void> {
+  async handleDisconnect(client: Socket) {
     const userId = client.data?.userId;
-    if (userId) {
-      await this.redisService.del(`online:${userId}`);
-      // locationState는 자동 만료되도록 냅둬도 됨
-    }
+    if (!userId) return;
+  
+    // 유예 시간 5초 후 처리
+    setTimeout(async () => {
+      const isReconnected = await this.checkUserStillConnected(userId);
+      if (!isReconnected) {
+        // 여기서 진짜 유저 퇴장 처리
+        await this.redisService.del(`online:${userId}`);
+        console.log(`❌ 유저 ${userId} 완전 퇴장 처리`);
+      } else {
+        console.log(`✅ 유저 ${userId} 재접속 감지 → 퇴장 취소`);
+      }
+    }, 5000); // 5초 유예
+  }
+
+  async checkUserStillConnected(userId: number): Promise<boolean> {
+    const socketId = await this.redisService.get(`user-socket:${userId}`);
+    return !!socketId;
   }
   
+    
   async getLocationData(userId: number) {
     const raw = await this.redisService.get(`locationState:${userId}`);
     if (!raw) return { state: 'lobby', roomInfo: null };

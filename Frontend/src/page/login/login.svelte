@@ -1,8 +1,10 @@
 <script lang="ts">
   import { THEME } from '../../common/constant/theme';
   import { pageStore } from '../../common/store/pageStore';
-  import { restoreAuthFromSessionAndCookie, setAuthSuccess } from '../../common/store/authStore';
+  import { authStore, restoreAuthFromSessionAndCookie, setAuthSuccess } from '../../common/store/authStore';
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
+  import { initSocket } from '../../common/store/socketStore';
 
   function goToGoogleLogin() {
     window.location.href = '/api/auth/google/login';
@@ -40,7 +42,12 @@ onMount( async () => {
   const result = getIAInformationFromUrl()
   if (result){
    await restoreAuthFromSessionAndCookie()
+   const auth = get(authStore);
+    if (auth.token) {
+      await initSocket(); // ✅ WebSocket 최초 연결
+    }
   }
+
 
 });  
   </script>

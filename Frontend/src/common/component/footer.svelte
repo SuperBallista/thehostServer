@@ -3,18 +3,7 @@
   import { roomId } from '../store/socketStore';
     import { pageStore, locationState, currentRoom } from "../store/pageStore";
     import { showMessageBox } from "../messagebox/customStore";
-    import { initSocket } from "../store/socketStore";
-    import { authStore } from "../store/authStore";
-    import { onMount } from "svelte";
-    import { get } from "svelte/store";
 
-
-    onMount(async () => {
-    const auth = get(authStore);
-    if (auth.token) {
-      await initSocket(); // ✅ WebSocket 최초 연결
-    }
-  });
 
 
 

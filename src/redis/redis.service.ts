@@ -7,13 +7,16 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private redisClient: Redis;
 
 
-  onModuleInit() {
+  async onModuleInit() {
     this.redisClient = new Redis({
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT || '6379', 10),
     });
+  
+    await this.redisClient.flushdb(); // ✅ 전체 초기화
+    console.log('🧹 Redis 전체 초기화 완료');
   }
-
+  
   onModuleDestroy() {
     this.redisClient.disconnect();
   }
@@ -72,4 +75,5 @@ async smembers(key: string): Promise<string[]> {
 pipeline() {
   return this.redisClient.pipeline();
 }
+
 }

@@ -51,7 +51,7 @@ export class LobbyService {
 
       
     // 위치 기록
-    await this.redisService.set(`locationState:${hostUserId}`, 'room ' + roomData.id, 300);
+    await this.redisService.set(`locationState:${hostUserId}`, JSON.stringify({locationState: 'host', roomId: roomData.id}), 300);
   
     // PubSub 브로드캐스트
     redisPublisher.publish('room:create', JSON.stringify(roomData.id));

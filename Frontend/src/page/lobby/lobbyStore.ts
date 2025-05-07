@@ -19,7 +19,7 @@ export async function listenRoomListUpdates() {
   socket.off('lobby:roomList');
   socket.on('lobby:roomList', (roomList) => {
     console.log(roomList)
-    rooms.set(roomList);
+    rooms.set(roomList);  
   });
 }
 
