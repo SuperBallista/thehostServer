@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: mysql8.4
+    ports:
+      - "3406:3306"  # 호스트의 3406 포트를 컨테이너의 3306에 연결
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass          # 루트 비밀번호
+      MYSQL_DATABASE: app_db                 # 생성할 기본 DB
+      MYSQL_USER: app_user                   # 생성할 사용자 이름
+      MYSQL_PASSWORD: app_pass               # 사용자 비밀번호
+    volumes:
+      - mysql_data:/var/lib/mysql            # 데이터 지속 저장
+    restart: unless-stopped
+
+volumes:
+  mysql_data:

@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "get:front": "npm --prefix frontend run build && rimraf front && copyfiles -u 2 frontend/front/**/* front",
+    "get:front": "npm --prefix Frontend run build && rimraf front && copyfiles -u 2 \"Frontend/front/**/*\" front",
     "build": "npm run get:front && nest build && npm run copy:sql",
     "copy:sql": "copyfiles -u 1 src/**/*.sql dist",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
