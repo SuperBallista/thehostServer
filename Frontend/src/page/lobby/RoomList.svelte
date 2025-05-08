@@ -4,16 +4,37 @@
     import { rooms, onJoinRoom, getRoomList, listenRoomListUpdates } from './lobbyStore'
     import { awaitSocketReady } from '../../common/utils/awaitSocketReady';
     import { get } from 'svelte/store';
+    import { currentRoom, locationState, pageStore } from '../../common/store/pageStore';
+    import { roomId } from '../../common/store/socketStore';
+    import { showMessageBox } from '../../common/messagebox/customStore';
 
     onMount(async ()=>{
-    await awaitSocketReady()
-    await listenRoomListUpdates()
+    await awaitSocketReady();
+    await listenRoomListUpdates();
     await getRoomList(1);
+    await moveToBeforePage();
     setTimeout(() => {
     console.log('🧪 get(rooms):', get(rooms));
   }, 1000); // emit async 대응
 })
-  
+
+async function moveToBeforePage() {
+  if (($pageStore !== 'room' && $pageStore !== 'game')&& $roomId !== null) {
+    locationState.set('lobby')
+    currentRoom.set(null)
+  } else if ($pageStore === 'room' && $roomId !== null){
+    locationState.set('room')
+  } else if ($pageStore === 'game' && $roomId !== null){
+    locationState.set('game')
+  } else if ($locationState !== 'lobby' && $roomId !== null) {
+    locationState.set("lobby")
+    pageStore.set('lobby')
+    showMessageBox('error', '방 정보 오류', '방 정보가 없어 로비로 이동합니다')
+  }    
+ } 
+
+
+
   
   </script>
   

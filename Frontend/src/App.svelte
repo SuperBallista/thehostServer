@@ -6,6 +6,9 @@
   import NewUser from "./page/newUser/newUser.svelte";
   import WaitRoom from "./page/waitRoom/waitRoom.svelte";
 
+  
+
+
 </script>
 <BoxOverlay/>
 
