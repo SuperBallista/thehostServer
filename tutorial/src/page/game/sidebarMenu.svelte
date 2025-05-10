@@ -1,6 +1,11 @@
 <script lang="ts">
     import { THEME } from "../../common/constant/theme";
 
+          export let onOpenInventory: () => void;
+    export let onOpenAction: () => void;
+    export let onExit: () => void;
+  
+
 
   let openSection: 'inventory' | 'action' | null = null;
   const toggle = (section: typeof openSection) => {

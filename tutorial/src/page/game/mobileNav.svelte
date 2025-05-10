@@ -1,4 +1,11 @@
 <script lang="ts">
+
+        export let onOpenInventory: () => void;
+    export let onOpenAction: () => void;
+    export let onOpenSurvivors: () => void;
+    export let onExit: () => void;
+  
+
   </script>
   
   <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 flex justify-around items-center h-14">

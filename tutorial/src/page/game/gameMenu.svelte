@@ -1,6 +1,6 @@
 <script lang="ts">
-    import SidebarMenu from './SidebarMenu.svelte';
-    import MobileNav from './MobileNav.svelte';
+    import SidebarMenu from './sidebarMenu.svelte';
+    import MobileNav from './mobileNav.svelte';
     import { onMount } from 'svelte';
     import { writable } from 'svelte/store';
   
@@ -17,6 +17,8 @@
       window.addEventListener('resize', check);
       return () => window.removeEventListener('resize', check);
     });
+  
+
   </script>
   
   {#if $isMobile}
