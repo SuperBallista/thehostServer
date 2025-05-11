@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [svelte(), tailwindcss()],
   server: {
     host: '127.0.0.1', // IPv4 루프백 주소
-    port: 3000
+    port: 4000
   }
 })
 

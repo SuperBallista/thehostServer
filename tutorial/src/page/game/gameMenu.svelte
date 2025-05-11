@@ -8,6 +8,7 @@
     export let onOpenAction: () => void;
     export let onOpenSurvivors: () => void;
     export let onExit: () => void;
+    export let onSkip: () => void;
   
     const isMobile = writable(false);
   
@@ -26,12 +27,12 @@
       {onOpenInventory}
       {onOpenAction}
       {onOpenSurvivors}
+      {onSkip}
       {onExit}
     />
   {:else}
     <SidebarMenu
-      {onOpenInventory}
-      {onOpenAction}
+      {onSkip}
       {onExit}
     />
   {/if}

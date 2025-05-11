@@ -3,18 +3,21 @@
 
   import { afterUpdate } from 'svelte';
   import { THEME } from '../../common/constant/theme';
+  
 
-  let container: HTMLDivElement;
+  let targetEl: HTMLElement;
 
   afterUpdate(() => {
-    container?.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    targetEl?.scrollTo({ top: targetEl.scrollHeight, behavior: 'smooth' });
   });
 </script>
+<div id='tutorialStep1' bind:this={targetEl} class={`rounded-xl flex-1 overflow-y-auto p-4 space-y-2 chat-log ${THEME.bgTertiary} ${THEME.textPrimary}`}>
 
-<div bind:this={container} class={`rounded-xl flex-1 overflow-y-auto p-4 space-y-2 chat-log ${THEME.bgTertiary} ${THEME.textPrimary}`}>
+
   {#each messages as msg}
     <div class={msg.system ? THEME.textAccent : THEME.textPrimary}>{msg.content}</div>
   {/each}
+ 
 </div>
 
 <style>
