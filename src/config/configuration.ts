@@ -40,6 +40,10 @@ export const configuration = (): any => ({
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
   googleRedirectUrl: process.env.GOOGLE_REDIRECT_URL,
 
+    // ✅ Redis 추가
+  redisHost: process.env.REDIS_HOST || 'localhost',
+  redisPort: parseInt(process.env.REDIS_PORT || '6379', 10),
+
   frontendUrl: process.env.FRONTEND_URL
 });
 

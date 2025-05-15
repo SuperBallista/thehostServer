@@ -19,6 +19,6 @@
 <NewUser/>
 {:else if $pageStore === 'lobby'}
 <Lobby/>
-{:else if $pageStore === 'room'}
+{:else if $pageStore === 'room' || $pageStore === 'host'}
 <WaitRoom/>
 {/if}

@@ -1,16 +1,18 @@
 // src/socket/lobby.service.ts
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { redisPublisher } from '../redis/redis.pubsub';
+import { Injectable } from '@nestjs/common';
+import { RedisPubSubService } from '../redis/redisPubSub.service';
 import { Room, userShortInfo } from './lobby.types';
 import { RedisService } from 'src/redis/redis.service';
 import { encodeBase32 } from 'src/utils/base32';
+import { WsException } from '@nestjs/websockets';
 
 
 @Injectable()
 export class LobbyService {
   private rooms: Map<string, Room> = new Map();
   constructor(
-    private readonly redisService: RedisService
+    private readonly redisService: RedisService,
+    private readonly redisPubSubService: RedisPubSubService
   ) {}
 
   private generateRoomTag():number{
@@ -30,7 +32,7 @@ export class LobbyService {
         return roomNameAndTag
       }
     }
-    throw new HttpException('방 태그 생성에 실패했습니다. 잠시 후 재시도하거나 방제를 바꾸어서 재시도 해보세요', HttpStatus.CONFLICT)
+    throw new WsException('방 태그 생성에 실패했습니다. 잠시 후 재시도하거나 방제를 바꾸어서 재시도 해보세요')
   }
 
   async createRoom(hostUserId: number, name: string, hostUser: userShortInfo): Promise<Room> {
@@ -45,7 +47,7 @@ export class LobbyService {
     this.rooms.set(roomData.id, roomData);
   
     // Redis 저장
-    await this.redisService.set(`room:find:${roomData.id}`, JSON.stringify(roomData));
+    await this.redisService.set(`room:find:${roomData.id}`, JSON.stringify(roomData),3600);
 
     await this.redisService.set(`room:list:${Date.now()}`, roomData.id);
 
@@ -54,7 +56,7 @@ export class LobbyService {
     await this.redisService.set(`locationState:${hostUserId}`, JSON.stringify({locationState: 'host', roomId: roomData.id}), 300);
   
     // PubSub 브로드캐스트
-    redisPublisher.publish('room:create', JSON.stringify(roomData.id));
+    this.redisPubSubService.publisher.publish('room:create', JSON.stringify(roomData.id));
   
     return roomData;
   }
@@ -99,4 +101,9 @@ export class LobbyService {
       .filter((room): room is Room => room !== null);
   }
     
+      async joinRoom(roomId:string){
+       const roomData = JSON.parse(await this.redisService.get(`room:find:${roomId}`) as string)
+        return roomData
+      }
+
       }

@@ -4,11 +4,36 @@
     import { closeMessageBox, showMessageBox } from '../../common/messagebox/customStore';
     import { THEME } from '../../common/constant/theme';
     import PlayerCard from './playerCard.svelte';
+    import { awaitSocketReady } from '../../common/utils/awaitSocketReady';
   
     onMount(async () => {
       showMessageBox('loading', '방 정보 열기', '방 정보를 서버로부터 가져옵니다');
       closeMessageBox();
     });
+
+
+    async function leaveRoom() {
+    // 메시지 박스 보여주고 이후 라우팅 또는 상태 초기화 처리
+    showMessageBox('loading', '방 나가기', '로비로 이동 중입니다...');
+    const socket = await awaitSocketReady();
+    socket.emit('location:update', {
+  state: 'lobby',
+  roomId: null,
+});    
+    closeMessageBox();
+}
+
+async function startGame() {
+  showMessageBox('loading', '게임 시작', '게임을 시작합니다...');
+
+  // TODO: 서버에 게임 시작 요청 보내기
+  // 예: socket.emit('room:start', { roomId: $currentRoom.id });
+
+  closeMessageBox();
+}
+
+
+
   </script>
   
   <!-- ✅ 전체 레이아웃: 어두운 배경 + 중앙 정렬 -->
@@ -33,6 +58,21 @@
         <span class={`${THEME.textSecondary} font-semibold`}>참가자 수:</span>
         <span class={`${THEME.textWhite} ml-2`}>{$currentRoom?.players.length}명</span>
       </p>
+
+      <div class="mt-4 text-center flex justify-evenly">
+  <button
+    on:click={startGame}
+    class={`px-4 py-2 ${THEME.bgPrimary} text-white font-semibold rounded-lg shadow-md transition`}
+  >
+    🚀 게임 시작
+  </button>
+  <button
+    on:click={leaveRoom}
+    class={`px-4 py-2 ${THEME.bgSecondary} text-white font-semibold rounded-lg shadow-md transition`}
+  >
+    🔙 방 나가기
+  </button>
+</div>
   
 <!-- 카드 영역 -->
 <div class="mt-6">

@@ -24,9 +24,28 @@ export async function listenRoomListUpdates() {
 }
 
 
-export async function onJoinRoom(roomId:string) {
-    
+export async function onJoinRoom(roomId: string) {
+  const socket = await awaitSocketReady();
+
+  // 서버에 위치 상태 먼저 등록
+  socket.emit('location:update', {
+    state: 'room',
+    roomId,
+  });
+
+  // 방 입장 요청 (roomId 명시적으로 같이 전송)
+  socket.emit('lobby:joinRoom', { roomId }, (roomData: Room | null) => {
+    if (roomData) {
+      currentRoom.set(roomData);
+      locationState.set('room');
+      pageStore.set('room');
+    } else {
+      console.warn('❌ 방 입장 실패: 방 정보를 받아오지 못했습니다.');
+      showMessageBox('error', '방 입장 실패', '해당 방에 입장할 수 없습니다.');
+    }
+  });
 }
+
 
 
 export async function makeRoom() {

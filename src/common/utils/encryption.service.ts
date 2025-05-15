@@ -38,20 +38,20 @@ export class EncryptionService {
   }
 
   // 닉네임 복호화
-  decryptNickname(encryptedBase64: string, ivBase64: string): string {
-    try {
-      const rawKey = Buffer.from(this.configService.get<string>('AES_SECRET_KEY') as string, 'base64');
-      const iv = Buffer.from(ivBase64, 'base64');
-      const encrypted = Buffer.from(encryptedBase64, 'base64');
-      
-      const decipher = crypto.createDecipheriv('aes-256-cbc', rawKey, iv);
-      
-      let decrypted = decipher.update(encrypted);
-      decrypted = Buffer.concat([decrypted, decipher.final()]);
-      
-      return decrypted.toString('utf8');
-    } catch (error) {
-      throw new Error(`복호화 실패: ${error.message}`);
-    }
+decryptNickname(encryptedBase64: string | Buffer, ivBase64: string | Buffer): string {
+  try {
+    const rawKey = Buffer.from(this.configService.get<string>('AES_SECRET_KEY') as string, 'base64');
+
+    const iv = typeof ivBase64 === 'string' ? Buffer.from(ivBase64, 'base64') : ivBase64;
+    const encrypted = typeof encryptedBase64 === 'string' ? Buffer.from(encryptedBase64, 'base64') : encryptedBase64;
+
+    const decipher = crypto.createDecipheriv('aes-256-cbc', rawKey, iv);
+    let decrypted = decipher.update(encrypted);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+
+    return decrypted.toString('utf8');
+  } catch (error) {
+    throw new Error(`복호화 실패: ${error.message}`);
   }
+}
 }

@@ -1,8 +1,9 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { UserCacheService } from './user-cache.service';
 import { UserDto } from './dto/user.dto';
 import { UserRepository } from './user.repository';
 import { EncryptionService } from 'src/common/utils/encryption.service';
+import { WsException } from '@nestjs/websockets';
 
 @Injectable()
 export class UserService {
@@ -67,7 +68,7 @@ export class UserService {
 
     const user = await this.userRepository.findById(userId);
     if (!user) {
-      throw new HttpException('해당 계정을 찾을 수 없습니다', HttpStatus.NOT_FOUND);
+      throw new WsException('해당 계정을 찾을 수 없습니다');
     }
 
     await this.userCache.setUser(userId, user);

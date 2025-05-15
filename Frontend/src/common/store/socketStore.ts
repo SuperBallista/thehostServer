@@ -41,23 +41,21 @@ export function initSocket(): Promise<void> {
       console.log('✅ Socket.IO 연결됨');
       reconnectAttempts = 0;
     
-      socket.emit('location:restore'); // 👈 명시적 요청
-    
-      socket.on('location:restore', ({ state, roomInfo }) => {
-        console.log('📍 복원 위치:', state, roomInfo);
-        locationState.set(state);
-    
-        if (state === 'room' && roomInfo) {
-          currentRoom.set(roomInfo);
-          pageStore.set('room');
-        } else if (state === 'game') {
-          currentRoom.set(roomInfo);
-          pageStore.set('game');
-        } else {
-          pageStore.set('lobby');
-        }
-      });
-    
+socket.off('location:restore');
+socket.on('location:restore', ({ state, roomInfo, roomId }) => {
+  console.log('📍 복원 위치:', state, roomId, roomInfo);
+  locationState.set(state);
+
+  if (roomInfo) {
+    currentRoom.set(roomInfo);
+    pageStore.set(state);
+  } else {
+    pageStore.set('lobby');
+  }
+});
+
+socket.emit('location:restore'); // ← 이벤트 핸들러 준비된 다음에 emit
+
       resolve(); // 연결 완료
     });
     

@@ -5,6 +5,7 @@ import type { Room } from '../../page/lobby/lobby.type';
 export type Page =
   | 'login'
   | 'lobby'
+  | 'host'
   | 'room'
   | 'game'
   | 'result'

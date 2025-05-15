@@ -7,6 +7,7 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
+  WsException,
 } from '@nestjs/websockets';
 import { LobbyService } from './lobby.service';
 import { Server, Socket } from 'socket.io';
@@ -24,8 +25,18 @@ export class LobbyGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleConnection(@ConnectedSocket() client: Socket) {
     try {
-      await this.connectionService.verifyAndTrackConnection(client); // 저장만
+    const { userId, locationState, roomId } =  await this.connectionService.verifyAndTrackConnection(client); // 저장만
       console.log(`✅ 유저 ${client.data.userId} 연결됨`);
+
+        // 클라이언트에 위치 상태 전송
+  client.emit('locationState', {
+    locationState,
+    roomId,
+  });
+
+    console.log(`유저 ${userId} 접속됨 (${locationState}:${roomId})`)
+
+
     } catch (err) {
       console.warn(err);
       client.disconnect();
@@ -40,8 +51,8 @@ async handleRestoreRequest(@ConnectedSocket() client: Socket) {
     return;
   }
 
-  const { state, roomInfo } = await this.connectionService.getLocationData(userId);
-  client.emit('location:restore', { state, roomInfo });
+  const { locationState, roomInfo, roomId } = await this.connectionService.getLocationData(userId);
+  client.emit('location:restore', { state:locationState, roomInfo: roomInfo, roomId });
 }
 
 
@@ -85,6 +96,40 @@ async handleRestoreRequest(@ConnectedSocket() client: Socket) {
     client.emit('lobby:roomList', roomList);
   }
 
-  
-    
+
+  @SubscribeMessage('location:update')
+async handleLocationUpdate(
+  @ConnectedSocket() client: Socket,
+  @MessageBody() data: { state: 'lobby' | 'room' | 'game', roomId?: string }
+) {
+  const userId = client.data?.userId;
+  if (!userId || !data?.state) {
+    throw new WsException('유저 정보가 없습니다')
+  }
+
+  const locationData = {
+    state: data.state,
+    roomId: data.roomId || '',
+  };
+
+  await this.connectionService.setLocation(userId, locationData);
+
+  client.emit('location:updated', locationData);
+}
+
+  @SubscribeMessage('lobby:joinRoom')
+  async handleJoinRoom(
+    @ConnectedSocket() client: Socket,
+     @MessageBody() data: {roomId: string }
+  ){
+   
+   const roomData = await this.lobbyService.joinRoom(data.roomId)
+  if (roomData) {
+    // 유저 추가 및 상태 설정
+    client.join(data.roomId);
+    return roomData;
+  } else {
+    return null;
+  }
+  }
   }
