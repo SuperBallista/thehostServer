@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import { socketStore } from '../../common/store/socketStore';
+import { initSocket, socketStore } from '../../common/store/socketStore';
 import type { Socket } from 'socket.io-client';
 
 // socketStore.ts
@@ -28,6 +28,7 @@ export async function awaitSocketReady(timeoutMs = 5000): Promise<Socket> {
           clearInterval(check);
           unsub();
           reject(new Error('⛔ 소켓이 초기화되지 않았습니다.'));
+          initSocket()
         }
       }, 50);
     });
