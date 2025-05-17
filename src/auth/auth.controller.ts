@@ -3,17 +3,17 @@ import { Controller, Get, Post, Req, Res, Query, UseGuards, HttpStatus, Redirect
 import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../jwt/guards/jwt-auth.guard';
-import { ConfigService } from '@nestjs/config';
 import { changeNicknameInfo } from './auth.type';
 import { CurrentUser } from 'src/jwt/decorators/current-user.decorator';
 import { UserTypeDecorater } from 'src/common/types/jwt.type';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('auth')
 export class AuthController {
 
   constructor(
     private readonly authService: AuthService,
-    private readonly configService: ConfigService 
+    private readonly configService: ConfigService
   ) {
    
   }
@@ -36,7 +36,7 @@ export class AuthController {
       // ✅ 기존 계정인 경우: 리프레시 토큰 쿠키 설정
       res.cookie('refresh_token', refreshToken, {
         httpOnly: true,
-        secure: !this.configService.get<boolean>('localTest'),
+        secure: this.configService.get<string>('LOCAL_TEST') !== 'true',
         sameSite: 'strict',
         expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       });
@@ -71,7 +71,7 @@ export class AuthController {
       path: '/',
       expires: new Date(Date.now() - 3600000),
       httpOnly: true,
-      secure: this.configService.get<string>('localTest') !== 'true',
+      secure: this.configService.get<string>('LOCAL_TEST') !== 'true',
       sameSite: 'strict',
     });
   }
@@ -86,7 +86,7 @@ export class AuthController {
   
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
-      secure: this.configService.get<string>('LOCAL') !== 'true',
+      secure: this.configService.get<string>('LOCAL_TEST') !== 'true',
       sameSite: 'strict',
       path: '/',
     });

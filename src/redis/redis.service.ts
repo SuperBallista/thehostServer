@@ -1,16 +1,19 @@
 // redis/redis.service.ts
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private redisClient: Redis;
 
+  constructor(private readonly configService: ConfigService) {}
 
   async onModuleInit() {
+
     this.redisClient = new Redis({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379', 10),
+      host: this.configService.get<string>('REDIS_HOST'),
+      port: this.configService.get<number>('REDIS_PORT', 6379),
     });
   
     await this.redisClient.flushdb(); // ✅ 전체 초기화

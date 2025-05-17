@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS users (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   nickname_hash VARCHAR(128) NOT NULL,
-  encrypted_nickname VARBINARY(256) NOT NULL,
-  iv_nickname VARBINARY(32) NOT NULL,
+  encrypted_nickname VARCHAR(256) NOT NULL,
+  iv_nickname VARCHAR(32) NOT NULL,
   oauth_provider VARCHAR(32) NOT NULL,
   oauth_id VARCHAR(128) NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

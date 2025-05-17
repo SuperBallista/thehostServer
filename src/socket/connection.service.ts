@@ -17,7 +17,7 @@ export class ConnectionService {
 
   async verifyAndTrackConnection(client: Socket): Promise<{ userId: number, locationState: string, roomId: any }> {
     const token = client.handshake.auth?.token;
-    if (!token) throw new Error('Missing token');
+    if (!token) throw new WsException('Missing token');
   
     const payload = await this.jwtService.parseAccessToken(token);
     client.data.userId = payload.userId;

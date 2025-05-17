@@ -26,9 +26,9 @@ export class AuthService {
 
   getGoogleAuthUrl(): string {
     const googleOAuthConfig = {
-      clientID: this.configService.get<string>('googleClientId') as string,
-      clientSecret: this.configService.get<string>('googleClientSecret') as string,
-      redirectUri: this.configService.get<string>('googleRedirectUrl') as string, // 여기 수정
+      clientID: this.configService.get<string>('GOOGLE_CLIENT_ID') as string,
+      clientSecret: this.configService.get<string>('GOOGLE_CLIENT_SECRET') as string,
+      redirectUri: this.configService.get<string>('GOOGLE_REDIRECT_URL') as string, // 여기 수정
       scope: ['profile', 'email'],
 
     };
@@ -72,20 +72,26 @@ export class AuthService {
   
 
 async authCallbackFlow(code) {
+  //코드를 구글 서버로 보내서 사용자 ID를 가져옵니다를 가져옵니다/
    const userInfo = await this.authGetGoogleOauthId(code)
+   //사용자 ID로 계정이 Redis 또는 DB에 있는지 여부를 조회합니다
     const existingUser = await this.userService.findUserByOAuthId(userInfo.id, 'google');
+    //계정 DB정보를 바탕으로 전달할 토큰과 닉네임 정보를 생성합니다
     const {userId, accessToken, refreshToken, tempToken, nickname} = await this.checkExistingAccount(existingUser,userInfo.id)
+    // 만약 유저 정보가 있으면 캐싱합니다.
     if (existingUser) await this.userCacheService.setUser(userId, existingUser)
+      //생성된 정보를 바탕으로 토큰 URL 쿼리를 생성합니다
     const url = await this.makeUriData(accessToken, tempToken, nickname, userId);
+    // URL과 리프레시토큰을 리턴합니다
     return { url, refreshToken }
   }
 
 
   private async authGetGoogleOauthId(code) {
     const googleOAuthConfig = {
-      clientID: this.configService.get<string>('googleClientId'),
-      clientSecret: this.configService.get<string>('googleClientSecret'),
-      redirectUri: this.configService.get<string>('googleRedirectUrl'),
+      clientID: this.configService.get<string>('GOOGLE_CLIENT_ID'),
+      clientSecret: this.configService.get<string>('GOOGLE_CLIENT_SECRET'),
+      redirectUri: this.configService.get<string>('GOOGLE_REDIRECT_URL'),
     };
   
     try {
@@ -132,7 +138,6 @@ async authCallbackFlow(code) {
   async checkExistingAccount(userData:UserDto | null, oauthId:string){
     if (userData) {
       const userId = Number(userData.id);
-
       let nickname:string | undefined
 
       const encryptedData = userData.encryptedNickname
@@ -196,9 +201,10 @@ async handleGetMe(req: Request): Promise<any> {
   }
 }
 
+//**URI 만들어서 주소 쿼리로 토큰 및 로그인 이용자 정보 첨부 */
 private async makeUriData(accessToken, tempToken, nickname, userId){
   nickname = encodeURIComponent(nickname)
-  const frontendUrl = this.configService.get<string>('frontendUrl');
+  const frontendUrl = this.configService.get<string>('FRONTEND_URL');
   if (tempToken){
     return `${frontendUrl}?token=${tempToken}`
   } else if (accessToken && nickname && userId){

@@ -12,6 +12,7 @@ import {
 import { LobbyService } from './lobby.service';
 import { Server, Socket } from 'socket.io';
 import { ConnectionService } from './connection.service';
+import { RedisPubSubService } from 'src/redis/redisPubSub.service';
 
 @WebSocketGateway({ cors: true })
 export class LobbyGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -21,7 +22,12 @@ export class LobbyGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly connectionService: ConnectionService,
     private readonly lobbyService: LobbyService,
+    private readonly redisPubSubService: RedisPubSubService,
   ) {}
+
+  afterInit(server: Server){
+    this.redisPubSubService.io = server
+  }
 
   async handleConnection(@ConnectedSocket() client: Socket) {
     try {
@@ -82,7 +88,7 @@ async handleRestoreRequest(@ConnectedSocket() client: Socket) {
   
     client.emit('roomCreated', room);
   
-    const roomList = await this.lobbyService.getRooms(); // 이 함수도 async면 await 필요
+    const roomList = await this.lobbyService.getRooms();
     this.server.to('lobby').emit('roomListUpdated', roomList);
   }
 
@@ -122,14 +128,17 @@ async handleLocationUpdate(
     @ConnectedSocket() client: Socket,
      @MessageBody() data: {roomId: string }
   ){
-   
-   const roomData = await this.lobbyService.joinRoom(data.roomId)
-  if (roomData) {
-    // 유저 추가 및 상태 설정
-    client.join(data.roomId);
-    return roomData;
-  } else {
-    return null;
+   return await this.lobbyService.joinRoom(data.roomId, client.data?.userId)
   }
+
+    @SubscribeMessage('lobby:exitToLobby')
+  async handleExitToLobby(
+    @ConnectedSocket() client: Socket,
+     @MessageBody() data: {roomId: string }
+  ){
+   return await this.lobbyService.exitToLobby(data.roomId, client.data?.userId)
   }
+
+
+  
   }

@@ -5,6 +5,8 @@ import { Room, userShortInfo } from './lobby.types';
 import { RedisService } from 'src/redis/redis.service';
 import { encodeBase32 } from 'src/utils/base32';
 import { WsException } from '@nestjs/websockets';
+import { UserDto } from 'src/user/dto/user.dto';
+import { UserService } from 'src/user/user.service';
 
 
 @Injectable()
@@ -12,7 +14,8 @@ export class LobbyService {
   private rooms: Map<string, Room> = new Map();
   constructor(
     private readonly redisService: RedisService,
-    private readonly redisPubSubService: RedisPubSubService
+    private readonly redisPubSubService: RedisPubSubService,
+    private readonly userService: UserService,
   ) {}
 
   private generateRoomTag():number{
@@ -41,6 +44,7 @@ export class LobbyService {
       name,
       hostUserId,
       players: [hostUser],
+      date: Date.now().toString()
     };
   
     // 메모리에도 저장 (옵션)
@@ -49,7 +53,7 @@ export class LobbyService {
     // Redis 저장
     await this.redisService.set(`room:find:${roomData.id}`, JSON.stringify(roomData),3600);
 
-    await this.redisService.set(`room:list:${Date.now()}`, roomData.id);
+    await this.redisService.set(`room:list:${roomData.date}`, roomData.id);
 
       
     // 위치 기록
@@ -60,50 +64,84 @@ export class LobbyService {
   
     return roomData;
   }
-  
-  async getRooms(page: number = 1): Promise<Room[]> {
-    const keys = await this.redisService.scanKeys('room:list:*');
-  
-    // 최신순 정렬
-    const sortedKeys = keys.sort().reverse();
-  
-    // 페이지네이션 계산 (10개 단위)
-    const pageSize = 10;
-    const start = (page - 1) * pageSize;
-    const end = start + pageSize;
-    const pagedKeys = sortedKeys.slice(start, end);
-  
-    // 각 키에서 roomId 추출 후 room:find:{id} 불러오기
-    const pipeline = this.redisService.pipeline();
-    pagedKeys.forEach((key) => pipeline.get(key)); // room:list:{ts} → roomId
-    const roomIdResults = await pipeline.exec();
 
-    if (!roomIdResults) return []
-  
-    // roomId → room:find:{id}로 다시 가져오기
-    const roomIds = roomIdResults
-      .map(([err, id]) => (err || typeof id !== 'string' ? null : id))
-      .filter((id): id is string => !!id);
-  
-    const roomPipeline = this.redisService.pipeline();
-    roomIds.forEach((id) => roomPipeline.get(`room:find:${id}`));
-    const roomResults = (await roomPipeline.exec()) || [];
-  
-    return roomResults
-      .map(([err, json]) => {
-        if (err || typeof json !== 'string') return null;
-        try {
-          return JSON.parse(json) as Room;
-        } catch {
-          return null;
-        }
-      })
-      .filter((room): room is Room => room !== null);
-  }
-    
-      async joinRoom(roomId:string){
-       const roomData = JSON.parse(await this.redisService.get(`room:find:${roomId}`) as string)
+  async getRooms(page: number = 1): Promise<Room[]> {
+  const roomListKeys = await this.getPaginatedRoomListKeys(page);
+  const roomIds = await this.getRoomIdsFromKeys(roomListKeys);
+    return await this.getRoomsFromIds(roomIds);
+}
+
+private async getPaginatedRoomListKeys(page: number): Promise<string[]> {
+  const keys = await this.redisService.scanKeys('room:list:*');
+  const sortedKeys = keys.sort().reverse();
+
+  const pageSize = 10;
+  const start = (page - 1) * pageSize;
+  const end = start + pageSize;
+
+  return sortedKeys.slice(start, end);
+}
+
+private async getRoomIdsFromKeys(keys: string[]): Promise<string[]> {
+  const pipeline = this.redisService.pipeline();
+  keys.forEach((key) => pipeline.get(key));
+  const results = await pipeline.exec();
+  if (!results) {
+    throw new WsException('방 리스트에서 ID를 찾을 수 없습니다')}
+  return results
+    .map(([err, id]) => (err || typeof id !== 'string' ? null : id))
+    .filter((id): id is string => !!id);
+}
+
+private async getRoomsFromIds(roomIds: string[]): Promise<Room[]> {
+  const pipeline = this.redisService.pipeline();
+  roomIds.forEach((id) => pipeline.get(`room:find:${id}`));
+  const results = await pipeline.exec();
+  if (!results) {
+    throw new WsException('방 상세 정보를 찾을 수 없습니다')
+  }  
+  return results
+    .map(([err, json]) => {
+      if (err || typeof json !== 'string') return null;
+      try {
+        return JSON.parse(json) as Room;
+      } catch {
+        return null;
+      }
+    })
+    .filter((room): room is Room => room !== null);
+}
+
+       async joinRoom(roomId:string, userId:number){
+        // 유저 ID로 유저 정보를 불러옴
+       const userData:UserDto = await this.userService.findById(userId)
+       // 방 정보를 레디스에서 불러옴옴
+       const roomData:Room = JSON.parse(await this.redisService.get(`room:find:${roomId}`) as string)
+       // 방정보에 새로운 유저정보를 추가함
+       if (!userData.nickname) throw new WsException('닉네임이 없습니다')
+       roomData.players.push({id: userData.id, nickname: userData.nickname})
+       // PubSub 브로드캐스트
+       this.redisPubSubService.publisher.publish(`room:update`, JSON.stringify(roomData));
+
+       await this.redisService.set(`locationState:${userId}`, JSON.stringify({locationState: 'room', roomId: roomData.id}), 300);
+
         return roomData
       }
 
+      async exitToLobby(roomId:string, userId: number){
+        if (!roomId) return null
+        const roomData:Room = JSON.parse(await this.redisService.get(`room:find:${roomId}`) as string)
+
+       roomData.players = roomData.players.filter(player => player.id !== userId)
+
+       await this.redisService.set(`locationState:${userId}`, JSON.stringify({locationState: 'lobby', roomId: null}), 300);
+
+       if (roomData.players[0].id !== roomData.hostUserId) {
+        await this.redisService.del(`room:list:${roomData.date}`)
+        return null
+       }
+       this.redisPubSubService.publisher.publish(`room:update`, JSON.stringify(roomData));
+
+       return roomData
+      }
       }

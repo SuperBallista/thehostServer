@@ -1,36 +1,21 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onDestroy, onMount } from 'svelte';
     import { currentRoom } from '../../common/store/pageStore';
     import { closeMessageBox, showMessageBox } from '../../common/messagebox/customStore';
     import { THEME } from '../../common/constant/theme';
     import PlayerCard from './playerCard.svelte';
-    import { awaitSocketReady } from '../../common/utils/awaitSocketReady';
-  
+    import { leaveRoom, relaodRoomInfo, reloadOffRoomInfo, startGame } from './waitRoomStore';
     onMount(async () => {
       showMessageBox('loading', '방 정보 열기', '방 정보를 서버로부터 가져옵니다');
+      await relaodRoomInfo(); // 방정보 수신 켜기
       closeMessageBox();
     });
 
+    onDestroy(async () => {
+      await reloadOffRoomInfo(); // 방정보 수신 끄기
+    })
 
-    async function leaveRoom() {
-    // 메시지 박스 보여주고 이후 라우팅 또는 상태 초기화 처리
-    showMessageBox('loading', '방 나가기', '로비로 이동 중입니다...');
-    const socket = await awaitSocketReady();
-    socket.emit('location:update', {
-  state: 'lobby',
-  roomId: null,
-});    
-    closeMessageBox();
-}
 
-async function startGame() {
-  showMessageBox('loading', '게임 시작', '게임을 시작합니다...');
-
-  // TODO: 서버에 게임 시작 요청 보내기
-  // 예: socket.emit('room:start', { roomId: $currentRoom.id });
-
-  closeMessageBox();
-}
 
 
 
@@ -75,16 +60,17 @@ async function startGame() {
 </div>
   
 <!-- 카드 영역 -->
+      {#if $currentRoom}
 <div class="mt-6">
     <h3 class={`mb-2 text-lg font-bold ${THEME.textAccentStrong}`}>참가자 목록</h3>
     <div class="flex flex-wrap justify-start">
       {#each $currentRoom?.players || [] as player}
-        <PlayerCard nickname={player.nickname} />
+        <PlayerCard playerId={player.id} nickname={player.nickname} />
       {/each}
     </div>
   </div>
 
-      {#if !$currentRoom}
+      {:else}
         <div class={`mt-6 text-center ${THEME.textWarning}`}>
           방 정보를 불러올 수 없습니다.
         </div>

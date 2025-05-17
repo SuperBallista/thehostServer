@@ -4,7 +4,6 @@
   import { authStore, restoreAuthFromSessionAndCookie, setAuthSuccess } from '../../common/store/authStore';
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
-  import { initSocket } from '../../common/store/socketStore';
 
   function goToGoogleLogin() {
     window.location.href = '/api/auth/google/login';
@@ -38,13 +37,15 @@
 
 
 
-onMount( async () => {
+onMount(async () => {
   const result = getIAInformationFromUrl()
   if (result){
    await restoreAuthFromSessionAndCookie()
    const auth = get(authStore);
-    if (auth.token) {
-      await initSocket(); // ✅ WebSocket 최초 연결
+    if (auth.user?.nickname) {
+    console.log('기존 유저, 로비 이동');
+    pageStore.set('lobby');
+    window.history.replaceState(null, '', window.location.pathname);
     }
   }
 

@@ -6,15 +6,12 @@ import { UserModule } from './user/user.module';
 import { RedisModule } from './redis/redis.module';
 import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
-import { configuration, validationSchema  } from './config/configuration';
 import { SocketModule } from './socket/socket.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [configuration],
-      validationSchema,
     }),
         
     // 모듈 임포트
