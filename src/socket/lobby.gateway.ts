@@ -13,6 +13,10 @@ import { LobbyService } from './lobby.service';
 import { Server, Socket } from 'socket.io';
 import { ConnectionService } from './connection.service';
 import { RedisPubSubService } from 'src/redis/redisPubSub.service';
+import { moveToLobby, moveToRoom } from './utils/socketRoomManager';
+
+
+
 
 @WebSocketGateway({ cors: true })
 export class LobbyGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -25,9 +29,15 @@ export class LobbyGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly redisPubSubService: RedisPubSubService,
   ) {}
 
-  afterInit(server: Server){
-    this.redisPubSubService.io = server
-  }
+// lobby.gateway.ts
+afterInit(server: Server) {
+  this.redisPubSubService.io = server;
+
+  this.redisPubSubService.registerRoomListUpdateCallback(async () => {
+    const roomList = await this.lobbyService.getRooms();
+    this.server.to('lobby').emit('update:room:list');
+  });
+}
 
   async handleConnection(@ConnectedSocket() client: Socket) {
     try {
@@ -35,7 +45,7 @@ export class LobbyGateway implements OnGatewayConnection, OnGatewayDisconnect {
       console.log(`✅ 유저 ${client.data.userId} 연결됨`);
 
         // 클라이언트에 위치 상태 전송
-  client.emit('locationState', {
+  client.emit('update:location', {
     locationState,
     roomId,
   });
@@ -49,16 +59,16 @@ export class LobbyGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
   
-  @SubscribeMessage('location:restore')
+  @SubscribeMessage('request:location:restore')
 async handleRestoreRequest(@ConnectedSocket() client: Socket) {
   const userId = client.data.userId;
   if (!userId) {
-    client.emit('location:restore', { state: 'lobby', roomInfo: null });
+    client.emit('update:location:restore', { state: 'lobby', roomInfo: null });
     return;
   }
 
   const { locationState, roomInfo, roomId } = await this.connectionService.getLocationData(userId);
-  client.emit('location:restore', { state:locationState, roomInfo: roomInfo, roomId });
+  client.emit('update:location:restore', { state:locationState, roomInfo: roomInfo, roomId });
 }
 
 
@@ -68,42 +78,43 @@ async handleRestoreRequest(@ConnectedSocket() client: Socket) {
     console.log(`❌ 유저 ${client.data?.userId} 접속 해제`);
   }
 
-  @SubscribeMessage('createRoom')
-  async handleCreateRoom(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { name: string },
-  ) {
-    const hostUser = {
-      nickname: client.data.nickname,
-      id: client.data.userId,
-    };
-    const { name } = data;
-  
-    if (!hostUser.id || !name) {
-      client.emit('error', { message: '잘못된 요청입니다.' });
-      return;
-    }
-  
-    const room = await this.lobbyService.createRoom(hostUser.id, name, hostUser); // ✅ await 추가
-  
-    client.emit('roomCreated', room);
-  
-    const roomList = await this.lobbyService.getRooms();
-    this.server.to('lobby').emit('roomListUpdated', roomList);
+@SubscribeMessage('request:room:create')
+async handleCreateRoom(
+  @ConnectedSocket() client: Socket,
+  @MessageBody() data: { name: string },
+) {
+  const hostUser = {
+    nickname: client.data.nickname,
+    id: client.data.userId,
+  };
+  const { name } = data;
+
+  if (!hostUser.id || !name) {
+    client.emit('update:error', { message: '잘못된 요청입니다.' });
+    return;
   }
 
-  @SubscribeMessage('lobby:getRoomList')
+  const room = await this.lobbyService.createRoom(hostUser.id, name, hostUser);
+
+  moveToRoom(client, room.id)
+
+  // ✅ 생성 결과 전송
+  client.emit('update:room:create', room);
+  this.server.to('lobby').emit('update:room:list');
+}
+
+  @SubscribeMessage('request:room:list')
   async handleGetRoomList(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { page?: number }
   ) {
     const page = data?.page ?? 1;
     const roomList = await this.lobbyService.getRooms(page);
-    client.emit('lobby:roomList', roomList);
+    return roomList
   }
 
 
-  @SubscribeMessage('location:update')
+  @SubscribeMessage('request:location:update')
 async handleLocationUpdate(
   @ConnectedSocket() client: Socket,
   @MessageBody() data: { state: 'lobby' | 'room' | 'game', roomId?: string }
@@ -120,25 +131,30 @@ async handleLocationUpdate(
 
   await this.connectionService.setLocation(userId, locationData);
 
-  client.emit('location:updated', locationData);
+  client.emit(`update:location`, locationData);
 }
 
-  @SubscribeMessage('lobby:joinRoom')
-  async handleJoinRoom(
-    @ConnectedSocket() client: Socket,
-     @MessageBody() data: {roomId: string }
-  ){
-   return await this.lobbyService.joinRoom(data.roomId, client.data?.userId)
-  }
+@SubscribeMessage('request:room:join')
+async handleJoinRoom(
+  @ConnectedSocket() client: Socket,
+  @MessageBody() data: { roomId: string }
+) {
+  const room = await this.lobbyService.joinRoom(data.roomId, client.data?.userId);
 
-    @SubscribeMessage('lobby:exitToLobby')
-  async handleExitToLobby(
-    @ConnectedSocket() client: Socket,
-     @MessageBody() data: {roomId: string }
-  ){
-   return await this.lobbyService.exitToLobby(data.roomId, client.data?.userId)
-  }
+  moveToRoom(client, room.id)
+  this.server.to('lobby').emit('update:room:list');
+  this.server.to(`room:${room.id}`).emit('update:room:data')
+  return room; // 응답도 동시에 보내려면 유지
+}
 
+@SubscribeMessage('request:room:exit')
+async handleExitToLobby(
+  @ConnectedSocket() client: Socket,
+  @MessageBody() data: { roomId: string }
+) {
+  const result = await this.lobbyService.exitToLobby(data.roomId, client.data?.userId);
 
-  
+  moveToLobby(client)
+  return result;
+}
   }

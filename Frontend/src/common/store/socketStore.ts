@@ -72,8 +72,9 @@ function setupCoreHandlers(socket: Socket, resolve: () => void, reject: (e: Erro
 
 
 function setupCustomHandlers(socket: Socket) {
-  socket.off('location:restore');
-  socket.on('location:restore', ({ state, roomInfo, roomId }) => {
+  // 요청-응답 패턴에 맞게 수정
+  socket.off('update:location:restore');
+  socket.on('update:location:restore', ({ state, roomInfo, roomId }) => {
     console.log('📍 복원 위치:', state, roomId, roomInfo);
     locationState.set(state);
     roomId && roomInfo ? currentRoom.set(roomInfo) : null;
@@ -84,6 +85,6 @@ function setupCustomHandlers(socket: Socket) {
     console.log('📩 메시지 수신:', data);
   });
 
-  // emit은 나중에 해도 됨
-  socket.emit('location:restore');
+  // emit은 요청용으로 prefix 붙여서
+  socket.emit('request:location:restore');
 }

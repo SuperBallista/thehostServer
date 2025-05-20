@@ -13,6 +13,8 @@ export type Page =
   
 export const pageStore = writable<Page>('login');
 
+export const lobbyPage = writable<number>(1);
+
 
 export const locationState = writable<string>('lobby')
 

@@ -4,14 +4,14 @@
     import { rooms, onJoinRoom, getRoomList, listenRoomListUpdates } from './lobbyStore'
     import { awaitSocketReady } from '../../common/utils/awaitSocketReady';
     import { get } from 'svelte/store';
-    import { currentRoom, locationState, pageStore } from '../../common/store/pageStore';
+    import { currentRoom, lobbyPage, locationState, pageStore } from '../../common/store/pageStore';
     import { roomId } from '../../common/store/socketStore';
     import { showMessageBox } from '../../common/messagebox/customStore';
 
     onMount(async ()=>{
     await awaitSocketReady();
     await listenRoomListUpdates();
-    await getRoomList(1);
+    await getRoomList($lobbyPage);
     await moveToBeforePage();
     setTimeout(() => {
     console.log('🧪 get(rooms):', get(rooms));

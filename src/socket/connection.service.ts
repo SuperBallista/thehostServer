@@ -6,6 +6,7 @@ import { Socket } from 'socket.io';
 import { Room } from './lobby.types';
 import { UserService } from 'src/user/user.service';
 import { WsException } from '@nestjs/websockets';
+import { moveToLobby, moveToRoom } from './utils/socketRoomManager';
 
 @Injectable()
 export class ConnectionService {
@@ -15,38 +16,45 @@ export class ConnectionService {
     private readonly userService: UserService
   ) {}
 
-  async verifyAndTrackConnection(client: Socket): Promise<{ userId: number, locationState: string, roomId: any }> {
-    const token = client.handshake.auth?.token;
-    if (!token) throw new WsException('Missing token');
-  
-    const payload = await this.jwtService.parseAccessToken(token);
-    client.data.userId = payload.userId;
-    client.data.nickname = payload.nickname;
-  
-    await this.redisService.set(`online:${payload.userId}`, client.id);
-  
-    // 기존 locationState를 Redis에서 가져옴
-    const raw = await this.redisService.get(`locationState:${payload.userId}`);
-    let locationState = 'lobby';
-    let roomId = null;
-  
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      locationState = parsed.locationState || 'lobby';
-      roomId = parsed.roomId || '';
-  
-      if ((locationState === 'room' || locationState === 'game') && roomId) {
-        const roomData = await this.redisService.get(`room:${roomId}`);
-        if (roomData) {
-          roomId = JSON.parse(roomData);
-          client.data.currentRoom = roomId;
-        }
+async verifyAndTrackConnection(client: Socket): Promise<{ userId: number, locationState: string, roomId: any }> {
+  const token = client.handshake.auth?.token;
+  if (!token) throw new WsException('Missing token');
+
+  const payload = await this.jwtService.parseAccessToken(token);
+  client.data.userId = payload.userId;
+  client.data.nickname = payload.nickname;
+
+  await this.redisService.set(`online:${payload.userId}`, client.id);
+
+  const raw = await this.redisService.get(`locationState:${payload.userId}`);
+  let locationState = 'lobby';
+  let roomId = null;
+
+  if (raw) {
+    const parsed = JSON.parse(raw);
+    locationState = parsed.locationState || 'lobby';
+    roomId = parsed.roomId || '';
+
+    if ((locationState === 'room' || locationState === 'game') && roomId) {
+      const roomString = await this.redisService.get(`room:data:${roomId}`);
+      if (roomString) {
+       const roomData:Room = JSON.parse(roomString);
+        client.data.currentRoom = roomData.id;
+
+        // ✅ socket.io 방에 다시 join
+        moveToRoom(client, roomData.id || roomId);
+      } else {
+        moveToLobby(client); // fallback
       }
+    } else {
+      moveToLobby(client);
     }
-  
-    return { userId: payload.userId, locationState, roomId };
+  } else {
+    moveToLobby(client);
   }
 
+  return { userId: payload.userId, locationState, roomId };
+}
   async handleDisconnect(client: Socket) {
     const userId = client.data?.userId;
     if (!userId) return;
@@ -78,7 +86,7 @@ export class ConnectionService {
     
     let roomInfo
     if ((locationState === 'room' || locationState === 'host' || locationState === 'game') && roomId) {
-      const roomData = await this.redisService.get(`room:find:${roomId}`);
+      const roomData = await this.redisService.get(`room:data:${roomId}`);
       if (roomData && typeof roomData === 'string') {
         roomInfo = JSON.parse(roomData);
       }
@@ -88,11 +96,11 @@ export class ConnectionService {
       }
 
       async setLocation(userId: number, data: { state: string; roomId: string }) {
-      let roomData:Room = JSON.parse(await this.redisService.get(`room:find:${data.roomId}`) as string) as unknown as Room;
+      let roomData:Room = JSON.parse(await this.redisService.get(`room:data:${data.roomId}`) as string) as unknown as Room;
       let userData = await this.userService.findById(userId)
       if (!userData.nickname) throw new WsException('서버 오류 발생: 닉네임이 없음')
       await this.redisService.set(`locationState:${userId}`, JSON.stringify(data));
-      roomData.players.push({id: userData.id, nickname:userData.nickname})
+      if (roomData) roomData.players.push({id: userData.id, nickname:userData.nickname})
 }
 
   

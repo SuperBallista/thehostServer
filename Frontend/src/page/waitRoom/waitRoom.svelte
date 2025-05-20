@@ -52,7 +52,7 @@
     🚀 게임 시작
   </button>
   <button
-    on:click={leaveRoom}
+    on:click={() => leaveRoom('로비로 이동합니다...')}
     class={`px-4 py-2 ${THEME.bgSecondary} text-white font-semibold rounded-lg shadow-md transition`}
   >
     🔙 방 나가기
