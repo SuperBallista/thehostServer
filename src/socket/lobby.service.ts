@@ -77,7 +77,7 @@ export class LobbyService {
        if (!userData.nickname) throw new WsException('닉네임이 없습니다')
        roomData.players.push({id: userData.id, nickname: userData.nickname})
        // PubSub 브로드캐스트
-       this.redisPubSubService.publisher.publish(`internal:room:data${roomData.id}`, JSON.stringify(roomData));
+       this.redisPubSubService.publisher.publish(`internal:room:data`, JSON.stringify(roomData));
 
        await this.redisService.set(`locationState:${userId}`, JSON.stringify({locationState: 'room', roomId: roomData.id}), 300);
        this.redisPubSubService.publisher.publish('internal:room:list', JSON.stringify(roomData.id));
@@ -94,8 +94,11 @@ export class LobbyService {
         // 방 정보 불러오기
         const roomData:Room = JSON.parse(await this.redisService.get(`room:data:${roomId}`) as string)
 
+
         // 내 위치 정보 변경
        await this.redisService.set(`locationState:${userId}`, JSON.stringify({locationState: 'lobby', roomId: null}), 300);
+
+       if (!roomData) return null;
 
        roomData.players = roomData.players.filter(player => player.id !== userId)
 
