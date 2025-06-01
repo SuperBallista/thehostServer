@@ -6,8 +6,9 @@ export const THEME = {
     bgAccent: 'bg-red-800',
     bgAccentHover: 'bg-red-700',
     bgAccentPrimary: 'bg-red-600',
-    bgWarning: 'bg-yellow-600',    
+    bgWarning: 'bg-purple-800',    
     bgDisabled: 'bg-gray-700',
+    bgTooltip: 'bg-zinc-800',
   
     // 테두리 색상
     borderPrimary: 'border-gray-700',
@@ -20,11 +21,11 @@ export const THEME = {
     textTertiary: 'text-gray-500',
     textAccent: 'text-red-500',
     textAccentStrong: 'text-red-600',
-    textWarning: 'text-yellow-600',
+    textWarning: 'text-purple-300',
     textWhite: 'text-white',
   
     // 포커스 효과
-    focusRing: 'focus:ring-2 focus:ring-red-700',
+    focusRing: 'focus:ring-2 focus:ring-purple-300',
   
     // 기타 공통 스타일
     transition: 'transition',

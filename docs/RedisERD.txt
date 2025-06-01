@@ -1,0 +1,30 @@
+locationState
+userId - fk
+locationState - lobby / room / game
+roomId - string
+
+online
+userId - fk
+websocketId - string
+
+room:data
+id - pk
+name - string
+hostUserId - number
+players - array[ nickname, id]
+date - number
+
+room:list
+date - fk
+roomId - pk
+
+user
+id - pk
+oauth_provider - google
+oauth_id - string
+nickname - string
+last_connection_at - number
+
+user_oauth:google
+oauth_id - pk
+userId - fk
