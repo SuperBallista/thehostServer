@@ -14,6 +14,7 @@ import { Server, Socket } from 'socket.io';
 import { ConnectionService } from './connection.service';
 import { RedisPubSubService } from 'src/redis/redisPubSub.service';
 import { moveToLobby, moveToRoom } from './utils/socketRoomManager';
+import { publishRoomUpdate } from 'src/redis/redisPubSubHelper';
 
 
 
@@ -28,6 +29,15 @@ export class LobbyGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly lobbyService: LobbyService,
     private readonly redisPubSubService: RedisPubSubService,
   ) {}
+
+
+  onModuleInit() {
+    this.redisPubSubService.registerRoomListUpdateCallback(async () => {
+      const roomList = await this.lobbyService.getRooms();
+      this.redisPubSubService.io?.to('lobby').emit('update:room:list', roomList);
+      console.log('📢 update:room:list → 로비 전체에 emit');
+    });
+  }
 
 // lobby.gateway.ts
 afterInit(server: Server) {
@@ -142,8 +152,9 @@ async handleJoinRoom(
   const room = await this.lobbyService.joinRoom(data.roomId, client.data?.userId);
 
   moveToRoom(client, room.id)
-  this.server.to('lobby').emit('update:room:list');
-  this.server.to(`room:${room.id}`).emit('update:room:data')
+
+  publishRoomUpdate(this.redisPubSubService, room.id)
+
   return room; // 응답도 동시에 보내려면 유지
 }
 
@@ -153,7 +164,6 @@ async handleExitToLobby(
   @MessageBody() data: { roomId: string }
 ) {
   const result = await this.lobbyService.exitToLobby(data.roomId, client.data?.userId);
-
   moveToLobby(client)
   return result;
 }

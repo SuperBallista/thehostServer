@@ -22,7 +22,7 @@ export async function relaodRoomInfo() {
 
   // 새로운 핸들러 등록
   roomUpdateHandler = (room: Room) => {
-    currentRoom.set({ ...room, players: [...room.players] });
+    currentRoom.set(room);
   };
 
 
