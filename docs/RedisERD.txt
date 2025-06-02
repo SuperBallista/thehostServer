@@ -28,3 +28,33 @@ last_connection_at - number
 user_oauth:google
 oauth_id - pk
 userId - fk
+
+
+game:gameId
+id - pk
+turn - number
+hostId - fk
+
+
+game:gameId:region:regionId
+id - pk
+members - [ fk - playerId ]
+messages - [ string ]
+
+game:gameId:player:playerId
+id - pk
+userId - fk
+state - enum(alive / host / zombie / killed)
+infected - boolean
+items - [item]
+regionId - fk
+next - fk(regionId)
+act - enum(runaway / hide / lure )
+
+
+game:gameId:host
+id - pk
+infect - playerId
+zombie - [{playerId, targetId, next}]
+
+
