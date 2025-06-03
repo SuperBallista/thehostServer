@@ -1,6 +1,7 @@
 <script lang="ts">
   import BoxOverlay from "./common/messagebox/BoxOverlay.svelte";
   import { pageStore } from "./common/store/pageStore";
+    import GameLayout from "./page/game/gameLayout.svelte";
   import Lobby from "./page/lobby/lobby.svelte";
   import Login from "./page/login/login.svelte";
   import NewUser from "./page/newUser/newUser.svelte";
@@ -21,4 +22,6 @@
 <Lobby/>
 {:else if $pageStore === 'room' || $pageStore === 'host'}
 <WaitRoom/>
+{:else if $pageStore === 'game'}
+<GameLayout/>
 {/if}

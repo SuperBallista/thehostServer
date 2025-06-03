@@ -87,7 +87,8 @@ export async function startGame() {
   const roomId = get(currentRoom)?.id;
   if (roomId) {
     socket.emit('request:room:start', { roomId });
-  }
-
+  }  
+  pageStore.set('game')
+  
   closeMessageBox();
 }
