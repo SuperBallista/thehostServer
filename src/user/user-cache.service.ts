@@ -44,7 +44,7 @@ export class UserCacheService {
 
   
     const data = {
-      id: user.id.toString(),
+      id: user.id,
       oauth_provider: user.oAuthProvider,
       oauth_id: user.oAuthId,
       nickname,
@@ -56,7 +56,7 @@ export class UserCacheService {
   
     await redisClient.set(
       `user_oauth:${user.oAuthProvider}:${user.oAuthId}`,
-      user.id.toString(),
+      user.id,
       'EX',
       60 * 60 * 3,
     );

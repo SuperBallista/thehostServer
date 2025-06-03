@@ -25,7 +25,7 @@ export class UserRepository {
 
     const user = result[0];
     return {
-      id: user.id.toString(),
+      id: Number(user.id),
       oAuthProvider: user.oauth_provider,
       oAuthId: user.oauth_id,
       nicknameHash: user.nickname_hash,
@@ -54,7 +54,7 @@ export class UserRepository {
 
     const user = result[0];
     return {
-      id: user.id.toString(),
+      id: Number(user.id),
       oAuthProvider: user.oauth_provider,
       oAuthId: user.oauth_id,
       nicknameHash: user.nickname_hash,

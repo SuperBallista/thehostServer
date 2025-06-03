@@ -163,8 +163,7 @@ async handleExitToLobby(
   @ConnectedSocket() client: Socket,
   @MessageBody() data: { roomId: string }
 ) {
-  const result = await this.lobbyService.exitToLobby(data.roomId, client.data?.userId);
+  await this.lobbyService.exitToLobby(data.roomId, client.data?.userId);
   moveToLobby(client)
-  return result;
 }
   }

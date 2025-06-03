@@ -34,7 +34,6 @@ export async function relaodRoomInfo() {
 export async function sendRoomExitRequest(roomId: string) {
   const socket = await awaitSocketReady();
   socket.emit('request:room:exit', { roomId });
-  socket.emit('request:room:leave', { roomId });
 }
 
 export async function clearRoomEventHandlers() {

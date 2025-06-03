@@ -20,9 +20,9 @@ export function moveToRoom(client: Socket, roomId: string) {
 export function moveToLobby(client: Socket) {
   const currentRooms = Array.from(client.rooms).filter(r => r !== client.id);
 
-  // ✅ 모든 "room:" prefix 방에서 나감
+  // ✅ 모든 "room:" 에서 방에서 나감
   for (const room of currentRooms) {
-    if (room.startsWith('room:')) {
+    if (room.includes('room:')) {
       client.leave(room);
     }
   }

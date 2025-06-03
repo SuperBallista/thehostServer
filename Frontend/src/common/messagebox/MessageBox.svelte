@@ -2,7 +2,9 @@
     import { onMount, onDestroy } from "svelte";
     import {
       messageType, messageTitle, messageContent, messageColor,
-      messageInputs, messageResolve, closeMessageBox, messageIcon
+      messageInputs, messageResolve, closeMessageBox, messageIcon,
+      imageSrc
+
     } from "./customStore";
     import InputBox from "./InputBox.svelte";
     import LoadingSpinner from "./LoadingSpinner.svelte";
@@ -40,6 +42,18 @@
   return "text";
 }
 
+let showTipButton = true;
+
+$: {
+  if ($messageType === "tips") {
+    showTipButton = false;
+    setTimeout(() => {
+      showTipButton = true;
+    }, 3000);
+  }
+}
+
+
   
     onMount(() => {
       window.addEventListener("keydown", handleKey);
@@ -53,6 +67,11 @@
       window.removeEventListener("keydown", handleKey);
     });
 
+
+      $: resolvedMessage =
+    typeof $messageContent === "function"
+      ? $messageContent(Object.fromEntries($messageInputs.map(i => [i.key, i.value])))
+      : $messageContent;
   </script>
   
       <div class="message-box" style="background: {messageBoxColor.background}; color: {messageBoxColor.font}">
@@ -65,7 +84,10 @@
           {#if $messageType === "loading" || $messageType === "success"}
             <LoadingSpinner size={50} color={$messageColor} />
           {/if}
-            <p>{$messageContent}</p>
+          {#if $imageSrc}
+          <img class="message-image" src={$imageSrc} alt="image"/>
+          {/if}
+<p>{resolvedMessage}</p>
             {#if $messageType === "input"}
             {#each $messageInputs as input}
             <InputBox
@@ -94,17 +116,20 @@
           취소
         </button>
         {:else}
-        <button
-        class="button btn-default"
-        style="--btn-default: {messageBoxColor['btn-default']}; --btn-default-hover: {messageBoxColor['btn-default-hover']}; --btn-text: {messageBoxColor['btn-text']};"
-        bind:this={confirmButton}
-        on:click={() => confirm(true)}>
-        확인
-      </button>
-           {/if}
-          </div>
-        {/if}
-      </div>
+        
+  {#if $messageType !== "tips" || showTipButton}
+    <button
+      class="button btn-default"
+      style="--btn-default: {messageBoxColor['btn-default']}; --btn-default-hover: {messageBoxColor['btn-default-hover']}; --btn-text: {messageBoxColor['btn-text']};"
+      bind:this={confirmButton}
+      on:click={() => confirm(true)}>
+      확인
+    </button>
+  {/if}
+    {/if}
+     </div>
+       {/if}
+        </div>
   
 
 <style>
@@ -176,6 +201,47 @@
 
   .btn-cancel:hover {
     background-color: var(--btn-cancel-hover);
+  }
+
+  .message-image {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  margin: 12px auto;
+  object-fit: contain;
+}
+
+  .region-member {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .region-member-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 30%;
+    max-width: 100px;
+    padding: 5px;
+    border: 2px solid #d8b4fe;        /* ✔ 테두리 추가 */
+    border-radius: 10px;            /* ✔ 둥근 테두리 */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* ✔ 살짝 그림자 효과 (선택 사항) */
+  }
+  
+  .player {
+    width: 100%;
+    height: auto;
+  }
+
+  .region-member-nickname {
+    text-align: center;
+    word-break: break-word; /* 줄바꿈 가능하도록 */
+    overflow-wrap: break-word; /* 줄바꿈 가능하도록 */
+    width: 100%; /* 그림 너비와 일치 */
+    color: #d8b4fe;
   }
 
   </style>

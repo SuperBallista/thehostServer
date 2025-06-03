@@ -78,7 +78,7 @@ export class LobbyService {
 
         const userDataText = {id: userData.id, nickname: userData.nickname}
 
-       if (!roomData.players.some(player => player.id === userDataText.id)) roomData.players.push(userDataText)
+       if (!roomData.players.some(player => Number(player.id) === userDataText.id)) roomData.players.push(userDataText)
 
         await this.redisService.set(`room:data:${roomId}`, JSON.stringify(roomData))
 
@@ -97,8 +97,8 @@ export class LobbyService {
 }
 
 //** 방참여자 명단에서 나간 사람을 제거 */
-private async removeUserFromRoom(room: Room, userId: number): Promise<Room> { 
-  room.players = room.players.filter(player => player.id !== userId);
+private removeUserFromRoom(room: Room, userId: number): Room { 
+  room.players = room.players.filter(player => Number(player.id) !== Number(userId));
   return room;
 }
 
@@ -111,6 +111,7 @@ private async deleteRoomCompletely(room: Room) {
 
 //** 방정보가 업데이트된 것을 레디스에서 업데이트 */
 private async updateRoomInRedis(room: Room) { 
+  console.log('📝 Redis 저장:', room.players.map(p => p.id));
   await this.redisService.set(`room:data:${room.id}`, JSON.stringify(room), 3600);
 }
 
@@ -130,28 +131,30 @@ private async notifyRoomDestroyed(room: Room) {
 
 
 
-async exitToLobby(roomId: string, userId: number): Promise<Room | null> {
+async exitToLobby(roomId: string, userId: number) {
   if (!userId || !roomId) throw new WsException('사용자 또는 방 정보 오류');
 
   const roomRaw = await this.redisService.get(`room:data:${roomId}`);
   if (!roomRaw) return null;
 
-  const roomData: Room = JSON.parse(roomRaw);
-  await this.updateUserLocationToLobby(userId);
+  let roomData: Room = JSON.parse(roomRaw);
 
-  // ✅ 항상 먼저 플레이어 목록에서 제거
-  roomData.players = roomData.players.filter(p => p.id !== userId);
+  roomData = this.removeUserFromRoom(roomData, userId)
+  await this.updateUserLocationToLobby(userId);
 
   const isHost = userId === Number(roomData.hostUserId);
 
   if (isHost) {
-    if (roomData.players.length > 0) {
-      roomData.hostUserId = roomData.players[0].id;
-      // 나중에 한 번에 처리
-    } else {
+  if (roomData.players.length > 0) {
+  const newHost = roomData.players[0];
+  if (!newHost || !newHost.id) {
+    throw new WsException('새로운 방장을 지정할 수 없습니다');
+  }
+  roomData.hostUserId = newHost.id;
+  }
+  else {
       await this.deleteRoomCompletely(roomData);
       await this.notifyRoomDestroyed(roomData);
-      return null;
     }
   }
 
@@ -159,7 +162,6 @@ async exitToLobby(roomId: string, userId: number): Promise<Room | null> {
   await this.updateRoomInRedis(roomData);
   await this.broadcastRoomUpdate(roomData);
 
-  return roomData;
 }
 
 

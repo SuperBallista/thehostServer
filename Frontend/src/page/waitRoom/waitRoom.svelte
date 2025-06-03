@@ -47,7 +47,7 @@
       <div class="mt-4 text-center flex justify-evenly">
   <button
     on:click={startGame}
-    class={`px-4 py-2 ${THEME.bgPrimary} text-white font-semibold rounded-lg shadow-md transition`}
+    class={`px-4 py-2 ${THEME.bgAccent} text-white font-semibold rounded-lg shadow-md transition`}
   >
     🚀 게임 시작
   </button>
