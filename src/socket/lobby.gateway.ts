@@ -51,16 +51,16 @@ afterInit(server: Server) {
 
   async handleConnection(@ConnectedSocket() client: Socket) {
     try {
-    const { userId, locationState, roomId } =  await this.connectionService.verifyAndTrackConnection(client); // 저장만
+    const { userId, state, roomId } =  await this.connectionService.verifyAndTrackConnection(client); // 저장만
       console.log(`✅ 유저 ${client.data.userId} 연결됨`);
 
         // 클라이언트에 위치 상태 전송
   client.emit('update:location', {
-    locationState,
+    state,
     roomId,
   });
 
-    console.log(`유저 ${userId} 접속됨 (${locationState}:${roomId})`)
+    console.log(`유저 ${userId} 접속됨 (${state}:${roomId})`)
 
 
     } catch (err) {
@@ -77,8 +77,8 @@ async handleRestoreRequest(@ConnectedSocket() client: Socket) {
     return;
   }
 
-  const { locationState, roomInfo, roomId } = await this.connectionService.getLocationData(userId);
-  client.emit('update:location:restore', { state:locationState, roomInfo: roomInfo, roomId });
+  const { state, roomInfo, roomId } = await this.connectionService.getLocationData(userId);
+  client.emit('update:location:restore', { state, roomInfo: roomInfo, roomId });
 }
 
 
@@ -109,7 +109,7 @@ async handleCreateRoom(
   moveToRoom(client, room.id)
 
   // ✅ 생성 결과 전송
-  client.emit('update:room:create', room);
+  client.emit('update:room:data', room);
   this.server.to('lobby').emit('update:room:list');
 }
 

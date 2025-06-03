@@ -16,7 +16,7 @@ export class ConnectionService {
     private readonly userService: UserService
   ) {}
 
-async verifyAndTrackConnection(client: Socket): Promise<{ userId: number, locationState: string, roomId: any }> {
+async verifyAndTrackConnection(client: Socket): Promise<{ userId: number, state: string, roomId: any }> {
   const token = client.handshake.auth?.token;
   if (!token) throw new WsException('Missing token');
 
@@ -27,15 +27,15 @@ async verifyAndTrackConnection(client: Socket): Promise<{ userId: number, locati
   await this.redisService.set(`online:${payload.userId}`, client.id);
 
   const raw = await this.redisService.get(`locationState:${payload.userId}`);
-  let locationState = 'lobby';
+  let loadedState = 'lobby';
   let roomId = null;
 
   if (raw) {
     const parsed = JSON.parse(raw);
-    locationState = parsed.locationState || 'lobby';
+    loadedState = parsed.state || 'lobby';
     roomId = parsed.roomId || '';
 
-    if ((locationState === 'room' || locationState === 'game') && roomId) {
+    if ((loadedState === 'room' || loadedState === 'game') && roomId) {
       const roomString = await this.redisService.get(`room:data:${roomId}`);
       if (roomString) {
        const roomData:Room = JSON.parse(roomString);
@@ -53,7 +53,7 @@ async verifyAndTrackConnection(client: Socket): Promise<{ userId: number, locati
     moveToLobby(client);
   }
 
-  return { userId: payload.userId, locationState, roomId };
+  return { userId: payload.userId, state:loadedState, roomId };
 }
   async handleDisconnect(client: Socket) {
     const userId = client.data?.userId;
@@ -80,19 +80,19 @@ async verifyAndTrackConnection(client: Socket): Promise<{ userId: number, locati
     
   async getLocationData(userId: number) {
     const raw = await this.redisService.get(`locationState:${userId}`);
-    if (!raw) return { locationState: 'lobby', roomId: null };
+    if (!raw) return { state: 'lobby', roomId: null };
     
-    const { locationState, roomId } = JSON.parse(raw);
+    const { state, roomId } = JSON.parse(raw);
     
     let roomInfo
-    if ((locationState === 'room' || locationState === 'host' || locationState === 'game') && roomId) {
+    if ((state === 'room' || state === 'host' || state === 'game') && roomId) {
       const roomData = await this.redisService.get(`room:data:${roomId}`);
       if (roomData && typeof roomData === 'string') {
         roomInfo = JSON.parse(roomData);
       }
     }
     
-    return { locationState, roomInfo, roomId };
+    return { state, roomInfo, roomId };
       }
 
       async setLocation(userId: number, data: { state: string; roomId: string }) {

@@ -30,40 +30,55 @@ export async function relaodRoomInfo() {
   socket.on('update:room:closed', async () => await leaveRoom('방이 사라졌습니다'));
 }
 
-export async function reloadOffRoomInfo() {
-  const socket = await awaitSocketReady();
-  const roomId = get(currentRoom)?.id;
-  if (!roomId) return;
 
-  // 서버에 방 나가기 요청
+export async function sendRoomExitRequest(roomId: string) {
+  const socket = await awaitSocketReady();
   socket.emit('request:room:exit', { roomId });
   socket.emit('request:room:leave', { roomId });
+}
 
-  // 핸들러 제거
+export async function clearRoomEventHandlers() {
+  const socket = await awaitSocketReady();
   if (roomUpdateHandler) {
     socket.off('update:room:data', roomUpdateHandler);
     roomUpdateHandler = null;
   }
-    socket.off(`update:room:closed`)
+  socket.off('update:room:closed');
 }
 
-export async function leaveRoom(message:string) {
+export async function reloadOffRoomInfo() {
+  const roomId = get(currentRoom)?.id;
+  if (!roomId) return;
+
+  await sendRoomExitRequest(roomId);
+  await clearRoomEventHandlers();
+}
+
+
+export async function leaveRoom(message: string) {
   showMessageBox('loading', '로비 이동', message);
 
-  await reloadOffRoomInfo();
+  await reloadOffRoomInfo();  // 실제로는 두 단계로 나눠져 있음
 
-  // 클라이언트 상태 초기화
+  resetClientStateToLobby();
+
+  await notifyServerLocationChange();
+
+  closeMessageBox();
+}
+
+function resetClientStateToLobby() {
   pageStore.set('lobby');
   locationState.set('lobby');
   currentRoom.set(null);
+}
 
+async function notifyServerLocationChange() {
   const socket = await awaitSocketReady();
   socket.emit('request:location:update', {
-    state: 'lobby',
+    locationState: 'lobby',
     roomId: null,
   });
-
-  closeMessageBox();
 }
 
 export async function startGame() {

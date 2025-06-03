@@ -60,7 +60,7 @@ export class LobbyService {
 
       
     // 위치 기록
-    await this.redisService.set(`locationState:${hostUserId}`, JSON.stringify({locationState: 'host', roomId: roomData.id}), 300);
+    await this.redisService.set(`locationState:${hostUserId}`, JSON.stringify({state: 'host', roomId: roomData.id}), 300);
   
     // PubSub 브로드캐스트
     this.redisPubSubService.publisher.publish('internal:room:list', JSON.stringify(roomData.id));
@@ -75,56 +75,92 @@ export class LobbyService {
        const roomData:Room = JSON.parse(await this.redisService.get(`room:data:${roomId}`) as string)
        // 방정보에 새로운 유저정보를 추가함
        if (!userData.nickname) throw new WsException('닉네임이 없습니다')
-       roomData.players.push({id: userData.id, nickname: userData.nickname})
+
+        const userDataText = {id: userData.id, nickname: userData.nickname}
+
+       if (!roomData.players.some(player => player.id === userDataText.id)) roomData.players.push(userDataText)
+
+        await this.redisService.set(`room:data:${roomId}`, JSON.stringify(roomData))
+
        // PubSub 브로드캐스트
        this.redisPubSubService.publisher.publish(`internal:room:data`, JSON.stringify(roomData));
 
-       await this.redisService.set(`locationState:${userId}`, JSON.stringify({locationState: 'room', roomId: roomData.id}), 300);
+       await this.redisService.set(`locationState:${userId}`, JSON.stringify({state: 'room', roomId: roomData.id}), 300);
        this.redisPubSubService.publisher.publish('internal:room:list', JSON.stringify(roomData.id));
 
         return roomData
       }
 
-      async exitToLobby(roomId:string, userId: number){
+//** 방에서 나가는 사람의 위치를 로비로 변경 */
+      private async updateUserLocationToLobby(userId: number) { 
+  await this.redisService.set(`locationState:${userId}`, JSON.stringify({ state: 'lobby', roomId: null }), 300);
+}
 
-        if (!userId) throw new WsException('사용자정보 오류입니다')
+//** 방참여자 명단에서 나간 사람을 제거 */
+private async removeUserFromRoom(room: Room, userId: number): Promise<Room> { 
+  room.players = room.players.filter(player => player.id !== userId);
+  return room;
+}
 
-        // 널 체크
-        if (!roomId) return null
-        // 방 정보 불러오기
-        const roomData:Room = JSON.parse(await this.redisService.get(`room:data:${roomId}`) as string)
+//** 방장이 없는 방을 폐쇄 */
+private async deleteRoomCompletely(room: Room) { 
+  await this.redisService.del(`room:list:${room.date}`);
+  await this.redisService.del(`room:data:${room.id}`);
+  await this.redisPubSubService.publisher.publish(`internal:room:delete:${room.id}`, JSON.stringify(room.id));
+}
 
+//** 방정보가 업데이트된 것을 레디스에서 업데이트 */
+private async updateRoomInRedis(room: Room) { 
+  await this.redisService.set(`room:data:${room.id}`, JSON.stringify(room), 3600);
+}
 
-        // 내 위치 정보 변경
-       await this.redisService.set(`locationState:${userId}`, JSON.stringify({locationState: 'lobby', roomId: null}), 300);
+//** 방정보가 업데이트된 것을 레디스 pub/sub으로 알리기 */
+private async broadcastRoomUpdate(room: Room) {
+  await this.redisPubSubService.publisher.publish(`internal:room:data`, JSON.stringify(room));
+  await this.redisPubSubService.publisher.publish('internal:room:list', JSON.stringify(room.id));
+}
 
-       if (!roomData) return null;
-
-       roomData.players = roomData.players.filter(player => player.id !== userId)
-
-       // 호스트가 나갔을 경우 방 삭제
-       if (userId === Number(roomData.hostUserId)) {
-
-        await this.redisService.del(`room:list:${roomData.date}`)
-        await this.redisService.del(`room:data:${roomId}`)
-
-        await this.redisPubSubService.publisher.publish(`internal:room:delete:${roomData.id}`, JSON.stringify(roomData.id));
-        return null
-       }
-
-       
-       // 레디스 퍼블리시
-       this.redisPubSubService.publisher.publish(`internal:room:data`, JSON.stringify(roomData));
-       this.redisPubSubService.publisher.publish('internal:room:list', JSON.stringify(roomData.id));
-
-       // 방 안에 있는 사람 킥
-      await this.redisPubSubService.publish(`internal:room:delete:${roomId}`,
-      JSON.stringify({ roomId, kickedUserIds: roomData.players.map(p => p.id) }));
+//** 방이 폐쇄되었을 때 남은 사람을 로비로 킥 */
+private async notifyRoomDestroyed(room: Room) {
+  await this.redisPubSubService.publish(`internal:room:delete:${room.id}`, JSON.stringify({
+    roomId: room.id,
+    kickedUserIds: room.players.map(p => p.id)
+  }));
+}
 
 
-       return roomData
-      }
 
+async exitToLobby(roomId: string, userId: number): Promise<Room | null> {
+  if (!userId || !roomId) throw new WsException('사용자 또는 방 정보 오류');
+
+  const roomRaw = await this.redisService.get(`room:data:${roomId}`);
+  if (!roomRaw) return null;
+
+  const roomData: Room = JSON.parse(roomRaw);
+  await this.updateUserLocationToLobby(userId);
+
+  // ✅ 항상 먼저 플레이어 목록에서 제거
+  roomData.players = roomData.players.filter(p => p.id !== userId);
+
+  const isHost = userId === Number(roomData.hostUserId);
+
+  if (isHost) {
+    if (roomData.players.length > 0) {
+      roomData.hostUserId = roomData.players[0].id;
+      // 나중에 한 번에 처리
+    } else {
+      await this.deleteRoomCompletely(roomData);
+      await this.notifyRoomDestroyed(roomData);
+      return null;
+    }
+  }
+
+  // ✅ 후처리: 저장 & 브로드캐스트는 공통 처리
+  await this.updateRoomInRedis(roomData);
+  await this.broadcastRoomUpdate(roomData);
+
+  return roomData;
+}
 
 
       

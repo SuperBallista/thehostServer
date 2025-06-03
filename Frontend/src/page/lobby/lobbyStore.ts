@@ -35,33 +35,23 @@ export async function onJoinRoom(roomId: string) {
   const socket = await awaitSocketReady();
 
   socket.emit('request:location:update', {
-    state: 'room',
+    locationState: 'room',
     roomId,
   });
 
   socket.emit('request:room:join', { roomId }, (roomData: Room | null) => {
-    if (roomData) {
-      currentRoom.set(roomData);
-      locationState.set('room');
-      pageStore.set('room');
-    } else {
+    if (!roomData) {
       showMessageBox('error', '방 입장 실패', '해당 방에 입장할 수 없습니다.');
+      return;
     }
+    setRoomState(roomData); // 상태 업데이트는 동일한 함수 사용
   });
 }
 
 
 
+// UI 요청 + 트리거
 export async function makeRoom() {
-  const socket = await awaitSocketReady();
-
-  socket.off('update:room:create');
-  socket.on('update:room:create', (room: Room) => {
-    currentRoom.set(room);
-    locationState.set('room');
-    pageStore.set('room');
-  });
-
   const userResponse = await showMessageBox(
     'input',
     '방 생성하기',
@@ -70,11 +60,26 @@ export async function makeRoom() {
     [{ key: 'name', label: ' ', placeholder: '방 제목 입력' }]
   );
 
-  if (userResponse.success) {
-    const roomName = userResponse.values?.name || '빠른 게임방';
-    socket.emit('request:room:create', { name: roomName });
-  } else {
-    socket.off('update:room:create');
-  }
+  if (!userResponse.success) return;
+
+  const roomName = userResponse.values?.name || '빠른 게임방';
+  await createRoomOnServer(roomName);
 }
 
+// 서버 요청 + 상태 설정
+async function createRoomOnServer(roomName: string) {
+  const socket = await awaitSocketReady();
+
+  // 방 입장 수신 핸들러 등록
+  socket.off('update:room:data');
+  socket.on('update:room:data', setRoomState);
+
+  socket.emit('request:room:create', { name: roomName });
+}
+
+// 상태 저장 로직만 따로
+function setRoomState(room: Room) {
+  currentRoom.set(room);
+  locationState.set('room');
+  pageStore.set('room');
+}
