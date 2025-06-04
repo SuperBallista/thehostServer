@@ -3,6 +3,8 @@ import { awaitSocketReady } from "../../common/utils/awaitSocketReady";
 import { currentRoom, locationState, pageStore } from "../../common/store/pageStore";
 import type { Room } from "../lobby/lobby.type";
 import { closeMessageBox, showMessageBox } from "../../common/messagebox/customStore";
+import { Socket } from "socket.io-client";
+import { roomId } from "../../common/store/socketStore";
 
 let roomUpdateHandler: ((roomData: Room) => void) | null = null;
 
@@ -91,4 +93,13 @@ export async function startGame() {
   pageStore.set('game')
   
   closeMessageBox();
+}
+
+export async function handleBotSetting() {
+  const roomData = get(currentRoom)
+  if (!roomData) return
+  const socket = await awaitSocketReady();
+  roomData.bot = !roomData.bot
+  socket.emit(`request:room:setting`, {roomData});  
+  currentRoom.set(roomData)  
 }

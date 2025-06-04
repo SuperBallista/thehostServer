@@ -47,7 +47,8 @@ export class LobbyService {
       name,
       hostUserId,
       players: [hostUser],
-      date: Date.now().toString()
+      date: Date.now().toString(),
+      bot: true
     };
   
     // 메모리에도 저장 (옵션)
@@ -129,6 +130,12 @@ private async notifyRoomDestroyed(room: Room) {
   }));
 }
 
+
+//** 방 옵션이 변경되었을 때 Pub/Sub으로 동기화 */
+async changeRoomOption(room: Room){
+await this.redisService.set(`room:data:${room.id}`, JSON.stringify(room))
+await this.broadcastRoomUpdate(room)
+}
 
 
 async exitToLobby(roomId: string, userId: number) {

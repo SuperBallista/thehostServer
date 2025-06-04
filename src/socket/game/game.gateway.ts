@@ -4,14 +4,14 @@
 // game.gateway.ts
 import {
     ConnectedSocket,
+  MessageBody,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { RedisPubSubService } from 'src/redis/redisPubSub.service';
 import { GameService } from './game.service';
-import { RedisService } from 'src/redis/redis.service';
+import { Room } from '../lobby.types';
 
 
 
@@ -23,8 +23,6 @@ export class GameGateway {
 
   constructor(
     private readonly gameService: GameService,
-    private readonly redisPubSubService: RedisPubSubService,
-    private readonly redisService: RedisService
   ) {}
     
 @SubscribeMessage('request:room:start')
@@ -33,6 +31,15 @@ async handleGameStart(
 )
   {
     await this.gameService.gameStart(client.data.userId)
+
+}
+
+@SubscribeMessage('internal:game:start')
+async handleSubscribeGameStart(
+  @ConnectedSocket() client: Socket,
+  @MessageBody() room:Room
+){
+  await this.gameService.subscribeGameStart(client.data.id, room.players, room.id)
 
 }
 }

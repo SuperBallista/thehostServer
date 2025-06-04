@@ -15,6 +15,7 @@ import { ConnectionService } from './connection.service';
 import { RedisPubSubService } from 'src/redis/redisPubSub.service';
 import { moveToLobby, moveToRoom } from './utils/socketRoomManager';
 import { publishRoomUpdate } from 'src/redis/redisPubSubHelper';
+import { Room } from './lobby.types';
 
 
 
@@ -156,6 +157,13 @@ async handleJoinRoom(
   publishRoomUpdate(this.redisPubSubService, room.id)
 
   return room; // 응답도 동시에 보내려면 유지
+}
+
+@SubscribeMessage(`request:room:setting`)
+async handleRoomSetting(
+  @MessageBody() data: {roomData: Room}
+){
+  await this.lobbyService.changeRoomOption(data.roomData)
 }
 
 @SubscribeMessage('request:room:exit')

@@ -3,6 +3,7 @@
     import { get } from "svelte/store";
     import { THEME } from "../../common/constant/theme";
     import { currentRoom } from "../../common/store/pageStore";
+    import { authStore } from "../../common/store/authStore";
 
     export let nickname: string;
     export let playerId:number;
@@ -14,6 +15,6 @@
                ${THEME.roundedDefault} 
                ${THEME.shadow} 
                text-center`}>
-    <div class="text-sm font-semibold truncate">{nickname}</div>
+    <div class="text-sm font-semibold truncate">{$authStore.user?.id===playerId ? '나 ' : null}{nickname}</div>
   </div>
   

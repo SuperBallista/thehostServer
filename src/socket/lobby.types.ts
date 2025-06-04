@@ -3,7 +3,8 @@ export interface Room {
   name: string;
   hostUserId: number;
   players: userShortInfo[];
-  date: string      
+  date: string;
+  bot: boolean;      
 }
 
 export interface userShortInfo{
