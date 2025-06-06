@@ -15,26 +15,11 @@ export async function relaodRoomInfo() {
   // 요청: 방 정보 재조회 및 socket room join
   socket.emit('request:room:join', { roomId });
 
-  if (roomUpdateHandler) {
-    socket.off('update:room:data', roomUpdateHandler);
-  }
-  socket.off(`update:room:closed`)
-  socket.off(`update:room:${roomId}:start`)
-
   // 새로운 핸들러 등록
   roomUpdateHandler = (room: Room) => {
     currentRoom.set(room);
   };
 
-
-  socket.on('update:room:data', roomUpdateHandler);
-  socket.on('update:room:closed', async () => await leaveRoom('방이 사라졌습니다'));
-  socket.on(`update:room:${roomId}:start`, () => {
-    socket.off(`update:room:data`);
-    socket.off(`update:room:closed`);
-    locationState.set('game');
-    pageStore.set('game');
-  } )
 }
 
 
@@ -43,31 +28,10 @@ export async function sendRoomExitRequest(roomId: string) {
   socket.emit('request:room:exit', { roomId });
 }
 
-export async function clearRoomEventHandlers(roomId:string) {
-  const socket = await awaitSocketReady();
-  if (roomUpdateHandler) {
-    socket.off('update:room:data', roomUpdateHandler);
-    socket.off(`update:room:closed`)
-    socket.off(`update:room:${roomId}:start`)
-
-    roomUpdateHandler = null;
-  }
-  socket.off('update:room:closed');
-}
-
-export async function reloadOffRoomInfo() {
-  const roomId = get(currentRoom)?.id;
-  if (!roomId) return;
-
-  await sendRoomExitRequest(roomId);
-  await clearRoomEventHandlers(roomId);
-}
 
 
 export async function leaveRoom(message: string) {
   showMessageBox('loading', '로비 이동', message);
-
-  await reloadOffRoomInfo();  // 실제로는 두 단계로 나눠져 있음
 
   resetClientStateToLobby();
 

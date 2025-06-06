@@ -1,4 +1,4 @@
-import {writable } from "svelte/store";
+import {get, writable } from "svelte/store";
 import { HostAct, Region, Survivor, type GamePlayerStatus } from "../game.type";
 
 
@@ -10,4 +10,3 @@ export const count = writable<number>(60)
 export const surivorList = writable<Survivor[]>([]) // 보이는 생존자목록
 export const hostAct = writable<HostAct | null>() // 숙주 행동
 export const region = writable<Region>() // 구역 정보
-

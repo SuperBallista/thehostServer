@@ -114,7 +114,7 @@ async handleCreateRoom(
   this.server.to('lobby').emit('update:room:list');
 }
 
-  @SubscribeMessage('request:room:list')
+  @SubscribeMessage('request:lobby:list')
   async handleGetRoomList(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { page?: number }
