@@ -78,8 +78,8 @@ async handleRestoreRequest(@ConnectedSocket() client: Socket) {
     return;
   }
 
-  const { state, roomInfo, roomId } = await this.connectionService.getLocationData(userId);
-  client.emit('update:location:restore', { state, roomInfo: roomInfo, roomId });
+  const result = await this.connectionService.getLocationData(userId);
+  client.emit('update:location:restore', { state: result.state, roomInfo: result.roomInfo?? null, roomId: result.roomId?? null });
 }
 
 

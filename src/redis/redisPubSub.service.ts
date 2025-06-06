@@ -3,6 +3,9 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { Server } from 'socket.io';
+import { RedisService } from './redis.service';
+import { WsException } from '@nestjs/websockets';
+import { string } from 'joi';
 
 @Injectable()
 export class RedisPubSubService implements OnModuleInit {
@@ -18,6 +21,7 @@ export class RedisPubSubService implements OnModuleInit {
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly redisService: RedisService
   ) {
     const host = this.configService.get<string>('REDIS_HOST');
     const port = this.configService.get<number>('REDIS_PORT', 6379);
@@ -37,9 +41,9 @@ export class RedisPubSubService implements OnModuleInit {
     console.log(`✅ internal:room:delete:* 패턴 구독 시작 (${count}개 채널)`);
   });
 
-this.subscriber.on('pmessage', async (pattern, channel, message) => {
+this.subscriber.on('pmessage', async (pattern, channel, message:string) => {
   if (channel.startsWith('internal:room:delete:')) {
-    const { roomId, kickedUserIds } = JSON.parse(message);
+    const roomId = message;
 
     // ✅ 방에 있던 유저들에게는 "방이 사라졌음" 알림
     this.io?.to(`room:${roomId}`).emit('update:room:closed', {
@@ -68,7 +72,8 @@ this.subscriber.on('pmessage', async (pattern, channel, message) => {
     // ✔ 고친 부분: internal:room:data로 비교
     if (channel === 'internal:room:data') {
       try {
-        const room = JSON.parse(message);
+        const room = await this.redisService.getAndParse(`room:data:${message}`)
+        if (!room) throw new WsException('방 정보를 찾을 수 없습니다')
         const roomId = room.id;
         this.io?.to(`room:${roomId}`).emit(`update:room:data`, room); // 이벤트명도 정리
         console.log(`📢 update:room:data → room:${roomId} 클라이언트에게 emit`);

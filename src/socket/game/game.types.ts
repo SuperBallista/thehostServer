@@ -48,7 +48,7 @@ export class GamePlayer{
     playerId: number;
     userId: number;
     state: State
-    infected: boolean;
+    infected: number | null;
     items: ItemCode[]
     regionId: number;
     next: number;

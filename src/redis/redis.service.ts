@@ -1,6 +1,7 @@
 // redis/redis.service.ts
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { WsException } from '@nestjs/websockets';
 import Redis from 'ioredis';
 
 @Injectable()
@@ -29,13 +30,15 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** ✅ 단일 키 저장 (기본 5분 TTL 적용 예시) */
-  async set(key: string, value: string, expireSeconds = 300): Promise<'OK'> {
-    return await this.redisClient.set(key, value, 'EX', expireSeconds);
+  async stringifyAndSet(key: string, value: object, expireSeconds = 300): Promise<'OK'> {
+    return await this.redisClient.set(key, JSON.stringify(value), 'EX', expireSeconds);
   }
 
   /** ✅ 단일 키 조회 */
-  async get(key: string): Promise<string | null> {
-    return await this.redisClient.get(key);
+  async getAndParse(key: string) {
+    const value =  await this.redisClient.get(key)
+    if (!value) return null
+    return JSON.parse(value);
   }
 
   /** ✅ 단일 키 삭제 */

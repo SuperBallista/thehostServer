@@ -10,13 +10,15 @@ export type Page =
   | 'game'
   | 'result'
   | 'setting'
+
+ export type State = `lobby` | `host` | `room` | `game`
   
 export const pageStore = writable<Page>('login');
 
 export const lobbyPage = writable<number>(1);
 
 
-export const locationState = writable<string>('lobby')
+export const locationState = writable<State>('lobby')
 
 
 export const currentRoom = writable<Room|null>(null);

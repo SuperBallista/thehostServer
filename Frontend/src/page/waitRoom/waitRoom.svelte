@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from 'svelte';
-    import { currentRoom } from '../../common/store/pageStore';
+    import { currentRoom, pageStore } from '../../common/store/pageStore';
     import { closeMessageBox, showMessageBox } from '../../common/messagebox/customStore';
     import { THEME } from '../../common/constant/theme';
     import PlayerCard from './playerCard.svelte';
@@ -17,12 +17,8 @@
       await reloadOffRoomInfo(); // 방정보 수신 끄기
     })
 
-
-
-
-
   </script>
-  
+  {#if $pageStore !== 'game'}
   <!-- ✅ 전체 레이아웃: 어두운 배경 + 중앙 정렬 -->
   <div class={`min-h-screen flex items-center justify-center ${THEME.bgSecondary}`}>
     <div class={`w-full max-w-md p-6 m-4
@@ -49,6 +45,7 @@
       <div class="mt-4 text-center flex justify-evenly">
   <button
     on:click={startGame}
+    
     class={`px-4 py-2 ${THEME.bgAccent} text-white font-semibold rounded-lg shadow-md transition`}
   >
     🚀 게임 시작
@@ -88,4 +85,4 @@
       {/if}
     </div>
   </div>
-  
+  {/if}

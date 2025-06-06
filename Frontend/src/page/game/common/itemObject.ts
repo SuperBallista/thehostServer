@@ -23,7 +23,7 @@ export class  Item {
     const userResponse = await selectPlayerMessageBox('아이템 주기', '누구에게 아이템을 주겠습니까?', [], `img/items/${this.code}.jpg`)
 
     if (userResponse) {
-        showMessageBox('alert','아이템 건네주기',`${userResponse.name}에게 ${this.name}을(를) 건네주었습니다`)
+        showMessageBox('alert','아이템 건네주기',`${userResponse.nickname}에게 ${this.name}을(를) 건네주었습니다`)
   }}
 
 async use(): Promise<void> {

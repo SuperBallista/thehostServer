@@ -3,8 +3,6 @@ import { awaitSocketReady } from "../../common/utils/awaitSocketReady";
 import { currentRoom, locationState, pageStore } from "../../common/store/pageStore";
 import type { Room } from "../lobby/lobby.type";
 import { closeMessageBox, showMessageBox } from "../../common/messagebox/customStore";
-import { Socket } from "socket.io-client";
-import { roomId } from "../../common/store/socketStore";
 
 let roomUpdateHandler: ((roomData: Room) => void) | null = null;
 
@@ -21,6 +19,7 @@ export async function relaodRoomInfo() {
     socket.off('update:room:data', roomUpdateHandler);
   }
   socket.off(`update:room:closed`)
+  socket.off(`update:room:${roomId}:start`)
 
   // 새로운 핸들러 등록
   roomUpdateHandler = (room: Room) => {
@@ -30,6 +29,12 @@ export async function relaodRoomInfo() {
 
   socket.on('update:room:data', roomUpdateHandler);
   socket.on('update:room:closed', async () => await leaveRoom('방이 사라졌습니다'));
+  socket.on(`update:room:${roomId}:start`, () => {
+    socket.off(`update:room:data`);
+    socket.off(`update:room:closed`);
+    locationState.set('game');
+    pageStore.set('game');
+  } )
 }
 
 
@@ -38,10 +43,13 @@ export async function sendRoomExitRequest(roomId: string) {
   socket.emit('request:room:exit', { roomId });
 }
 
-export async function clearRoomEventHandlers() {
+export async function clearRoomEventHandlers(roomId:string) {
   const socket = await awaitSocketReady();
   if (roomUpdateHandler) {
     socket.off('update:room:data', roomUpdateHandler);
+    socket.off(`update:room:closed`)
+    socket.off(`update:room:${roomId}:start`)
+
     roomUpdateHandler = null;
   }
   socket.off('update:room:closed');
@@ -52,7 +60,7 @@ export async function reloadOffRoomInfo() {
   if (!roomId) return;
 
   await sendRoomExitRequest(roomId);
-  await clearRoomEventHandlers();
+  await clearRoomEventHandlers(roomId);
 }
 
 

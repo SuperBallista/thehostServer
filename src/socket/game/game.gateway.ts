@@ -37,9 +37,8 @@ async handleGameStart(
 @SubscribeMessage('internal:game:start')
 async handleSubscribeGameStart(
   @ConnectedSocket() client: Socket,
-  @MessageBody() room:Room
+  @MessageBody() roomData:Room
 ){
-  await this.gameService.subscribeGameStart(client.data.id, room.players, room.id)
-
+  await this.gameService.subscribeGameStart(client, client.data.id, roomData.players, roomData.id)
 }
 }

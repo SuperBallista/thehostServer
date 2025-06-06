@@ -9,10 +9,13 @@
   import ActionModal from './menu/actionModal.svelte';
     import PlayerSelector from './selectModal/playerSelector.svelte';
     import SelectOptionBox from './selectModal/selectOptionBox.svelte';
+    import { pageStore } from '../../common/store/pageStore';
+    
   let showSurvivorModal = false;
 
 
 </script>
+{#if $pageStore === 'game'}
 <PlayerSelector/>
 <SelectOptionBox/>
 <div class={`flex flex-col md:flex-row min-h-screen px-6 py-4 gap-x-6 ${THEME.bgSecondary} ${THEME.textPrimary}`}>
@@ -47,3 +50,4 @@
     max-height: calc(100vh - 200px);
   }
 </style>
+{/if}

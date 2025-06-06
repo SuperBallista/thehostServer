@@ -4,7 +4,7 @@ import  io  from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { showMessageBox } from '../messagebox/customStore';
 import { authStore } from './authStore';
-import { locationState, currentRoom, pageStore } from './pageStore';
+import { locationState, currentRoom, pageStore, type State } from './pageStore';
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const wsHost = window.location.host;
@@ -87,4 +87,44 @@ function setupCustomHandlers(socket: Socket) {
 
   // emit은 요청용으로 prefix 붙여서
   socket.emit('request:location:restore');
+}
+
+function setupDynamicSubscriptions(socket: Socket) {
+  let prevChannel: string | null = null;
+
+  // 유저 정보는 항상 수신
+;
+  socket.on(`update:user:${get(authStore).user?.id}`, handleUserUpdate);
+
+  // location 상태에 따라 수신 채널 변경
+  locationState.subscribe((state:State) => {
+
+    // 새로 구독할 채널 결정
+    const newChannel = state === 'lobby'
+      ? 'update:state:lobby'
+      : get(roomId)
+        ? `update:state:${get(roomId)}`
+        : null;
+
+    // 이전 채널 구독 해제
+    if (prevChannel && prevChannel !== newChannel) {
+      socket.off(prevChannel);
+      console.log(`❎ Unsubscribed from ${prevChannel}`);
+    }
+
+    // 새 채널 구독
+    if (newChannel && newChannel !== prevChannel) {
+      socket.on(newChannel, (payload) => {
+        console.log(`📡 Received ${newChannel}:`, payload);
+        // 예시 처리
+        if (state === 'lobby') {
+          pageStore.set('lobby');
+        } else {
+          currentRoom.set(payload.room);
+        }
+      });
+      console.log(`✅ Subscribed to ${newChannel}`);
+      prevChannel = newChannel;
+    }
+  });
 }
