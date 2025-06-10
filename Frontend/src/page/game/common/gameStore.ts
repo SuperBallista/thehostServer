@@ -7,6 +7,6 @@ export const myStatus = writable<GamePlayerStatus | undefined>(undefined) // 내
 export const useRegionsNumber = writable<number>(6) // 사용 구역 갯수
 export const gameTurn = writable<number>(1) // 게임 턴수
 export const count = writable<number>(60)
-export const surivorList = writable<Survivor[]>([]) // 보이는 생존자목록
+export const survivorList = writable<Survivor[]>([]) // 보이는 생존자목록
 export const hostAct = writable<HostAct | null>() // 숙주 행동
 export const region = writable<Region>() // 구역 정보

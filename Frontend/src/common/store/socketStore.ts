@@ -5,9 +5,9 @@ import type { Socket } from 'socket.io-client';
 import { showMessageBox } from '../messagebox/customStore';
 import { authStore } from './authStore';
 import { locationState, currentRoom, pageStore, type State, lobbyPage } from './pageStore';
-import type { gameRoomDataResponse, lobbyDataResponse, userDataResponse } from './synchronize.type';
+import type { userDataResponse } from './synchronize.type';
 import { exitRoomState, rooms, setRoomState } from '../../page/lobby/lobbyStore';
-import { count, gameTurn, hostAct, myStatus, playerId, region, surivorList, useRegionsNumber } from '../../page/game/common/gameStore';
+import { count, gameTurn, hostAct, myStatus, playerId, region, survivorList, useRegionsNumber } from '../../page/game/common/gameStore';
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const wsHost = window.location.host;
@@ -76,71 +76,46 @@ function setupCoreHandlers(socket: Socket, resolve: () => void, reject: (e: Erro
 
 
 function setupDynamicSubscriptions(socket: Socket) {
-  let prevChannel: string | null = null;
 
-  // 유저 정보는 항상 수신
-;
-  socket.on(`update:user:${get(authStore).user?.id}`, (responseData:userDataResponse) => {
-    if (responseData.locationState) locationState.set(responseData.locationState)
-    if (responseData.user) {
+  socket.on(`update`, (responseData:userDataResponse) => {
+    updateData(responseData)
+})}
+
+function updateData(payload:userDataResponse){
+    if (payload.locationState) locationState.set(payload.locationState)
+    if (payload.user) {
       const oldAuthStore = get(authStore)
-      oldAuthStore.user = responseData.user
+      oldAuthStore.user = payload.user
       authStore.set(oldAuthStore)
     }
-    if (responseData.token) {
+    if (payload.token) {
       const oldAuthStore = get(authStore)
-      oldAuthStore.token = responseData.token
+      oldAuthStore.token = payload.token
       authStore.set(oldAuthStore)
     }
-  });
 
-  // location 상태에 따라 수신 채널 변경
-  locationState.subscribe((state:State) => {
-
-    // 새로 구독할 채널 결정
-    const newChannel = get(roomId)
-      ?  `update:room:${get(roomId)}`
-      : `update:lobby:${get(lobbyPage)}` 
-
-
-    // 이전 채널 구독 해제
-    if (prevChannel && prevChannel !== newChannel) {
-      socket.off(prevChannel);
-      console.log(`❎ Unsubscribed from ${prevChannel}`);
-    }
-
-    // 새 채널 구독
-    if (newChannel && newChannel !== prevChannel) {
-      socket.on(newChannel, (payload) => {
-
-        console.log(`📡 Received ${newChannel}:`, payload);
-
-        if (newChannel===`update:room:${get(roomId)}`) {updateLobbyData(payload)}
-        else {updateRoomData(payload)}
-
-      });
-      console.log(`✅ Subscribed to ${newChannel}`);
-      prevChannel = newChannel;
-    }
-  });
-}
-
-function updateLobbyData(payload:lobbyDataResponse){
   if (payload.page) lobbyPage.set(payload.page)
   if (payload.roomList) rooms.set(payload.roomList)
   if (payload.joinRoom) setRoomState(payload.joinRoom)
-}
 
-function updateRoomData(payload:gameRoomDataResponse){
+
   if (payload.roomData) currentRoom.set(payload.roomData) // 방정보 업데이트
   if (payload.exitRoom) exitRoomState() // 방나가기
   if (payload.gameTurn) gameTurn.set(payload.gameTurn) // 게임턴 넘기기
   if (payload.count) count.set(payload.count) // 게임 시간 넘기기
-  if (payload.hostAct) hostAct.set(payload.hostAct) // 숙주 행동 업데이트
-  if (payload.myStatus) myStatus.set(payload.myStatus) // 내 상태 업데이트
+  if (payload.hostAct) get(hostAct)?.updateData(payload.hostAct.zombieList) // 좀비 리스트 업데이트
+  if (payload.myStatus) get(myStatus)?.updateData(payload.myStatus) // 내 상태 업데이트
   if (payload.playerId) playerId.set(payload.playerId) // 플레이어 id 적용
-  if (payload.region) region.set(payload.region) // 구역 업데이트
-  if (payload.surivorList) surivorList.set(payload.surivorList) // 생존자 목록 업데이트
+  if (payload.region) get(region).updateData(payload.region.chatLog, payload.region.regionMessageList) // 구역 업데이트
+  if (payload.survivorList) {
+const sList = get(survivorList);
+const pList = payload.survivorList ?? [];
+
+sList.forEach((s, i) => {
+  if (pList[i]) s.updateData(pList[i]);
+});
+
+   } // 생존자 목록 업데이트
   if (payload.useRegionsNumber) useRegionsNumber.set(payload.useRegionsNumber) // 사용 구역 번호 업데이트
 
 }

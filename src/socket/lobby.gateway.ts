@@ -16,6 +16,7 @@ import { RedisPubSubService } from 'src/redis/redisPubSub.service';
 import { moveToLobby, moveToRoom } from './utils/socketRoomManager';
 import { publishRoomUpdate } from 'src/redis/redisPubSubHelper';
 import { Room } from './lobby.types';
+import { userDataResponse } from './payload.types';
 
 
 
@@ -35,7 +36,7 @@ export class LobbyGateway implements OnGatewayConnection, OnGatewayDisconnect {
   onModuleInit() {
     this.redisPubSubService.registerRoomListUpdateCallback(async () => {
       const roomList = await this.lobbyService.getRooms();
-      this.redisPubSubService.io?.to('lobby').emit('update:room:list', roomList);
+      this.redisPubSubService.io?.to('lobby').emit('update', roomList);
       console.log('📢 update:room:list → 로비 전체에 emit');
     });
   }
@@ -46,7 +47,7 @@ afterInit(server: Server) {
 
   this.redisPubSubService.registerRoomListUpdateCallback(async () => {
     const roomList = await this.lobbyService.getRooms();
-    this.server.to('lobby').emit('update:room:list');
+    this.server.to('lobby').emit('update', roomList);
   });
 }
 
@@ -56,7 +57,7 @@ afterInit(server: Server) {
       console.log(`✅ 유저 ${client.data.userId} 연결됨`);
 
         // 클라이언트에 위치 상태 전송
-  client.emit('update:location', {
+  client.emit('update', {
     state,
     roomId,
   });
@@ -69,30 +70,29 @@ afterInit(server: Server) {
       client.disconnect();
     }
   }
+
   
-  @SubscribeMessage('request:location:restore')
+  @SubscribeMessage('connect')
 async handleRestoreRequest(@ConnectedSocket() client: Socket) {
   const userId = client.data.userId;
   if (!userId) {
-    client.emit('update:location:restore', { state: 'lobby', roomInfo: null });
+    client.emit('update', { state: 'lobby', roomInfo: null });
     return;
   }
 
   const result = await this.connectionService.getLocationData(userId);
   client.emit('update:location:restore', { state: result.state, roomInfo: result.roomInfo?? null, roomId: result.roomId?? null });
 }
-
-
     
   async handleDisconnect(@ConnectedSocket() client: Socket) {
     await this.connectionService.handleDisconnect(client);
     console.log(`❌ 유저 ${client.data?.userId} 접속 해제`);
   }
 
-@SubscribeMessage('request:room:create')
+@SubscribeMessage('request')
 async handleCreateRoom(
   @ConnectedSocket() client: Socket,
-  @MessageBody() data: { name: string },
+  @MessageBody() data: userDataResponse,
 ) {
   const hostUser = {
     nickname: client.data.nickname,

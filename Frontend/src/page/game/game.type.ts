@@ -1,6 +1,7 @@
 import { get } from "svelte/store";
-import { useRegionsNumber } from "./common/gameStore";
-import type { Item } from "./common/itemObject";
+import { hostAct, myStatus, region, useRegionsNumber } from "./common/gameStore";
+import { Item } from "./common/itemObject";
+import type { GamePlayerStatusInterface, SurvivorInterface } from "../../common/store/synchronize.type";
 
 export class GamePlayerStatus{ // 내 정보
  state: PlayerState;
@@ -15,6 +16,13 @@ export class GamePlayerStatus{ // 내 정보
   this.region = region
   this.next = Math.floor(Math.random()*get(useRegionsNumber))
   this.act = `lure`
+ }
+
+ updateData(payload:GamePlayerStatusInterface){
+ this.state = payload.state;
+ this.items =  payload.items.map(item => new Item(item))
+ this.region = payload.region;
+ myStatus.set(this)
  }
 
  setNext(next:number){
@@ -55,6 +63,10 @@ disappearSurvivor(){
     this.sameRegion = false
 } // 시야에서 사라짐
 
+updateData(Survivor: SurvivorInterface | undefined ){
+    if (Survivor && Survivor.sameRegion) this.checkAndUpdateSurvivor(Survivor.state)
+        else this.disappearSurvivor()
+}
 }
 
 type PlayerState = 'alive' | 'host' | `zombie` | `dead` | 'you' // 생존자 상태
@@ -79,6 +91,10 @@ export class HostAct{
     }
     setNextRegion(zombieId:number, regionId:number){ // 좀비 이동 세팅
         this.zombieList[zombieId].next = regionId
+    }
+    updateData(zombieList:Zombie[]){
+        this.zombieList = zombieList
+        hostAct.set(this)
     }
     playNextTurn(){
         let targetId = this.infect
@@ -128,9 +144,11 @@ export class Region{
         this.regionMessageList = []
     }
 
-    chat(ChatMessage:ChatMessage){
-        this.chatLog.push(ChatMessage)
-    }    // 채팅창 메세지 추가
+    updateData(chatLog:ChatMessage[], messageList:RegionMessage[]){
+        this.chatLog = chatLog
+        this.regionMessageList = messageList
+        region.set(this)
+    }
 
     addMessage(message:RegionMessage){
         this.regionMessageList.push(message)
