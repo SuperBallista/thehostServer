@@ -1,12 +1,15 @@
 // src/socket/lobby.service.ts
 import { Injectable } from '@nestjs/common';
 import { RedisPubSubService } from '../redis/redisPubSub.service';
-import { Room, userShortInfo } from './lobby.types';
 import { RedisService } from 'src/redis/redis.service';
 import { encodeBase32 } from 'src/utils/base32';
 import { WsException } from '@nestjs/websockets';
 import { UserDto } from 'src/user/dto/user.dto';
 import { UserService } from 'src/user/user.service';
+import { playerShortInfo, Room, userDataResponse } from './payload.types';
+import { moveToRoom } from './utils/socketRoomManager';
+import { Socket } from 'socket.io';
+import { LocationState } from './data.types';
 
 
 @Injectable()
@@ -41,11 +44,15 @@ export class LobbyService {
     throw new WsException('방 태그 생성에 실패했습니다. 잠시 후 재시도하거나 방제를 바꾸어서 재시도 해보세요')
   }
 
-  async createRoom(hostUserId: number, name: string, hostUser: userShortInfo): Promise<Room> {
+  async createRoom(client:Socket, name: string): Promise<userDataResponse> {
+    const hostUser:{ id:number, nickname:string } = {
+      id: client.data.id,
+      nickname: client.data.nickname      
+    }
     const roomData: Room = {
       id: await this.makeRoomId(name),
       name,
-      hostUserId,
+      hostUserId: hostUser.id,
       players: [hostUser],
       date: new Date(),
       bot: true
@@ -61,15 +68,18 @@ export class LobbyService {
 
       
     // 위치 기록
-    await this.redisService.stringifyAndSet(`locationState:${hostUserId}`, {state: 'host', roomId: roomData.id}, 300);
+    await this.redisService.stringifyAndSet(`locationState:${hostUser.id}`, {state: 'host', roomId: roomData.id}, 300);
   
     // PubSub 브로드캐스트
     this.redisPubSubService.publisher.publish('internal:room:list', roomData.id);
+
+    moveToRoom(client, roomData.id)
   
-    return roomData;
+    return { roomData } ;
   }
 
-       async joinRoom(roomId:string, userId:number){
+       async joinRoom(client:Socket, roomId:string){
+        const userId = client.data.id
         // 유저 ID로 유저 정보를 불러옴
        const userData:UserDto = await this.userService.findById(userId)
        // 방 정보를 레디스에서 불러옴옴
@@ -88,8 +98,9 @@ export class LobbyService {
 
        await this.redisService.stringifyAndSet(`locationState:${userId}`, {state: 'room', roomId: roomData.id}, 300);
        this.redisPubSubService.publisher.publish('internal:room:list', roomData.id);
+       moveToRoom(client, roomId)
 
-        return roomData
+       return { roomData }
       }
 
 //** 방에서 나가는 사람의 위치를 로비로 변경 */
@@ -138,11 +149,15 @@ await this.broadcastRoomUpdate(room)
 }
 
 
-async exitToLobby(roomId: string, userId: number) {
+async exitToLobby(client: Socket): Promise<userDataResponse> {
+  const userId = client.data.id
+  const locationState:LocationState = await this.redisService.getAndParse(`locationState:${userId}`)
+  const roomId = locationState.roomId
+
   if (!userId || !roomId) throw new WsException('사용자 또는 방 정보 오류');
 
   let roomData:Room = await this.redisService.getAndParse(`room:data:${roomId}`);
-  if (!roomData) return null;
+  if (!roomData) return { exitRoom: true };
 
   roomData = this.removeUserFromRoom(roomData, userId)
   await this.updateUserLocationToLobby(userId);
@@ -167,14 +182,16 @@ async exitToLobby(roomId: string, userId: number) {
   await this.updateRoomInRedis(roomData);
   await this.broadcastRoomUpdate(roomData);
 
+  return { exitRoom: true }
 }
 
 
       
-  async getRooms(page: number = 1): Promise<Room[]> {
+  async getRooms(page: number = 1): Promise<userDataResponse> {
   const roomListKeys = await this.getPaginatedRoomListKeys(page);
   const roomIds = await this.getRoomIdsFromKeys(roomListKeys);
-    return await this.getRoomsFromIds(roomIds);
+  const roomList:Room[] = await this.getRoomsFromIds(roomIds)
+    return { roomList };
 }
 
 private async getPaginatedRoomListKeys(page: number): Promise<string[]> {

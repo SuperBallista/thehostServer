@@ -1,3 +1,4 @@
+
 export interface userRequest{
 token: string
 user: AuthUser
@@ -10,22 +11,23 @@ createRoom?: string
 joinRoom?: string
 exitRoom?: boolean
 
-myStatus?: GamePlayerStatus
+myStatus?: GamePlayerStatusInterface
 hostAct?: HostAct
 giveItem?: GiveItem
 useItem?: UseItem
 
+gameStart?: boolean
 
 
 }
 
 interface GiveItem{
   receiver: number
-  item: Item
+  item: ItemInterface
 }
 
 interface UseItem{
-  item: Item
+  item: ItemInterface
   targetPlayer?: number
   content?: string
   targetMessage?: number
@@ -48,10 +50,10 @@ joinRoom?:Room
 exitRoom?: boolean
 roomData?: Room
 playerId?: number
-myStatus?: GamePlayerStatus
+myStatus?: GamePlayerStatusInterface
 useRegionsNumber?: number
 gameTurn?: number
-surivorList?: Survivor[]
+survivorList?: SurvivorInterface[]
 hostAct?: HostAct
 region?: Region
 count?: number
@@ -65,57 +67,50 @@ interface AuthUser {
   nickname: string | null;
 }
 
-interface AuthState {
-  isLoggedIn: boolean;
-  isLoading: boolean;
-  token: string | null;
-  user: AuthUser | null;
-  error: string | null;
-}
+export type State = `lobby` | `host` | `room` | `game`
 
- type State = `lobby` | `host` | `room` | `game`
-
- interface Room {
+export interface Room {
     id: string;
     name: string;
-    hostUserId: string;
+    hostUserId: number;
     players: playerShortInfo[];
     bot: boolean
+    date?: Date
   };
 
-interface playerShortInfo{
+export interface playerShortInfo{
 nickname: string;
 id: number;
 }
 
-interface GamePlayerStatus{ // 내 정보
+export interface GamePlayerStatusInterface{ // 내 정보
  state: PlayerState;
- items: Item[];
+ items: ItemInterface[];
  region: number;
  next: number;
  act: Act
 }
 
-interface Survivor{ // 생존자 정보
+export interface SurvivorInterface{ // 생존자 정보
 playerId: number;
-nickname: string;
+nickname?: string;
 state: PlayerState;
 sameRegion: boolean
 }
 
 
-interface HostAct{
+export interface HostAct{
     infect: number | null
     canUseInfect: boolean
     zombieList: Zombie[]
 }
 
-interface Region{
+export interface Region{
     chatLog: ChatMessage[];
     regionMessageList: RegionMessage[];
 }
 
-interface Zombie{
+export interface Zombie{
     playerId: number
     targetId: number
     next: number
@@ -123,17 +118,17 @@ interface Zombie{
     region: number
 }
 
-interface ChatMessage{
+export interface ChatMessage{
     system: boolean
     message: string
     timeStamp: Date
 } // 채팅메세지 형식
 
-type RegionMessage = string | null // 구역 메세지 형식
+export type RegionMessage = string | null // 구역 메세지 형식
 
 
-type PlayerState = 'alive' | 'host' | `zombie` | `dead` | 'you' // 생존자 상태
-type Act = `runaway` | `hide` | `lure` // 좀비 대처 행동
-type Item = `spray` | `virusChecker` | `vaccine` | `medicine` | `vaccineMaterialA` | `vaccineMaterialB` | `vaccineMaterialC` | `wireless` | `eraser`
+export type PlayerState = 'alive' | 'host' | `zombie` | `dead` | 'you' // 생존자 상태
+export type Act = `runaway` | `hide` | `lure` // 좀비 대처 행동
+export type ItemInterface = `spray` | `virusChecker` | `vaccine` | `medicine` | `vaccineMaterialA` | `vaccineMaterialB` | `vaccineMaterialC` | `wireless` | `eraser`
 
 

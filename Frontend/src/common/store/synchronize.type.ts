@@ -16,7 +16,7 @@ hostAct?: HostAct
 giveItem?: GiveItem
 useItem?: UseItem
 
-
+gameStart?: boolean
 
 }
 
@@ -66,20 +66,12 @@ interface AuthUser {
   nickname: string | null;
 }
 
-interface AuthState {
-  isLoggedIn: boolean;
-  isLoading: boolean;
-  token: string | null;
-  user: AuthUser | null;
-  error: string | null;
-}
-
  type State = `lobby` | `host` | `room` | `game`
 
  interface Room {
     id: string;
     name: string;
-    hostUserId: string;
+    hostUserId: number;
     players: playerShortInfo[];
     bot: boolean
   };

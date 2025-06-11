@@ -6,23 +6,20 @@ import {
   OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
-  WebSocketServer,
-  WsException,
+  WebSocketServer
 } from '@nestjs/websockets';
 import { LobbyService } from './lobby.service';
 import { Server, Socket } from 'socket.io';
 import { ConnectionService } from './connection.service';
 import { RedisPubSubService } from 'src/redis/redisPubSub.service';
-import { moveToLobby, moveToRoom } from './utils/socketRoomManager';
-import { publishRoomUpdate } from 'src/redis/redisPubSubHelper';
-import { Room } from './lobby.types';
-import { userDataResponse } from './payload.types';
+import { Room, userDataResponse, userRequest } from './payload.types';
+import { GameService } from './game/game.service';
 
 
 
 
 @WebSocketGateway({ cors: true })
-export class LobbyGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
@@ -30,6 +27,7 @@ export class LobbyGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly connectionService: ConnectionService,
     private readonly lobbyService: LobbyService,
     private readonly redisPubSubService: RedisPubSubService,
+    private readonly gameService: GameService
   ) {}
 
 
@@ -92,86 +90,29 @@ async handleRestoreRequest(@ConnectedSocket() client: Socket) {
 @SubscribeMessage('request')
 async handleCreateRoom(
   @ConnectedSocket() client: Socket,
-  @MessageBody() data: userDataResponse,
+  @MessageBody() data: userRequest,
 ) {
-  const hostUser = {
-    nickname: client.data.nickname,
-    id: client.data.userId,
-  };
-  const { name } = data;
 
-  if (!hostUser.id || !name) {
-    client.emit('update:error', { message: '잘못된 요청입니다.' });
-    return;
-  }
+  let response:userDataResponse = {}
 
-  const room = await this.lobbyService.createRoom(hostUser.id, name, hostUser);
+  if (data.createRoom) response = await this.lobbyService.createRoom(client, data.createRoom)
+  if (data.joinRoom) response = await this.lobbyService.joinRoom(client , data.joinRoom)
+  if (data.exitRoom) response = await this.lobbyService.exitToLobby(client)
+  if (data.page) await this.lobbyService.getRooms(data.page)
+  if (data.gameStart) await this.gameService.gameStart(client.data.id)
 
-  moveToRoom(client, room.id)
 
   // ✅ 생성 결과 전송
-  client.emit('update:room:data', room);
-  this.server.to('lobby').emit('update:room:list');
+  client.emit('update', response);
 }
 
-  @SubscribeMessage('request:lobby:list')
-  async handleGetRoomList(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { page?: number }
-  ) {
-    const page = data?.page ?? 1;
-    const roomList = await this.lobbyService.getRooms(page);
-    return roomList
-  }
 
-
-  @SubscribeMessage('request:location:update')
-async handleLocationUpdate(
+@SubscribeMessage('internal:game:start')
+async handleSubscribeGameStart(
   @ConnectedSocket() client: Socket,
-  @MessageBody() data: { state: 'lobby' | 'room' | 'game', roomId?: string }
-) {
-  const userId = client.data?.userId;
-  if (!userId || !data?.state) {
-    throw new WsException('유저 정보가 없습니다')
-  }
-
-  const locationData = {
-    state: data.state,
-    roomId: data.roomId || '',
-  };
-
-  await this.connectionService.setLocation(userId, locationData);
-
-  client.emit(`update:location`, locationData);
-}
-
-@SubscribeMessage('request:room:join')
-async handleJoinRoom(
-  @ConnectedSocket() client: Socket,
-  @MessageBody() data: { roomId: string }
-) {
-  const room = await this.lobbyService.joinRoom(data.roomId, client.data?.userId);
-
-  moveToRoom(client, room.id)
-
-  publishRoomUpdate(this.redisPubSubService, room.id)
-
-  return room; // 응답도 동시에 보내려면 유지
-}
-
-@SubscribeMessage(`request:room:setting`)
-async handleRoomSetting(
-  @MessageBody() data: {roomData: Room}
+  @MessageBody() roomData:Room
 ){
-  await this.lobbyService.changeRoomOption(data.roomData)
+  await this.gameService.subscribeGameStart(client, client.data.id, roomData.players, roomData.id)
 }
 
-@SubscribeMessage('request:room:exit')
-async handleExitToLobby(
-  @ConnectedSocket() client: Socket,
-  @MessageBody() data: { roomId: string }
-) {
-  await this.lobbyService.exitToLobby(data.roomId, client.data?.userId);
-  moveToLobby(client)
 }
-  }

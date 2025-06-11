@@ -3,10 +3,12 @@ import { Injectable } from '@nestjs/common';
 import { RedisService } from '../redis/redis.service';
 import { JwtService } from '../jwt/jwt.service';
 import { Socket } from 'socket.io';
-import { LocationState, Room } from './lobby.types';
+import { Room } from './payload.types';
+
 import { UserService } from 'src/user/user.service';
 import { WsException } from '@nestjs/websockets';
 import { moveToLobby, moveToRoom } from './utils/socketRoomManager';
+import { LocationState } from './data.types';
 
 @Injectable()
 export class ConnectionService {

@@ -5,9 +5,11 @@ import { Game, GamePlayer, Host} from './game.types';
 import { RedisService } from 'src/redis/redis.service';
 import { UserService } from 'src/user/user.service';
 import { WsException } from '@nestjs/websockets';
-import { LocationState, Room, userShortInfo } from '../lobby.types';
+import { LocationState, userShortInfo } from '../data.types';
+import { Room, SurvivorInterface } from '../payload.types';
 import { getOrderRandom } from '../utils/randomManager';
 import { Socket } from 'socket.io';
+import { userDataResponse } from '../payload.types';
 
 
 @Injectable()
@@ -19,14 +21,14 @@ export class GameService {
   ) {}
 
 
-  async gameStart(hostUserId: number){
+  async gameStart(hostUserId: number): Promise<userDataResponse>{
     const state:LocationState = await this.redisService.getAndParse(`locationState:${hostUserId}`)
     if (!state) throw new WsException('방을 찾을 수 없습니다')   
     const roomData:Room = await this.getWaitRoomData(state.roomId)
-    const gameData = await this.makeGameData(roomData)
+    const gameData:userDataResponse = await this.makeGameData(roomData)
     await this.deleteWaitingRoomList(roomData.id, roomData.date)
 
-
+    return gameData
 }
 
 private async getWaitRoomData(roomId){
@@ -40,7 +42,7 @@ private async deleteWaitingRoomList(roomId, timeStamp){
     await this.redisService.del(`room:data:${roomId}`)
 }
 
-private async makeGameData(roomData:Room){
+private async makeGameData(roomData:Room): Promise<userDataResponse> {
     await this.redisPubSubService.publish(`internal:game:start` ,JSON.stringify(roomData)) // 모든 플레이어에게 게임 시작을 알림
     roomData.players = await this.fillBotPlayer(roomData) // 봇 채우기
     const hostPlayer = await this.selectHost(roomData.players) // 숙주 뽑기
@@ -50,6 +52,7 @@ private async makeGameData(roomData:Room){
     // 게임 데이터 세팅 준비 완료
     await this.createNewGameData(roomData.id, hostPlayer, players) // 게임 생성
 
+    return {}
 }
 
 private async selectHost(players:userShortInfo[]){
