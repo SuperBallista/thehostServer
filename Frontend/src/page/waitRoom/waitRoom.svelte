@@ -4,7 +4,7 @@
     import { closeMessageBox, showMessageBox } from '../../common/messagebox/customStore';
     import { THEME } from '../../common/constant/theme';
     import PlayerCard from './playerCard.svelte';
-    import { handleBotSetting, leaveRoom, relaodRoomInfo, reloadOffRoomInfo, startGame } from './waitRoomStore';
+    import { handleBotSetting, leaveRoom, relaodRoomInfo, startGame } from './waitRoomStore';
     import { authStore } from '../../common/store/authStore';
 
     onMount(async () => {
@@ -12,10 +12,6 @@
       await relaodRoomInfo(); // 방정보 수신 켜기
       closeMessageBox();
     });
-
-    onDestroy(async () => {
-      await reloadOffRoomInfo(); // 방정보 수신 끄기
-    })
 
   </script>
   {#if $pageStore !== 'game'}

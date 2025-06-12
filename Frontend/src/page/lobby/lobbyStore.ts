@@ -1,15 +1,17 @@
 import { get, writable } from 'svelte/store';
 import type { Room } from './lobby.type';
 import { showMessageBox } from '../../common/messagebox/customStore';
-import { currentRoom, lobbyPage, locationState, pageStore } from '../../common/store/pageStore';
+import { currentRoom, locationState, pageStore } from '../../common/store/pageStore';
 import { awaitSocketReady } from '../../common/utils/awaitSocketReady';
+import type { userRequest } from '../../common/store/synchronize.type';
+import { authStore } from '../../common/store/authStore';
 
 
 export const rooms = writable<Room[]>([])
 
 export async function getRoomList(page: number = 1) {
   const socket = await awaitSocketReady();
-    socket.emit('request:lobby:list',{ page });
+    socket.emit('request',{ page });
 }
 
 // UI 요청 + 트리거
@@ -26,7 +28,12 @@ export async function makeRoom() {
 
   const roomName = userResponse.values?.name || '빠른 게임방';
   const socket = await awaitSocketReady();
-  socket.emit('request:room:create', { name: roomName });
+  const token = get(authStore).token
+  const user = get(authStore).user
+  if (!token) return showMessageBox(`error`, '사용자 정보 없음', '사용자 정보가 없습니다. 다시 로그인하세요.')
+  if (!user) return showMessageBox(`error`, '사용자 정보 없음', '사용자 정보가 없습니다. 다시 로그인하세요.') 
+  const requestData:userRequest = { token, user, createRoom:roomName }
+  socket.emit('request', requestData);
 }
 
 // 상태 저장 로직만 따로
@@ -40,4 +47,15 @@ export function exitRoomState(){
   currentRoom.set(null);
   locationState.set(`lobby`);
   pageStore.set('lobby')
+}
+
+export async function onJoinRoom(roomId: string) {
+  const socket = await awaitSocketReady();
+  const token = get(authStore).token
+  const user = get(authStore).user
+  if (!token) return showMessageBox(`error`, '사용자 정보 없음', '사용자 정보가 없습니다. 다시 로그인하세요.')
+  if (!user) return showMessageBox(`error`, '사용자 정보 없음', '사용자 정보가 없습니다. 다시 로그인하세요.') 
+  const requestData:userRequest = {roomId, token, user, joinRoom:roomId}
+
+  socket.emit('request', requestData);
 }

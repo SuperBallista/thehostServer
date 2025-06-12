@@ -95,6 +95,7 @@ async handleCreateRoom(
 
   let response:userDataResponse = {}
 
+  
   if (data.createRoom) response = await this.lobbyService.createRoom(client, data.createRoom)
   if (data.joinRoom) response = await this.lobbyService.joinRoom(client , data.joinRoom)
   if (data.exitRoom) response = await this.lobbyService.exitToLobby(client)

@@ -1,12 +1,12 @@
 // src/socket/game/game.service.ts
 import { Injectable } from '@nestjs/common';
 import { RedisPubSubService } from '../../redis/redisPubSub.service';
-import { Game, GamePlayer, Host} from './game.types';
+import { Game, GameInRedis, GamePlayer, GamePlayerInRedis, GameRegionInRedis, Host} from './game.types';
 import { RedisService } from 'src/redis/redis.service';
 import { UserService } from 'src/user/user.service';
 import { WsException } from '@nestjs/websockets';
 import { LocationState, userShortInfo } from '../data.types';
-import { Room, SurvivorInterface } from '../payload.types';
+import { Room, State } from '../payload.types';
 import { getOrderRandom } from '../utils/randomManager';
 import { Socket } from 'socket.io';
 import { userDataResponse } from '../payload.types';
@@ -94,7 +94,7 @@ private async createNewGameData(gameId:string, hostPlayer:number, players: GameP
     await this.redisService.stringifyAndSet(`${gameDataIndex}:host`,newHost) // 숙주 데이터 생성
     
     for (const player of players){
-    await this.redisService.stringifyAndSet(`${gameDataIndex}:player:${player.playerId}`, player)
+    await this.redisService.stringifyAndSet(`${gameDataIndex}:player:${player.playerId}`, player.recordData())
     } // 플레이어 데이터 생성
 
     await this.redisService.stringifyAndSet(`${gameDataIndex}:region:0:turn:1`, {regionId:0, turn:1, message:[]})
@@ -107,11 +107,27 @@ private async createNewGameData(gameId:string, hostPlayer:number, players: GameP
 }
 
 async subscribeGameStart(socket:Socket, userId: number, users: userShortInfo[], roomId:string){
+  
   const userIdList = users.map(user => user.id) // 유저 리스트
-  const locationData = {state: `game`, roomId} // 유저의 위치 정보 변경
+  const locationData:{state: State, roomId: string} = {state: `game`, roomId} // 유저의 위치 정보 변경
   if (!userIdList.includes(userId)) return
   await this.redisService.stringifyAndSet(`locaionState:${userId}`, locationData)
-  await socket.emit(`update:room:${roomId}:start`)
+
+  const gameDataIndex = `game:${roomId}` // 게임방 키값 변수로 저장
+
+  const gameData:GameInRedis = await this.redisService.getAndParse(`${gameDataIndex}`)
+  let gamePlayerList:GamePlayerInRedis[] = []
+  let myPlayerData:GamePlayerInRedis
+  for (let i=0; i<19; i++){
+  const gamePlayerData:GamePlayerInRedis = await this.redisService.getAndParse(`${gameDataIndex}:player:${i}`)
+  if (gamePlayerData) gamePlayerList.push(gamePlayerData) 
+  if (gamePlayerData.userId === userId) myPlayerData = gamePlayerData
+  }
+  
+  const gameRegionData:GameRegionInRedis = await this.redisService.getAndParse(`${gameDataIndex}:region:`)
+
+  const response: userDataResponse = { locationState:locationData.state }
+  await socket.emit(`update`, response)
   console.log(`${roomId}방 시작하기`)
 }
 

@@ -9,7 +9,7 @@ export interface AuthUser {
 export interface AuthState {
   isLoggedIn: boolean;
   isLoading: boolean;
-  token: string | null;
+  token: string | undefined;
   user: AuthUser | null;
   error: string | null;
 }
@@ -17,7 +17,7 @@ export interface AuthState {
 const defaultState: AuthState = {
   isLoggedIn: false,
   isLoading: false,
-  token: null,
+  token: undefined,
   user: null,
   error: null,
 };

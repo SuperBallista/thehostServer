@@ -29,7 +29,7 @@
                 }}
                 class={`w-full py-2 px-4 rounded-xl shadow ${THEME.bgTertiary} hover:${THEME.bgAccent} transition-colors`}
               >
-                {player.name}
+                {player.nickname}
               </button>
             </li>
           {/each}

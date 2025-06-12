@@ -1,7 +1,7 @@
 export interface Room {
     id: string;
     name: string;
-    hostUserId: string;
+    hostUserId: number;
     players: playerShortInfo[];
     bot: boolean
   };

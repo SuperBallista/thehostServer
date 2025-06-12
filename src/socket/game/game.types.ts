@@ -14,6 +14,32 @@ constructor(gameId, hostId){
     this.action = []
 }
 
+recordData(){
+   const gameData = {
+    gameId: this.gameId,
+    turn: this.turn,
+    hostId: this.hostId,
+    record: this.record,
+    action: this.action
+}
+    return gameData
+}
+}
+
+export interface GameRegionInRedis{
+regionId: number
+turn: number
+chatMessage:chatMessage
+regionMessage:regionMessage
+}
+
+
+export interface GameInRedis{
+gameId: string;
+turn: number;
+hostId: string;
+record: Record[];
+action: Action[];
 }
 
 //**전체 게임 진행 기록 */
@@ -44,6 +70,17 @@ export interface Action{
     timeStamp: Date
 }
 
+export interface GamePlayerInRedis {
+    playerId: number;
+    userId: number;
+    state: State
+    infected: number | null;
+    items: ItemCode[]
+    regionId: number;
+    next: number;
+    act: Act;
+}
+
 export class GamePlayer{
     playerId: number;
     userId: number;
@@ -63,6 +100,20 @@ export class GamePlayer{
         this.items = []
         this.next = Math.floor(Math.random() * regionNumber)
         this.act = 'lure'
+    }
+
+    recordData(){
+        const playerData = {
+            playerId: this.playerId,
+            userId: this.userId,
+            state: this.state,
+            infected: this.infected,
+            items: this.items,
+            regionId: this.regionId,
+            next: this.next,
+            act: this.act
+        }
+        return playerData
     }
 }
 
