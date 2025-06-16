@@ -4,8 +4,8 @@
   "settings": {
     "width": 2000,
     "height": 2000,
-    "scrollTop": -668,
-    "scrollLeft": -496,
+    "scrollTop": -923,
+    "scrollLeft": -590,
     "zoomLevel": 1,
     "show": 431,
     "database": 4,
@@ -395,15 +395,15 @@
           "hONpFwf7Wz08p7DwP1i9f"
         ],
         "ui": {
-          "x": 1150.6627925920195,
-          "y": 1384.4777684751366,
+          "x": 1244.6628,
+          "y": 1329.4778,
           "zIndex": 604,
           "widthName": 70,
           "widthComment": 60,
           "color": ""
         },
         "meta": {
-          "updateAt": 1749040103596,
+          "updateAt": 1750066668222,
           "createAt": 1748934604863
         }
       }
@@ -1473,19 +1473,19 @@
         "id": "6ms_IhwOcVYchwBNyOE2k",
         "tableId": "cLov7xc44gKZdATcJSz_f",
         "name": "hostId",
-        "comment": "숙주",
+        "comment": "숙주 playerId (hostUserId)와 전혀 다른 개념임",
         "dataType": "INT",
         "default": "",
         "options": 8,
         "ui": {
           "keys": 2,
           "widthName": 60,
-          "widthComment": 60,
+          "widthComment": 245,
           "widthDataType": 60,
           "widthDefault": 60
         },
         "meta": {
-          "updateAt": 1748860325550,
+          "updateAt": 1750066714060,
           "createAt": 1748859938729
         }
       },
@@ -2090,9 +2090,9 @@
           "columnIds": [
             "6ms_IhwOcVYchwBNyOE2k"
           ],
-          "x": 1165.4149,
-          "y": 1258.3543,
-          "direction": 2
+          "x": 994.4149,
+          "y": 1346.3543,
+          "direction": 8
         },
         "meta": {
           "updateAt": 1748859938729,
@@ -2146,8 +2146,8 @@
           "columnIds": [
             "R6lQ_dHmq6_FRi7Ov-Ta4"
           ],
-          "x": 1515.6627925920195,
-          "y": 1436.4777684751366,
+          "x": 1609.6628,
+          "y": 1381.4778,
           "direction": 2
         },
         "meta": {
@@ -2165,8 +2165,8 @@
           "columnIds": [
             "R6lQ_dHmq6_FRi7Ov-Ta4"
           ],
-          "x": 1333.1627925920195,
-          "y": 1488.4777684751366,
+          "x": 1427.1628,
+          "y": 1433.4778,
           "direction": 8
         },
         "end": {
