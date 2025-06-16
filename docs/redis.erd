@@ -4,9 +4,9 @@
   "settings": {
     "width": 2000,
     "height": 2000,
-    "scrollTop": -923,
-    "scrollLeft": -590,
-    "zoomLevel": 1,
+    "scrollTop": -272,
+    "scrollLeft": -601,
+    "zoomLevel": 0.91,
     "show": 431,
     "database": 4,
     "databaseName": "theHost",
@@ -574,18 +574,18 @@
         "tableId": "1Ky0ufjoP1d03BSjLZBw0",
         "name": "date",
         "comment": "",
-        "dataType": "TIMESTAMP",
+        "dataType": "INT",
         "default": "",
         "options": 10,
         "ui": {
           "keys": 1,
           "widthName": 60,
           "widthComment": 60,
-          "widthDataType": 65,
+          "widthDataType": 60,
           "widthDefault": 60
         },
         "meta": {
-          "updateAt": 1748852257509,
+          "updateAt": 1750079891072,
           "createAt": 1748851721193
         }
       },
@@ -853,19 +853,19 @@
         "id": "xZbjX3bFzz6dl3SjETQmK",
         "tableId": "ZxgV6GXL1f2p-r3AmBqaX",
         "name": "date",
-        "comment": "",
-        "dataType": "TIMESTAMP",
+        "comment": "날짜를 숫자로 변환",
+        "dataType": "INT",
         "default": "",
         "options": 8,
         "ui": {
           "keys": 2,
           "widthName": 60,
-          "widthComment": 60,
-          "widthDataType": 65,
+          "widthComment": 105,
+          "widthDataType": 60,
           "widthDefault": 60
         },
         "meta": {
-          "updateAt": 1748852257509,
+          "updateAt": 1750079900522,
           "createAt": 1748852243429
         }
       },
@@ -1801,7 +1801,7 @@
           "columnIds": [
             "UMJbLidXNsrzZcG0GZbex"
           ],
-          "x": 807.9943,
+          "x": 805.4943,
           "y": 797.2726,
           "direction": 8
         },
@@ -1857,7 +1857,7 @@
           "columnIds": [
             "UMJbLidXNsrzZcG0GZbex"
           ],
-          "x": 1026.4942999999998,
+          "x": 1021.4943,
           "y": 665.2726,
           "direction": 2
         },
@@ -1894,7 +1894,7 @@
           "columnIds": [
             "xZbjX3bFzz6dl3SjETQmK"
           ],
-          "x": 1026.4942999999998,
+          "x": 1021.4943,
           "y": 753.2726,
           "direction": 2
         },

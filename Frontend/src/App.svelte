@@ -20,7 +20,8 @@
 <NewUser/>
 {:else if $pageStore === 'lobby'}
 <Lobby/>
-{:else if $pageStore === 'room' || $pageStore === 'host' || $pageStore === 'game'}
+{:else if $pageStore === 'room' || $pageStore === 'host'}
 <WaitRoom/>
+{:else if $pageStore === 'game'}
 <GameLayout/>
 {/if}

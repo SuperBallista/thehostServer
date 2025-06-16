@@ -11,7 +11,7 @@ export type Page =
   | 'result'
   | 'setting'
 
- export type State = `lobby` | `host` | `room` | `game`
+ export type State = 'lobby' | 'host' | 'room' | 'game'
   
 export const pageStore = writable<Page>('login');
 

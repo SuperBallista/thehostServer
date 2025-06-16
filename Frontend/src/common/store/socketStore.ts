@@ -77,45 +77,69 @@ function setupCoreHandlers(socket: Socket, resolve: () => void, reject: (e: Erro
 
 function setupDynamicSubscriptions(socket: Socket) {
 
-  socket.on(`update`, (responseData:userDataResponse) => {
+  socket.on('update', (responseData: userDataResponse) => {
     updateData(responseData)
-})}
+  });
 
-function updateData(payload:userDataResponse){
-    if (payload.locationState) locationState.set(payload.locationState)
-    if (payload.user) {
-      const oldAuthStore = get(authStore)
-      oldAuthStore.user = payload.user
-      authStore.set(oldAuthStore)
-    }
-    if (payload.token) {
-      const oldAuthStore = get(authStore)
-      oldAuthStore.token = payload.token
-      authStore.set(oldAuthStore)
-    }
+  // ✅ 게임 시작 이벤트 처리 추가
+  socket.on('internal:game:start', (roomData: any) => {
+    console.log('🎮 게임 시작 알림 수신:', roomData);
+    // 게임 시작 처리
+    socket.emit('internal:game:start', roomData);
+  });
+}
 
-  if (payload.page) lobbyPage.set(payload.page)
-  if (payload.roomList) rooms.set(payload.roomList)
-  if (payload.joinRoom) setRoomState(payload.joinRoom)
+function updateData(payload: userDataResponse) {
+  // 위치 상태 업데이트
+  if (payload.locationState) {
+    locationState.set(payload.locationState);
+    
+    // 페이지 자동 변경
+    if (payload.locationState === 'lobby') pageStore.set('lobby');
+    else if (payload.locationState === 'room') pageStore.set('room');
+    else if (payload.locationState === 'game') pageStore.set('game');
+  }
 
+  // 사용자 정보 업데이트
+  if (payload.user) {
+    const oldAuthStore = get(authStore);
+    oldAuthStore.user = payload.user;
+    authStore.set(oldAuthStore);
+  }
 
-  if (payload.roomData) currentRoom.set(payload.roomData) // 방정보 업데이트
-  if (payload.exitRoom) exitRoomState() // 방나가기
-  if (payload.gameTurn) gameTurn.set(payload.gameTurn) // 게임턴 넘기기
-  if (payload.count) count.set(payload.count) // 게임 시간 넘기기
-  if (payload.hostAct) get(hostAct)?.updateData(payload.hostAct.zombieList) // 좀비 리스트 업데이트
-  if (payload.myStatus) get(myStatus)?.updateData(payload.myStatus) // 내 상태 업데이트
-  if (payload.playerId) playerId.set(payload.playerId) // 플레이어 id 적용
-  if (payload.region) get(region).updateData(payload.region.chatLog, payload.region.regionMessageList) // 구역 업데이트
+  if (payload.token) {
+    const oldAuthStore = get(authStore);
+    oldAuthStore.token = payload.token;
+    authStore.set(oldAuthStore);
+  }
+
+  // 로비 관련 업데이트
+  if (payload.page) lobbyPage.set(payload.page);
+  if (payload.roomList) rooms.set(payload.roomList);
+  if (payload.joinRoom) setRoomState(payload.joinRoom);
+
+  // 방 관련 업데이트
+  if (payload.roomData) currentRoom.set(payload.roomData);
+  if (payload.exitRoom) exitRoomState();
+
+  // 게임 관련 업데이트
+  if (payload.gameTurn) gameTurn.set(payload.gameTurn);
+  if (payload.count) count.set(payload.count);
+  if (payload.hostAct) get(hostAct)?.updateData(payload.hostAct.zombieList);
+  if (payload.myStatus) get(myStatus)?.updateData(payload.myStatus);
+  if (payload.playerId) playerId.set(payload.playerId);
+  if (payload.region) get(region).updateData(payload.region.chatLog, payload.region.regionMessageList);
   if (payload.survivorList) {
-const sList = get(survivorList);
-const pList = payload.survivorList ?? [];
+    const sList = get(survivorList);
+    const pList = payload.survivorList ?? [];
+    sList.forEach((s, i) => {
+      if (pList[i]) s.updateData(pList[i]);
+    });
+  }
+  if (payload.useRegionsNumber) useRegionsNumber.set(payload.useRegionsNumber);
 
-sList.forEach((s, i) => {
-  if (pList[i]) s.updateData(pList[i]);
-});
-
-   } // 생존자 목록 업데이트
-  if (payload.useRegionsNumber) useRegionsNumber.set(payload.useRegionsNumber) // 사용 구역 번호 업데이트
-
+  // 알림 처리
+  if (payload.alarm) {
+    showMessageBox(payload.alarm.img as any, '알림', payload.alarm.message);
+  }
 }

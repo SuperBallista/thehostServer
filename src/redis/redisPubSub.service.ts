@@ -5,7 +5,13 @@ import Redis from 'ioredis';
 import { Server } from 'socket.io';
 import { RedisService } from './redis.service';
 import { WsException } from '@nestjs/websockets';
-import { string } from 'joi';
+import { Room } from 'src/socket/payload.types';
+import { 
+  InternalMessage, 
+  InternalUpdateType, 
+  InternalMessageBuilder,
+  MessageProcessResult
+} from './pubsub.types';
 
 @Injectable()
 export class RedisPubSubService implements OnModuleInit {
@@ -13,11 +19,9 @@ export class RedisPubSubService implements OnModuleInit {
   public subscriber: Redis;
   public io: Server | null = null;
 
-    private roomListUpdateCallback: (() => void) | null = null;
-
-    registerRoomListUpdateCallback(cb: () => void) {
-    this.roomListUpdateCallback = cb;
-  }
+  // 콜백 함수들
+  private roomListUpdateCallback: (() => void) | null = null;
+  private gameStartCallback: ((roomData: Room) => void) | null = null;
 
   constructor(
     private readonly configService: ConfigService,
@@ -30,73 +34,223 @@ export class RedisPubSubService implements OnModuleInit {
     this.subscriber = new Redis({ host, port });
   }
 
+  registerRoomListUpdateCallback(cb: () => void) {
+    this.roomListUpdateCallback = cb;
+  }
+
+  registerGameStartCallback(cb: (roomData: Room) => void) {
+    this.gameStartCallback = cb;
+  }
+
   onModuleInit() {
+    // 단일 internal 채널 구독
+    this.subscriber.subscribe('internal', (err, count) => {
+      if (err) {
+        console.error('❌ Redis internal 채널 구독 실패:', err);
+        return;
+      }
+      console.log(`✅ internal 채널 구독 시작 (${count}개 채널)`);
 
-
-      this.subscriber.psubscribe('internal:room:delete:*', (err, count) => {
-    if (err) {
-      console.error('❌ room:delete 구독 실패:', err);
-      return;
-    }
-    console.log(`✅ internal:room:delete:* 패턴 구독 시작 (${count}개 채널)`);
-  });
-
-this.subscriber.on('pmessage', async (pattern, channel, message:string) => {
-  if (channel.startsWith('internal:room:delete:')) {
-    const roomId = message;
-
-    // ✅ 방에 있던 유저들에게는 "방이 사라졌음" 알림
-    this.io?.to(`room:${roomId}`).emit('update:room:closed', {
-      roomId,
-      message: '방이 삭제되었습니다. 로비로 이동합니다.',
+      this.subscriber.on('message', async (channel, message) => {
+        if (channel === 'internal') {
+          await this.processInternalMessage(message);
+        }
+      });
     });
-
-    // ✅ 로비 유저에게는 방 목록에서 삭제하라고 알림
-    this.io?.to('lobby').emit('update:room:list');
-
-    console.log(`📢 update:room:closed → room:${roomId}`);
-    console.log(`📢 update:room:list → lobby`);
   }
-});
 
+  /**
+   * 내부 메시지 처리
+   */
+  private async processInternalMessage(messageStr: string): Promise<MessageProcessResult> {
+    try {
+      const message: InternalMessage = JSON.parse(messageStr);
+      
+      console.log(`📢 Internal Message: ${message.type}`, {
+        type: message.type,
+        targetRoom: message.targetRoomId,
+        targetUser: message.targetUserId
+      });
 
-    // room:data:update 구독
-  this.subscriber.subscribe('internal:room:data', (err, count) => {
-  if (err) {
-    console.error('❌ Redis 구독 실패:', err);
-    return;
-  }
-  console.log(`✅ internal:room:data 채널 구독 시작 (${count}개 채널)`);
+      let processed = false;
 
-  this.subscriber.on('message', async (channel, message) => {
-    // ✔ 고친 부분: internal:room:data로 비교
-    if (channel === 'internal:room:data') {
-      try {
-        const room = await this.redisService.getAndParse(`room:data:${message}`)
-        if (!room) throw new WsException('방 정보를 찾을 수 없습니다')
-        const roomId = room.id;
-        this.io?.to(`room:${roomId}`).emit(`update:room:data`, room); // 이벤트명도 정리
-        console.log(`📢 update:room:data → room:${roomId} 클라이언트에게 emit`);
-      } catch (e) {
-        console.warn('🚨 메시지 파싱 실패:', e);
+      switch (message.type) {
+        case InternalUpdateType.ROOM_LIST:
+          processed = await this.handleRoomListUpdate(message);
+          break;
+
+        case InternalUpdateType.ROOM_DATA:
+          processed = await this.handleRoomDataUpdate(message);
+          break;
+
+        case InternalUpdateType.ROOM_DELETE:
+          processed = await this.handleRoomDelete(message);
+          break;
+
+        case InternalUpdateType.GAME_START:
+          processed = await this.handleGameStart(message);
+          break;
+
+        case InternalUpdateType.USER_LOCATION:
+          processed = await this.handleUserLocation(message);
+          break;
+
+        case InternalUpdateType.PLAYER_STATUS:
+          processed = await this.handlePlayerStatus(message);
+          break;
+
+        default:
+          console.warn(`🚨 처리되지 않은 메시지 타입: ${message.type}`);
       }
+
+      return {
+        success: true,
+        type: message.type,
+        processed
+      };
+      
+    } catch (error) {
+      console.error('🚨 내부 메시지 처리 실패:', error);
+      return {
+        success: false,
+        type: InternalUpdateType.ROOM_LIST, // 기본값
+        processed: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * 방 목록 업데이트 처리
+   */
+  private async handleRoomListUpdate(message: InternalMessage): Promise<boolean> {
+    if (this.roomListUpdateCallback) {
+      this.roomListUpdateCallback();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * 방 데이터 업데이트 처리
+   */
+  private async handleRoomDataUpdate(message: InternalMessage): Promise<boolean> {
+    const { roomId } = message.data as any;
+    
+    try {
+      const room = await this.redisService.getAndParse(`room:data:${roomId}`);
+      if (room) {
+        this.io?.to(`room:${room.id}`).emit('update', { roomData: room });
+        console.log(`📢 방 데이터 업데이트 → room:${room.id}`);
+        return true;
+      }
+    } catch (error) {
+      console.error(`방 데이터 업데이트 실패: ${roomId}`, error);
+    }
+    return false;
+  }
+
+  /**
+   * 방 삭제 처리
+   */
+  private async handleRoomDelete(message: InternalMessage): Promise<boolean> {
+    const { roomId, kickedUserIds } = message.data as any;
+
+    // 로비 유저에게 방 목록 업데이트 알림
+    if (this.roomListUpdateCallback) {
+      this.roomListUpdateCallback();
     }
 
-    if (channel === 'internal:room:list') {
-      if (this.roomListUpdateCallback) {
-        this.roomListUpdateCallback(); // ← 콜백 실행
-      }
-    }
-  });
-});
-
-    // 추가 채널 구독
-    this.subscriber.subscribe('internal:room:list');
+    console.log(`📢 방 삭제 알림 → room:${roomId}`);
+    return true;
   }
 
-  
-  // 외부에서 호출할 수 있는 publish 함수
-  async publish(channel: string, payload: any) {
-    await this.publisher.publish(channel, JSON.stringify(payload));
+  /**
+   * 게임 시작 처리
+   */
+  private async handleGameStart(message: InternalMessage): Promise<boolean> {
+    const { roomId, gameId, playerIds } = message.data as any;
+    
+    try {
+      const roomData = await this.redisService.getAndParse(`room:data:${roomId}`);
+      if (roomData && this.gameStartCallback) {
+        this.gameStartCallback(roomData);
+        console.log(`📢 게임 시작 알림: ${roomId}`);
+        return true;
+      }
+    } catch (error) {
+      console.error(`게임 시작 처리 실패: ${roomId}`, error);
+    }
+    return false;
+  }
+
+  /**
+   * 유저 위치 업데이트 처리
+   */
+  private async handleUserLocation(message: InternalMessage): Promise<boolean> {
+    const { userId, locationState, roomId } = message.data as any;
+    
+    // 특정 유저에게만 위치 업데이트 전송
+    if (message.targetUserId) {
+      // 특정 유저의 소켓 ID를 찾아서 전송하는 로직 필요
+      console.log(`📍 유저 위치 업데이트: ${userId} → ${locationState}`);
+    }
+    
+    return true;
+  }
+
+  /**
+   * 플레이어 상태 업데이트 처리
+   */
+  private async handlePlayerStatus(message: InternalMessage): Promise<boolean> {
+    const { gameId, playerId, status } = message.data as any;
+    
+    this.io?.to(`game:${gameId}`).emit('update', {
+      playerId,
+      myStatus: status
+    });
+    
+    console.log(`🎮 플레이어 상태 업데이트: ${gameId}:${playerId}`);
+    return true;
+  }
+
+  /**
+   * 메시지 발행 (통합된 방식)
+   */
+  async publishInternal(message: InternalMessage): Promise<void> {
+    const messageStr = JSON.stringify(message);
+    await this.publisher.publish('internal', messageStr);
+  }
+
+  /**
+   * 편의 메서드들 - 기존 호환성 유지
+   */
+  async publishRoomListUpdate(roomId: string, action: 'create' | 'update' | 'delete' = 'update'): Promise<void> {
+    const message = InternalMessageBuilder.roomListUpdate(roomId, action);
+    await this.publishInternal(message);
+  }
+
+  async publishRoomDataUpdate(roomId: string): Promise<void> {
+    const message = InternalMessageBuilder.roomDataUpdate(roomId);
+    await this.publishInternal(message);
+  }
+
+  async publishRoomDelete(roomId: string, kickedUserIds: number[] = []): Promise<void> {
+    const message = InternalMessageBuilder.roomDelete(roomId, kickedUserIds);
+    await this.publishInternal(message);
+  }
+
+  async publishGameStart(roomId: string, gameId: string, playerIds: number[]): Promise<void> {
+    const message = InternalMessageBuilder.gameStart(roomId, gameId, playerIds);
+    await this.publishInternal(message);
+  }
+
+  /**
+   * 기존 호환성 유지를 위한 레거시 메서드
+   */
+  async publish(channel: string, payload: any): Promise<void> {
+    console.warn('⚠️ Legacy publish method used. Consider using publishInternal instead.');
+    const data = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    await this.publisher.publish(channel, data);
   }
 }

@@ -2,16 +2,16 @@
 export class Game {
 gameId: string;
 turn: number;
-hostId: string;
+hostId: number; // string에서 number로 변경
 record: Record[];
 action: Action[];
 
-constructor(gameId, hostId){
+constructor(gameId: string, hostId: number) {
     this.gameId = gameId;
     this.turn = 1;
-    this.hostId = hostId
-    this.record = []
-    this.action = []
+    this.hostId = hostId;
+    this.record = [];
+    this.action = [];
 }
 
 recordData(){
@@ -37,7 +37,7 @@ regionMessage:regionMessage
 export interface GameInRedis{
 gameId: string;
 turn: number;
-hostId: string;
+hostId: number;
 record: Record[];
 action: Action[];
 }
@@ -91,15 +91,16 @@ export class GamePlayer{
     next: number;
     act: Act;
 
-    constructor(playerId, userId, regionId, host:boolean, regionNumber: number){
-        this.playerId = playerId
-        this.userId = userId
-        this.regionId = regionId
+    constructor(playerId: number, userId: number, regionId: number, host: boolean, regionNumber: number) {
+        this.playerId = playerId;
+        this.userId = userId;
+        this.regionId = regionId;
+        this.infected = null; // 추가
         
         this.state = host ? 'host' : 'alive';
-        this.items = []
-        this.next = Math.floor(Math.random() * regionNumber)
-        this.act = 'lure'
+        this.items = [];
+        this.next = Math.floor(Math.random() * regionNumber);
+        this.act = 'lure';
     }
 
     recordData(){

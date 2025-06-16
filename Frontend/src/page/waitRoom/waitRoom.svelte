@@ -4,12 +4,12 @@
     import { closeMessageBox, showMessageBox } from '../../common/messagebox/customStore';
     import { THEME } from '../../common/constant/theme';
     import PlayerCard from './playerCard.svelte';
-    import { handleBotSetting, leaveRoom, relaodRoomInfo, startGame } from './waitRoomStore';
+    import { handleBotSetting, leaveRoom, reloadRoomInfo, startGame } from './waitRoomStore';
     import { authStore } from '../../common/store/authStore';
 
     onMount(async () => {
       showMessageBox('loading', '방 정보 열기', '방 정보를 서버로부터 가져옵니다');
-      await relaodRoomInfo(); // 방정보 수신 켜기
+      await reloadRoomInfo(); // 방정보 수신 켜기
       closeMessageBox();
     });
 

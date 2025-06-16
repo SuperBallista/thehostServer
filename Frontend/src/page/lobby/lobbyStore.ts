@@ -1,6 +1,6 @@
 import { get, writable } from 'svelte/store';
 import type { Room } from './lobby.type';
-import { showMessageBox } from '../../common/messagebox/customStore';
+import { closeMessageBox, showMessageBox } from '../../common/messagebox/customStore';
 import { currentRoom, locationState, pageStore } from '../../common/store/pageStore';
 import { awaitSocketReady } from '../../common/utils/awaitSocketReady';
 import type { userRequest } from '../../common/store/synchronize.type';
@@ -46,7 +46,8 @@ export function setRoomState(room: Room) {
 export function exitRoomState(){
   currentRoom.set(null);
   locationState.set(`lobby`);
-  pageStore.set('lobby')
+  pageStore.set('lobby');
+  closeMessageBox();
 }
 
 export async function onJoinRoom(roomId: string) {

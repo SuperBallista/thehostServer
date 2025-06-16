@@ -6,10 +6,11 @@ import { encodeBase32 } from 'src/utils/base32';
 import { WsException } from '@nestjs/websockets';
 import { UserDto } from 'src/user/dto/user.dto';
 import { UserService } from 'src/user/user.service';
-import { playerShortInfo, Room, userDataResponse } from './payload.types';
+import { Room, userDataResponse } from './payload.types';
 import { moveToRoom } from './utils/socketRoomManager';
 import { Socket } from 'socket.io';
 import { LocationState } from './data.types';
+import { InternalUpdateType } from 'src/redis/pubsub.types';
 
 
 @Injectable()
@@ -44,64 +45,75 @@ export class LobbyService {
     throw new WsException('방 태그 생성에 실패했습니다. 잠시 후 재시도하거나 방제를 바꾸어서 재시도 해보세요')
   }
 
-  async createRoom(client:Socket, name: string): Promise<userDataResponse> {
-    const hostUser:{ id:number, nickname:string } = {
-      id: client.data.id,
+  async createRoom(client: Socket, name: string): Promise<userDataResponse> {
+    const hostUser: { id: number, nickname: string } = {
+      id: client.data.id || client.data.userId,
       nickname: client.data.nickname      
-    }
+    };
+
     const roomData: Room = {
       id: await this.makeRoomId(name),
       name,
       hostUserId: hostUser.id,
       players: [hostUser],
-      date: new Date(),
+      date: Date.now(),
       bot: true
     };
   
-    // 메모리에도 저장 (옵션)
+    // 메모리에도 저장
     this.rooms.set(roomData.id, roomData);
   
     // Redis 저장
-    await this.redisService.stringifyAndSet(`room:data:${roomData.id}`, roomData,3600);
-
-    await this.redisService.stringifyAndSet(`room:list:${roomData.date}`, {id: roomData.id});
-
+    await this.redisService.stringifyAndSet(`room:data:${roomData.id}`, roomData, 3600);
+    if (!roomData.date) throw new WsException('날짜 생성 오류가 발생하였습니다')
+    await this.redisService.stringifyAndSet(`room:list:${roomData.date}`, { id: roomData.id });
       
-    // 위치 기록
-    await this.redisService.stringifyAndSet(`locationState:${hostUser.id}`, {state: 'host', roomId: roomData.id}, 300);
+    // 위치 기록 (room으로 변경)
+    await this.redisService.stringifyAndSet(`locationState:${hostUser.id}`, { state: 'room', roomId: roomData.id }, 300);
   
     // PubSub 브로드캐스트
-    this.redisPubSubService.publisher.publish('internal:room:list', roomData.id);
+    await this.redisPubSubService.publishRoomListUpdate(roomData.id, 'create');
 
-    moveToRoom(client, roomData.id)
+    moveToRoom(client, roomData.id);
   
-    return { roomData } ;
+    return { roomData, locationState: 'room' };
   }
 
-       async joinRoom(client:Socket, roomId:string){
-        const userId = client.data.id
-        // 유저 ID로 유저 정보를 불러옴
-       const userData:UserDto = await this.userService.findById(userId)
-       // 방 정보를 레디스에서 불러옴옴
-       const roomData:Room = await this.redisService.getAndParse(`room:data:${roomId}`)
-       // 방정보에 새로운 유저정보를 추가함
-       if (!userData.nickname) throw new WsException('닉네임이 없습니다')
+  async joinRoom(client: Socket, roomId: string): Promise<userDataResponse> {
+    const userId = client.data.id || client.data.userId;
+    
+    // 유저 ID로 유저 정보를 불러옴
+    const userData: UserDto = await this.userService.findById(userId);
+    // 방 정보를 레디스에서 불러옴
+    const roomData: Room = await this.redisService.getAndParse(`room:data:${roomId}`);
+    
+    if (!roomData) {
+      throw new WsException('존재하지 않는 방입니다');
+    }
+    
+    if (!userData.nickname) {
+      throw new WsException('닉네임이 없습니다');
+    }
 
-        const userDataText = {id: userData.id, nickname: userData.nickname}
+    const userDataText = { id: userData.id, nickname: userData.nickname };
 
-       if (!roomData.players.some(player => Number(player.id) === userDataText.id)) roomData.players.push(userDataText)
+    // 중복 참가 방지
+    if (!roomData.players.some(player => Number(player.id) === userDataText.id)) {
+      roomData.players.push(userDataText);
+    }
 
-        await this.redisService.stringifyAndSet(`room:data:${roomId}`, roomData)
+    await this.redisService.stringifyAndSet(`room:data:${roomId}`, roomData);
 
-       // PubSub 브로드캐스트
-       this.redisPubSubService.publisher.publish(`internal:room:data`, roomData.id);
+    // PubSub 브로드캐스트
+    await this.redisPubSubService.publishRoomDataUpdate(roomData.id);
 
-       await this.redisService.stringifyAndSet(`locationState:${userId}`, {state: 'room', roomId: roomData.id}, 300);
-       this.redisPubSubService.publisher.publish('internal:room:list', roomData.id);
-       moveToRoom(client, roomId)
+    await this.redisService.stringifyAndSet(`locationState:${userId}`, { state: 'room', roomId: roomData.id }, 300);
+    await this.redisPubSubService.publishRoomListUpdate(roomData.id, 'update');
+    
+    moveToRoom(client, roomId);
 
-       return { roomData }
-      }
+    return { roomData, locationState: 'room' };
+  }
 
 //** 방에서 나가는 사람의 위치를 로비로 변경 */
       private async updateUserLocationToLobby(userId: number) { 
@@ -118,7 +130,7 @@ private removeUserFromRoom(room: Room, userId: number): Room {
 private async deleteRoomCompletely(room: Room) { 
   await this.redisService.del(`room:list:${room.date}`);
   await this.redisService.del(`room:data:${room.id}`);
-  await this.redisPubSubService.publisher.publish(`internal:room:delete:${room.id}`, room.id);
+  await this.redisPubSubService.publishRoomDelete(room.id);
 }
 
 //** 방정보가 업데이트된 것을 레디스에서 업데이트 */
@@ -129,16 +141,14 @@ private async updateRoomInRedis(room: Room) {
 
 //** 방정보가 업데이트된 것을 레디스 pub/sub으로 알리기 */
 private async broadcastRoomUpdate(room: Room) {
-  await this.redisPubSubService.publisher.publish(`internal:room:data`, room.id);
-  await this.redisPubSubService.publisher.publish('internal:room:list', room.id);
+  await this.redisPubSubService.publishRoomDataUpdate(room.id);
+  await this.redisPubSubService.publishRoomListUpdate(room.id, 'update');
 }
 
 //** 방이 폐쇄되었을 때 남은 사람을 로비로 킥 */
 private async notifyRoomDestroyed(room: Room) {
-  await this.redisPubSubService.publish(`internal:room:delete:${room.id}`, JSON.stringify({
-    roomId: room.id,
-    kickedUserIds: room.players.map(p => p.id)
-  }));
+  // 새로운 구조에서는 publishRoomDelete를 사용
+  await this.redisPubSubService.publishRoomDelete(room.id);
 }
 
 
@@ -146,44 +156,51 @@ private async notifyRoomDestroyed(room: Room) {
 async changeRoomOption(room: Room){
 await this.redisService.stringifyAndSet(`room:data:${room.id}`, room)
 await this.broadcastRoomUpdate(room)
+
+return {}
 }
 
 
 async exitToLobby(client: Socket): Promise<userDataResponse> {
-  const userId = client.data.id
-  const locationState:LocationState = await this.redisService.getAndParse(`locationState:${userId}`)
-  const roomId = locationState.roomId
+    const userId = client.data.id || client.data.userId;
+    const locationState: LocationState = await this.redisService.getAndParse(`locationState:${userId}`);
+    const roomId = locationState?.roomId;
 
-  if (!userId || !roomId) throw new WsException('사용자 또는 방 정보 오류');
-
-  let roomData:Room = await this.redisService.getAndParse(`room:data:${roomId}`);
-  if (!roomData) return { exitRoom: true };
-
-  roomData = this.removeUserFromRoom(roomData, userId)
-  await this.updateUserLocationToLobby(userId);
-
-  const isHost = userId === Number(roomData.hostUserId);
-
-  if (isHost) {
-  if (roomData.players.length > 0) {
-  const newHost = roomData.players[0];
-  if (!newHost || !newHost.id) {
-    throw new WsException('새로운 방장을 지정할 수 없습니다');
-  }
-  roomData.hostUserId = newHost.id;
-  }
-  else {
-      await this.deleteRoomCompletely(roomData);
-      await this.notifyRoomDestroyed(roomData);
+    if (!userId || !roomId) {
+      throw new WsException('사용자 또는 방 정보 오류');
     }
+
+    let roomData: Room = await this.redisService.getAndParse(`room:data:${roomId}`);
+    if (!roomData) {
+      await this.updateUserLocationToLobby(userId);
+      return { exitRoom: true, locationState: 'lobby' };
+    }
+
+    roomData = this.removeUserFromRoom(roomData, userId);
+    await this.updateUserLocationToLobby(userId);
+
+    const isHost = userId === Number(roomData.hostUserId);
+
+    if (isHost) {
+      if (roomData.players.length > 0) {
+        const newHost = roomData.players[0];
+        if (!newHost || !newHost.id) {
+          throw new WsException('새로운 방장을 지정할 수 없습니다');
+        }
+        roomData.hostUserId = newHost.id;
+        await this.updateRoomInRedis(roomData);
+        await this.broadcastRoomUpdate(roomData);
+      } else {
+        await this.deleteRoomCompletely(roomData);
+        await this.notifyRoomDestroyed(roomData);
+      }
+    } else {
+      await this.updateRoomInRedis(roomData);
+      await this.broadcastRoomUpdate(roomData);
+    }
+
+    return { exitRoom: true, locationState: 'lobby' };
   }
-
-  // ✅ 후처리: 저장 & 브로드캐스트는 공통 처리
-  await this.updateRoomInRedis(roomData);
-  await this.broadcastRoomUpdate(roomData);
-
-  return { exitRoom: true }
-}
 
 
       

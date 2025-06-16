@@ -10,6 +10,7 @@ page?: number
 createRoom?: string
 joinRoom?: string
 exitRoom?: boolean
+room?: Room
 
 myStatus?: GamePlayerStatusInterface
 hostAct?: HostAct
@@ -75,7 +76,7 @@ export interface Room {
     hostUserId: number;
     players: playerShortInfo[];
     bot: boolean
-    date?: Date
+    date: number
   };
 
 export interface playerShortInfo{

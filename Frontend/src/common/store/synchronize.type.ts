@@ -10,6 +10,7 @@ page?: number
 createRoom?: string
 joinRoom?: string
 exitRoom?: boolean
+room?: Room
 
 myStatus?: GamePlayerStatusInterface
 hostAct?: HostAct
@@ -66,7 +67,7 @@ interface AuthUser {
   nickname: string | null;
 }
 
- type State = `lobby` | `host` | `room` | `game`
+ type State = 'lobby' | 'host' | 'room' | 'game'
 
  interface Room {
     id: string;

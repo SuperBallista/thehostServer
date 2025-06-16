@@ -1,9 +1,12 @@
 import { RedisPubSubService } from "./redisPubSub.service";
 
-// redisPubSubHelper.ts 또는 redisEventUtil.ts 같은 유틸 파일로 분리해도 좋음
-export function publishRoomUpdate(redisPubSubService: RedisPubSubService, roomId: string) {
-  
-    redisPubSubService.publish('internal:room:list', roomId);
-    redisPubSubService.publish(`internal:room:data`, roomId);
-  }
+/**
+ * 방 업데이트 헬퍼 함수
+ * 방 목록과 방 데이터를 동시에 업데이트하는 편의 함수
+ */
+export async function publishRoomUpdate(redisPubSubService: RedisPubSubService, roomId: string): Promise<void> {
+  // 새로운 통합 구조 사용
+  await redisPubSubService.publishRoomDataUpdate(roomId);
+  await redisPubSubService.publishRoomListUpdate(roomId, 'update');
+}
   
