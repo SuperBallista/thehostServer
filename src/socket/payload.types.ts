@@ -46,9 +46,10 @@ locationState?: State
 page?: number
 roomList?: Room[]
 joinRoom?:Room
+exitRoom?: boolean
 
 // 게임방 정보
-exitRoom?: boolean
+
 roomData?: Room
 playerId?: number
 myStatus?: GamePlayerStatusInterface

@@ -49,38 +49,17 @@ afterInit(server: Server) {
   });
 }
 
+  
   async handleConnection(@ConnectedSocket() client: Socket) {
     try {
-      const { userId, state, roomId } = await this.connectionService.verifyAndTrackConnection(client);
-      console.log(`✅ 유저 ${userId} 연결됨 (${state}:${roomId})`);
-
-      // 클라이언트에 위치 상태 전송
-      client.emit('update', {
-        locationState: state,
-        roomId,
-      });
-
+      const result = await this.connectionService.verifyAndTrackConnection(client);
+      
+      // 초기 연결 시 상태 전송
+      client.emit('update', result);
     } catch (err) {
       console.warn('연결 오류:', err);
       client.disconnect();
     }
-  }
-
-  
-  @SubscribeMessage('connect')
-  async handleRestoreRequest(@ConnectedSocket() client: Socket) {
-    const userId = client.data.userId;
-    if (!userId) {
-      client.emit('update', { locationState: 'lobby', roomInfo: null });
-      return;
-    }
-
-    const result = await this.connectionService.getLocationData(userId);
-    client.emit('update', { 
-      locationState: result.state, 
-      roomData: result.roomInfo ?? null, 
-      roomId: result.roomId ?? null 
-    });
   }
     
   async handleDisconnect(@ConnectedSocket() client: Socket) {

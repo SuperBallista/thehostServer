@@ -35,23 +35,29 @@
   }
 }
 
-
-
 onMount(async () => {
-  const result = getIAInformationFromUrl()
-  if (result){
-   await restoreAuthFromSessionAndCookie()
-   const auth = get(authStore);
-    if (auth.user?.nickname) {
-    console.log('기존 유저, 로비 이동');
-    pageStore.set('lobby');
-    window.history.replaceState(null, '', window.location.pathname);
+  const result = getIAInformationFromUrl();
+
+  if (result) {
+    // 1) 세션·쿠키 복원 시도
+    const complete = await restoreAuthFromSessionAndCookie();
+
+    // 2) 복원이 성공했을 때만 다음 단계로
+    if (complete) {
+    // 3) 최신 auth 상태 확인
+      const auth = get(authStore);
+
+      if (auth.user?.nickname) {
+        console.log('기존 유저, 로비 이동');
+        pageStore.set('lobby');
+        window.history.replaceState(null, '', window.location.pathname);
+      }
     }
   }
+});
 
 
-});  
-  </script>
+</script>
   
   <div class="bg-black min-h-screen flex flex-col items-center justify-center p-6">
     <!-- 로고 및 타이틀 -->

@@ -3,12 +3,13 @@ import { Injectable } from '@nestjs/common';
 import { RedisService } from '../redis/redis.service';
 import { JwtService } from '../jwt/jwt.service';
 import { Socket } from 'socket.io';
-import { Room, State } from './payload.types';
+import { Room, State, userDataResponse } from './payload.types';
 
 import { UserService } from 'src/user/user.service';
 import { WsException } from '@nestjs/websockets';
 import { moveToLobby, moveToRoom } from './utils/socketRoomManager';
 import { LocationState } from './data.types';
+import { GameDto, GameInRedis } from './game/game.types';
 
 @Injectable()
 export class ConnectionService {
@@ -18,12 +19,11 @@ export class ConnectionService {
     private readonly userService: UserService
   ) {}
 
-async verifyAndTrackConnection(client: Socket): Promise<{ userId: number, state: State, roomId: string }> {
+async verifyAndTrackConnection(client: Socket): Promise<userDataResponse> {
     const token = client.handshake.auth?.token;
     if (!token) throw new WsException('Missing token');
 
     const payload = await this.jwtService.parseAccessToken(token);
-    client.data.userId = payload.userId;
     client.data.id = payload.userId; // ✅ 일관성을 위한 추가
     client.data.nickname = payload.nickname;
 
@@ -32,6 +32,8 @@ async verifyAndTrackConnection(client: Socket): Promise<{ userId: number, state:
     const parsed: LocationState = await this.redisService.getAndParse(`locationState:${payload.userId}`);
     let loadedState: State = 'lobby';
     let roomId: string = '';
+    let roomData: Room | undefined
+    let gameResultData: userDataResponse | undefined
 
     if (parsed) {
       loadedState = parsed.state || 'lobby';
@@ -39,13 +41,21 @@ async verifyAndTrackConnection(client: Socket): Promise<{ userId: number, state:
 
       if ((loadedState === 'room' || loadedState === 'game') && roomId) {
         // ✅ 게임 중인 경우와 대기실인 경우 구분
-        const roomData: Room = await this.redisService.getAndParse(`room:data:${roomId}`);
-        const gameData = await this.redisService.getAndParse(`game:${roomId}`);
+        roomData = await this.redisService.getAndParse(`room:data:${roomId}`);
+        const gameData:GameInRedis = await this.redisService.getAndParse(`game:${roomId}`);
+        // 게임 관련 자료 모두 로드
         
         if (gameData && loadedState === 'game') {
           // 게임 중인 경우
-          client.data.currentRoom = roomId;
+          client.data.currentRoom = roomData?.id;
           moveToRoom(client, roomId);
+
+          gameResultData = { gameTurn: gameData.turn, }
+
+
+          
+
+          
         } else if (roomData && loadedState === 'room') {
           // 대기실인 경우
           client.data.currentRoom = roomData.id;
@@ -65,8 +75,12 @@ async verifyAndTrackConnection(client: Socket): Promise<{ userId: number, state:
       moveToLobby(client);
     }
 
-    return { userId: payload.userId, state: loadedState, roomId };
+    const response: userDataResponse = { user: {id:payload.userId, nickname: payload.nickname }, locationState: loadedState, roomData,  }
+
+    return response ;
   }
+
+  
   async handleDisconnect(client: Socket) {
     const userId = client.data?.userId;
     if (!userId) return;

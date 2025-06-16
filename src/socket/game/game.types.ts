@@ -42,6 +42,11 @@ record: Record[];
 action: Action[];
 }
 
+export interface GameDto{
+gameId: string,
+turn: number
+}
+
 //**전체 게임 진행 기록 */
 export interface Record{
     message: string
