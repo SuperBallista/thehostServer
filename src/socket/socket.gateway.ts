@@ -96,8 +96,8 @@ afterInit(server: Server) {
         response = roomList
       }
       
-      if (data.gameStart) {
-        response = await this.gameService.gameStart(client.data.userId)
+      if (data.gameStart && data.user.id) {
+        response = await this.gameService.gameStart(data.user.id)
       }
 
       // ✅ 응답 전송
