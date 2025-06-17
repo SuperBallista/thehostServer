@@ -80,13 +80,6 @@ function setupDynamicSubscriptions(socket: Socket) {
   socket.on('update', (responseData: userDataResponse) => {
     updateData(responseData)
   });
-
-  // ✅ 게임 시작 이벤트 처리 추가
-  socket.on('internal:game:start', (roomData: any) => {
-    console.log('🎮 게임 시작 알림 수신:', roomData);
-    // 게임 시작 처리
-    socket.emit('internal:game:start', roomData);
-  });
 }
 
 function updateData(payload: userDataResponse) {

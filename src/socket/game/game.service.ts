@@ -21,14 +21,14 @@ export class GameService {
   ) {}
 
 
-  async gameStart(hostUserId: number): Promise<userDataResponse>{
-    const state: LocationState = await this.redisService.getAndParse(`locationState:${hostUserId}`)
+  async gameStart(userId: number): Promise<userDataResponse>{
+    const state: LocationState = await this.redisService.getAndParse(`locationState:${userId}`)
     if (!state || !state.roomId) throw new WsException('방을 찾을 수 없습니다')   
     
     const roomData: Room = await this.getWaitRoomData(state.roomId)
     
     // 방장 권한 확인
-    if (roomData.hostUserId !== hostUserId) {
+    if (roomData.hostUserId !== userId) {
       throw new WsException('게임을 시작할 권한이 없습니다')
     }
     
@@ -123,7 +123,7 @@ private async createNewGameData(gameId: string, hostPlayer: number, players: Gam
     }
 }
 
-async subscribeGameStart(socket: Socket, userId: number, users: userShortInfo[], roomId: string) {
+async subscribeGameStart(userId: number, users: userShortInfo[], roomId: string) {
     const userIdList = users.map(user => user.id) // 유저 리스트
     
     if (!userIdList.includes(userId)) return
@@ -164,20 +164,17 @@ async subscribeGameStart(socket: Socket, userId: number, users: userShortInfo[],
           }
         }
         
-        socket.emit('update', response)
         console.log(`${roomId}방 게임 시작 - 유저 ${userId} (플레이어 ${myPlayerData.playerId})`)
+        return response
       } else {
         console.warn(`유저 ${userId}의 게임 데이터를 찾을 수 없음`)
       }
     } catch (error) {
-      console.error(`게임 시작 처리 중 오류:`, error)
-      socket.emit('update', { 
-        locationState: 'lobby',
-        alarm: { message: '게임 시작 중 오류가 발생했습니다', img: 'error' }
-      })
+      throw new WsException('게임 시작 처리 중 오류:`, error')
+    }
     }
 }
 
 
-}
+
 
