@@ -30,9 +30,10 @@ async function moveNextRegion() {
 );
 }
 }
+    let isOpen = false
 
   </script>
-  
+  {#if isOpen}
     <div class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
       <div class={`${THEME.bgTertiary} p-4 rounded-lg w-3/4 max-w-md shadow-md`}>
         <h2 class="text-lg text-red-400 mb-2">🧭 행동 선택</h2>
@@ -48,4 +49,4 @@ async function moveNextRegion() {
         </button>
       </div>
     </div>
-  
+{/if}  

@@ -8,7 +8,6 @@ import { WsException } from '@nestjs/websockets';
 import { LocationState, userShortInfo } from '../data.types';
 import { Room, State } from '../payload.types';
 import { getOrderRandom } from '../utils/randomManager';
-import { Socket } from 'socket.io';
 import { userDataResponse } from '../payload.types';
 
 
@@ -123,12 +122,12 @@ private async createNewGameData(gameId: string, hostPlayer: number, players: Gam
     }
 }
 
-async subscribeGameStart(userId: number, users: userShortInfo[], roomId: string) {
+async subscribeGameStart(client: any, userId: number, users: userShortInfo[], roomId: string) {
     const userIdList = users.map(user => user.id) // 유저 리스트
     
     if (!userIdList.includes(userId)) return
     
-    // ✅ 오타 수정: locaionState → locationState
+    // locationState 업데이트
     const locationData: { state: State, roomId: string } = { state: 'game', roomId }
     await this.redisService.stringifyAndSet(`locationState:${userId}`, locationData)
 
@@ -161,16 +160,20 @@ async subscribeGameStart(userId: number, users: userShortInfo[], roomId: string)
             region: myPlayerData.regionId,
             next: myPlayerData.next,
             act: myPlayerData.act as any
-          }
+          },
+          gameTurn: gameData.turn,
+          count: gameData.turn < 5? 60 : 90 // 카운트다운시간 5턴 전에는 1분, 5턴 이후 1분 30초
         }
         
         console.log(`${roomId}방 게임 시작 - 유저 ${userId} (플레이어 ${myPlayerData.playerId})`)
+        // 클라이언트에게 게임 데이터 전송
+        client.emit('update', response)
         return response
       } else {
         console.warn(`유저 ${userId}의 게임 데이터를 찾을 수 없음`)
       }
     } catch (error) {
-      throw new WsException('게임 시작 처리 중 오류:`, error')
+      throw new WsException(`게임 시작 처리 중 오류: ${error}`)
     }
     }
 }

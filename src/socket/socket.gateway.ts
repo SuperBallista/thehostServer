@@ -41,11 +41,24 @@ afterInit(server: Server) {
     this.server.to('lobby').emit('update', roomList);
   });
 
-  // ✅ 게임 시작 pub/sub 처리 추가
+  // ✅ 게임 시작 pub/sub 처리 - 서버에서 바로 처리
   this.redisPubSubService.registerGameStartCallback(async (roomData: Room) => {
-    console.log(`📢 게임 시작 알림: ${roomData.id}`)
-    // 해당 방의 모든 클라이언트에게 게임 시작 알림
-    this.server.to(`room:${roomData.id}`).emit('internal:game:start', roomData);
+    console.log(`📢 게임 시작 알림: ${roomData.id} - 서버에서 직접 처리`)
+    
+    // 각 플레이어에게 직접 subscribeGameStart 호출
+    for (const player of roomData.players) {
+      const clientSocket = this.getUserSocket(player.id);
+      if (clientSocket) {
+        await this.gameService.subscribeGameStart(
+          clientSocket, 
+          player.id, 
+          roomData.players, 
+          roomData.id
+        );
+      } else {
+        console.warn(`⚠️ 플레이어 ${player.id}의 소켓을 찾을 수 없음`);
+      }
+    }
   });
 }
 
@@ -115,12 +128,16 @@ afterInit(server: Server) {
   }
 
 
-  @SubscribeMessage('internal:game:start')
-  async handleSubscribeGameStart(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() roomData: Room
-  ) {
-    await this.gameService.subscribeGameStart(client, client.data.userId, roomData.players, roomData.id)
+  /**
+   * 유저 ID로 연결된 소켓 찾기
+   */
+  private getUserSocket(userId: number): Socket | null {
+    for (const [socketId, socket] of this.server.sockets.sockets) {
+      if (socket.data?.id === userId) {
+        return socket;
+      }
+    }
+    return null;
   }
 
 }
