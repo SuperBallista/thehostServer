@@ -1,24 +1,58 @@
 <script lang="ts">
   import { THEME } from '../../../common/constant/theme';
-  import type { Survivor } from '../game.type';
+  import { otherPlayers, myStatus, playersInMyRegion } from '../../../stores/gameStateStore';
+  import type { PlayerStatus } from '../../../stores/gameStateStore';
 
   export let isOpen: boolean = false;
   export let alwaysVisible: boolean = false;
   export let onClose: () => void = () => {};
-let survivorList:HTMLElement
-let survivor: Survivor[] = []
+  
+  let survivorList:HTMLElement
 
+  // 모든 플레이어 목록 (나 포함)
+  $: allPlayers = [
+    ...(($myStatus) ? [$myStatus] : []),
+    ...Array.from($otherPlayers.values())
+  ].sort((a, b) => a.playerId - b.playerId);
 
-
-
-  function getClass(s: Survivor): string {
+  function getClass(player: PlayerStatus): string {
     let result:string = ''
-    if (s.status === 'you') result = THEME.textWarning
-    if (s.status === 'dead') result = `line-through`;
-    if (!s.sameRegion) result = result + ` ${THEME.textTertiary} italic`;
-    if (s.status === 'zombie' && s.sameRegion) result = THEME.textAccentStrong;
+    
+    // 내 캐릭터인 경우
+    if (player.playerId === $myStatus?.playerId) {
+      result = THEME.textAccent;
+    }
+    
+    // 사망한 경우
+    if (player.state === 'dead') {
+      result = `line-through`;
+    }
+    
+    // 같은 구역에 없는 경우 (내가 아닌 경우만)
+    const isInMyRegion = $playersInMyRegion.some(p => p.playerId === player.playerId);
+    if (player.playerId !== $myStatus?.playerId && !isInMyRegion && player.region !== $myStatus?.region) {
+      result = result + ` ${THEME.textTertiary} italic`;
+    }
+    
+    // 같은 구역의 좀비인 경우
+    if (player.state === 'zombie' && isInMyRegion) {
+      result = THEME.textWarning;
+    }
+    
     if (result==='') result = THEME.textPrimary;
     return result
+  }
+
+  function getStatusText(state: PlayerStatus['state']): string {
+    switch(state) {
+      case 'you': return '나';
+      case 'alive': return '생존자';
+      case 'host': return '숙주';
+      case 'zombie': return '좀비';
+      case 'infected': return '감염자';
+      case 'dead': return '사망';
+      default: return '알 수 없음';
+    }
   }
 </script>
 
@@ -30,8 +64,11 @@ let survivor: Survivor[] = []
 
     <h2 class="text-lg font-bold mb-2">👥 생존자 정보</h2>
     <ul class="space-y-1 text-sm">
-      {#each survivor as s}
-        <li class={getClass(s)}>{s.name} ({s.status})</li>
+      {#each allPlayers as player}
+        <li class={getClass(player)}>
+          {player.nickname} 
+          ({player.playerId === $myStatus?.playerId ? '나' : getStatusText(player.state)})
+        </li>
       {/each}
     </ul>
   </div>
@@ -47,8 +84,11 @@ let survivor: Survivor[] = []
     >
       <h2 class="text-lg font-bold mb-2">👥 생존자 정보</h2>
       <ul class="space-y-1 text-sm">
-        {#each survivor as s}
-          <li class={getClass(s)}>{s.name} ({s.status})</li>
+        {#each allPlayers as player}
+          <li class={getClass(player)}>
+            {player.nickname} 
+            ({player.playerId === $myStatus?.playerId ? '나' : getStatusText(player.state)})
+          </li>
         {/each}
       </ul>
       <button

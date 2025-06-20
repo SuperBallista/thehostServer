@@ -36,9 +36,9 @@ async function moveNextRegion() {
   {#if isOpen}
     <div class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
       <div class={`${THEME.bgTertiary} p-4 rounded-lg w-3/4 max-w-md shadow-md`}>
-        <h2 class="text-lg text-red-400 mb-2">🧭 행동 선택</h2>
+        <h2 class="text-lg text-purple-400 mb-2">🧭 행동 선택</h2>
         <div class="space-y-2">
-          <button class={`block w-full py-2 rounded ${THEME.bgWarning}`}>다음 턴 이동 장소 설정</button>
+          <button class={`block w-full py-2 rounded ${THEME.bgAccent}`}>다음 턴 이동 장소 설정</button>
           <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>좀비 대처 행동</button>
           <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>감염시키기</button>
           <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>좀비의 공격 대상 정하기</button>

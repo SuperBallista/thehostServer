@@ -44,7 +44,7 @@ async function moveNextRegion() {
             <div class="text-white font-medium">{item.name}</div>
             <div class="flex gap-1">
               <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`}>안내</button>
-              <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgWarning}`}>사용</button>
+              <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgAccent}`}>사용</button>
               <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`}>주기</button>
             </div>
           </div>
@@ -57,7 +57,7 @@ async function moveNextRegion() {
   <div>
     <button bind:this={action} class="w-full text-left px-4 py-2 font-semibold" on:click={() => toggle('action')}>🧭 행동</button>
       <div class="pl-6 mt-1 space-y-1 text-sm flex flex-col">
-        <button on:click={() => moveNextRegion()} class={`block w-full py-2 rounded ${THEME.bgWarning}`}>다음 턴 이동 장소 설정</button>
+        <button on:click={() => moveNextRegion()} class={`block w-full py-2 rounded ${THEME.bgAccent}`}>다음 턴 이동 장소 설정</button>
           <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>좀비 대처 행동</button>
           <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>감염시키기(숙주 전용)</button>
           <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>좀비의 공격 대상 정하기(숙주 전용)</button>
@@ -69,7 +69,7 @@ async function moveNextRegion() {
     <button class="w-full text-left px-4 py-2 font-semibold">
       ⏭️ 넘기기
     </button>
-      <button class="w-full ${THEME.textWarning} text-left px-4 py-2 font-semibold">🚪 나가기</button>
+      <button class="w-full ${THEME.textAccent} text-left px-4 py-2 font-semibold">🚪 나가기</button>
 </div>
 </div>
 </div>

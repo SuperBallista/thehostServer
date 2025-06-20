@@ -40,7 +40,7 @@
             config.reject();
             selectPlayerStore.set(null);
           }}
-          class={`w-full py-2 px-4 rounded-xl border mt-2 ${THEME.textWarning} border-${THEME.bgWarning}`}
+          class={`w-full py-2 px-4 rounded-xl border mt-2 ${THEME.textAccent} border-${THEME.bgAccent}`}
         >
           취소
         </button>

@@ -7,17 +7,62 @@
   import GameMenu from './gameMenu.svelte';
   import InventoryModal from './menu/inventoryModal.svelte';
   import ActionModal from './menu/actionModal.svelte';
-    import PlayerSelector from './selectModal/playerSelector.svelte';
-    import SelectOptionBox from './selectModal/selectOptionBox.svelte';
-    import { pageStore } from '../../common/store/pageStore';
+  import PlayerSelector from './selectModal/playerSelector.svelte';
+  import SelectOptionBox from './selectModal/selectOptionBox.svelte';
+  import { pageStore } from '../../common/store/pageStore';
+  import { onMount, onDestroy } from 'svelte';
+  import { 
+    gamePhase,
+    gameResult,
+    syncWithServer,
+    resetGameState
+  } from '../../stores/gameStateStore';
+  import { socketStore } from '../../common/store/socketStore';
     
   let showSurvivorModal = false;
 
+  onMount(() => {
+    // 소켓 이벤트 리스너 등록
+    const socket = $socketStore;
+    if (socket) {
+      socket.on('game-update', (data) => {
+        syncWithServer(data);
+      });
+    }
+  });
+
+  onDestroy(() => {
+    // 게임 페이지를 떠날 때 상태 초기화
+    resetGameState();
+  });
 
 </script>
 {#if $pageStore === 'game'}
 <PlayerSelector/>
 <SelectOptionBox/>
+
+
+<!-- 게임 종료 모달 -->
+{#if $gamePhase === 'ended' && $gameResult}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white p-8 rounded-lg shadow-xl">
+      <h2 class="text-2xl font-bold mb-4">게임 종료!</h2>
+      <p class="text-lg">
+        {#if $gameResult === 'cure'}
+          🎉 생존자 승리! 백신을 성공적으로 투여했습니다.
+        {:else if $gameResult === 'infected'}
+          🧟 좀비 승리! 모든 생존자가 감염되었습니다.
+        {:else if $gameResult === 'killed'}
+          💀 좀비 승리! 모든 생존자가 사망했습니다.
+        {/if}
+      </p>
+      <button class="mt-4 px-4 py-2 bg-blue-500 text-white rounded" on:click={() => pageStore.set('lobby')}>
+        로비로 돌아가기
+      </button>
+    </div>
+  </div>
+{/if}
+
 <div class={`flex flex-col md:flex-row min-h-screen px-6 py-4 gap-x-6 ${THEME.bgSecondary} ${THEME.textPrimary}`}>
 
 

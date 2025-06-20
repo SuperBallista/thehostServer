@@ -24,7 +24,7 @@
                 config.resolve(option);
                 selectOptionStore.set(null);
               }}
-              class={`w-full py-2 px-4 rounded-xl shadow ${THEME.bgTertiary} hover:${THEME.bgWarning} transition-colors`}
+              class={`w-full py-2 px-4 rounded-xl shadow ${THEME.bgTertiary} hover:${THEME.bgAccent} transition-colors`}
             >
               {option.label}
             </button>
@@ -37,7 +37,7 @@
           config.reject();
           selectOptionStore.set(null);
         }}
-        class={`w-full py-2 px-4 rounded-xl border mt-2 ${THEME.textWarning} border-${THEME.bgWarning}`}
+        class={`w-full py-2 px-4 rounded-xl border mt-2 ${THEME.textAccent} border-${THEME.bgAccent}`}
       >
         취소
       </button>

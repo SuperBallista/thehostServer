@@ -12,7 +12,7 @@
 
   <button
     type="button"
-    class={`px-4 py-1 ${THEME.bgWarning} ${THEME.textWhite} ${THEME.roundedDefault}`}  >
+    class={`px-4 py-1 ${THEME.bgAccent} ${THEME.textWhite} ${THEME.roundedDefault}`}  >
     전송
   </button>
 </div>
