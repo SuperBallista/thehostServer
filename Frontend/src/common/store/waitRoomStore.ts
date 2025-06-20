@@ -1,9 +1,9 @@
 import { get } from "svelte/store";
-import { awaitSocketReady } from "../../common/utils/awaitSocketReady";
-import { currentRoom } from "../../common/store/pageStore";
-import { closeMessageBox, showMessageBox } from "../../common/messagebox/customStore";
-import { authStore } from "../../common/store/authStore";
-import type { userRequest } from "../../common/store/synchronize.type";
+import { awaitSocketReady } from "../utils/awaitSocketReady";
+import { currentRoom } from "./pageStore";
+import { closeMessageBox, showMessageBox } from "../messagebox/customStore";
+import { authStore } from "./authStore";
+import type { userRequest } from "./synchronize.type";
 
 export async function reloadRoomInfo() {
   const socket = await awaitSocketReady();

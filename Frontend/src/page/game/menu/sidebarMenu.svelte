@@ -1,6 +1,6 @@
 <script lang="ts">
     import { THEME } from "../../../common/constant/theme";
-    import { showSelectOptionBox } from "../selectModal/selectOptionStore";
+    import { showSelectOptionBox } from "../../../common/store/selectOptionStore";
 
     let itemList = [{name: ''}]
 

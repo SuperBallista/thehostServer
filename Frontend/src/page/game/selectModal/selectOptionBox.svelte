@@ -1,7 +1,7 @@
 <script lang="ts">
   import { get } from 'svelte/store';
   import { THEME } from '../../../common/constant/theme';
-  import { selectOptionStore } from './selectOptionStore'; // 따로 store 생성 필요
+  import { selectOptionStore } from '../../../common/store/selectOptionStore';
 
   let config = get(selectOptionStore);
 

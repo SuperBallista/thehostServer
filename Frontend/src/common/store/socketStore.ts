@@ -6,8 +6,8 @@ import { showMessageBox } from '../messagebox/customStore';
 import { authStore } from './authStore';
 import { locationState, currentRoom, pageStore, type State, lobbyPage } from './pageStore';
 import type { userDataResponse } from './synchronize.type';
-import { exitRoomState, rooms, setRoomState } from '../../page/lobby/lobbyStore';
-import { count, gameTurn, hostAct, myStatus, playerId, region, survivorList, useRegionsNumber } from '../../page/game/common/gameStore';
+import { exitRoomState, rooms, setRoomState } from './lobbyStore';
+import { count, gameTurn, hostAct, myStatus, playerId, region, survivorList, useRegionsNumber } from './gameStore';
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const wsHost = window.location.host;

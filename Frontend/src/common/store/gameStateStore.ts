@@ -3,7 +3,7 @@ import type {
   GamePlayerStatusInterface, 
   SurvivorInterface,
   ItemInterface 
-} from '../common/store/synchronize.type';
+} from './synchronize.type';
 
 // 게임 기본 정보
 export const gameId = writable<string>('');
@@ -109,7 +109,7 @@ export interface ItemUseRecord {
 export const itemUseHistory = writable<ItemUseRecord[]>([]);
 
 // showMessageBox import
-import { showMessageBox } from '../common/messagebox/customStore';
+import { showMessageBox } from '../messagebox/customStore';
 
 // 스토어 업데이트 함수들
 export function updateGameState(data: any) {

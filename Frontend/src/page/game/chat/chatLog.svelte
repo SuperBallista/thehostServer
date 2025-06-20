@@ -1,7 +1,7 @@
 <script lang="ts">
   import { afterUpdate } from 'svelte';
   import { THEME } from '../../../common/constant/theme';
-  import { chatMessages, myStatus } from '../../../stores/gameStateStore';
+  import { chatMessages, myStatus } from '../../../common/store/gameStateStore';
   
 
   let targetEl: HTMLElement;

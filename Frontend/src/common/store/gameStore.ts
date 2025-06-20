@@ -1,5 +1,5 @@
 import {get, writable } from "svelte/store";
-import { HostAct, Region, Survivor, type GamePlayerStatus } from "../game.type";
+import { HostAct, Region, Survivor, type GamePlayerStatus } from "../../page/game/game.type";
 
 
 export const playerId = writable<number | undefined>(undefined) // 플레이어 ID

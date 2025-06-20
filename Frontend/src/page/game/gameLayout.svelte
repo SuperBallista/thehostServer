@@ -16,7 +16,7 @@
     gameResult,
     syncWithServer,
     resetGameState
-  } from '../../stores/gameStateStore';
+  } from '../../common/store/gameStateStore';
   import { socketStore } from '../../common/store/socketStore';
     
   let showSurvivorModal = false;

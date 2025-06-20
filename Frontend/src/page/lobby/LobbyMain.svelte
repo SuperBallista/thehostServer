@@ -1,6 +1,6 @@
   <script lang="ts">
   import { THEME } from "../../common/constant/theme";
-  import {makeRoom} from "./lobbyStore"
+  import {makeRoom} from "../../common/store/lobbyStore"
 
   
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { selectPlayerStore } from './selectPlayerMessageBox';
+    import { selectPlayerStore } from '../../../common/store/selectPlayerMessageBox';
     import { THEME } from '../../../common/constant/theme';
     import { get } from 'svelte/store';
   

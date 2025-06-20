@@ -1,6 +1,6 @@
 <script lang="ts">
     import { THEME } from "../../../common/constant/theme";
-    import { myStatus } from '../../../stores/gameStateStore';
+    import { myStatus } from '../../../common/store/gameStateStore';
     import type { ItemInterface } from '../../../common/store/synchronize.type';
 
     export let isOpen = false;

@@ -1,10 +1,10 @@
 import { get, writable } from 'svelte/store';
-import type { Room } from './lobby.type';
-import { closeMessageBox, showMessageBox } from '../../common/messagebox/customStore';
-import { currentRoom, locationState, pageStore } from '../../common/store/pageStore';
-import { awaitSocketReady } from '../../common/utils/awaitSocketReady';
-import type { userRequest } from '../../common/store/synchronize.type';
-import { authStore } from '../../common/store/authStore';
+import type { Room } from '../../page/lobby/lobby.type';
+import { closeMessageBox, showMessageBox } from '../messagebox/customStore';
+import { currentRoom, locationState, pageStore } from './pageStore';
+import { awaitSocketReady } from '../utils/awaitSocketReady';
+import type { userRequest } from './synchronize.type';
+import { authStore } from './authStore';
 
 
 export const rooms = writable<Room[]>([])

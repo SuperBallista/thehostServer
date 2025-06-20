@@ -7,7 +7,7 @@ import {
   regionNames,
   regionMessages,
   totalRegions
-} from '../../../stores/gameStateStore';
+} from '../../../common/store/gameStateStore';
   
   let targetEl: HTMLElement
   let showAllMessages = false;

@@ -1,4 +1,4 @@
-import { selectPlayerMessageBox } from "../selectModal/selectPlayerMessageBox";
+import { selectPlayerMessageBox } from "../../../common/store/selectPlayerMessageBox";
 import { showMessageBox } from "../../../common/messagebox/customStore";
 import type { ItemInterface } from "../../../common/store/synchronize.type";
 

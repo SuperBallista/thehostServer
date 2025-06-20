@@ -1,5 +1,5 @@
 import { get } from "svelte/store";
-import { hostAct, myStatus, region, useRegionsNumber } from "./common/gameStore";
+import { hostAct, myStatus, region, useRegionsNumber } from "../../common/store/gameStore";
 import { Item } from "./common/itemObject";
 import type { GamePlayerStatusInterface, SurvivorInterface } from "../../common/store/synchronize.type";
 

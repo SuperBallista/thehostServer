@@ -4,7 +4,7 @@
     import { closeMessageBox, showMessageBox } from '../../common/messagebox/customStore';
     import { THEME } from '../../common/constant/theme';
     import PlayerCard from './playerCard.svelte';
-    import { handleBotSetting, leaveRoom, reloadRoomInfo, startGame } from './waitRoomStore';
+    import { handleBotSetting, leaveRoom, reloadRoomInfo, startGame } from '../../common/store/waitRoomStore';
     import { authStore } from '../../common/store/authStore';
 
     onMount(async () => {

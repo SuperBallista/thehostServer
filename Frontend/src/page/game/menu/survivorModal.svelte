@@ -1,7 +1,7 @@
 <script lang="ts">
   import { THEME } from '../../../common/constant/theme';
-  import { otherPlayers, myStatus, playersInMyRegion } from '../../../stores/gameStateStore';
-  import type { PlayerStatus } from '../../../stores/gameStateStore';
+  import { otherPlayers, myStatus, playersInMyRegion } from '../../../common/store/gameStateStore';
+  import type { PlayerStatus } from '../../../common/store/gameStateStore';
 
   export let isOpen: boolean = false;
   export let alwaysVisible: boolean = false;

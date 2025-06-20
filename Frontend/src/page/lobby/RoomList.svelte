@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { THEME } from '../../common/constant/theme';
-    import { rooms, onJoinRoom, getRoomList} from './lobbyStore'
+    import { rooms, onJoinRoom, getRoomList} from '../../common/store/lobbyStore'
     import { awaitSocketReady } from '../../common/utils/awaitSocketReady';
     import { get } from 'svelte/store';
     import { currentRoom, lobbyPage, locationState, pageStore } from '../../common/store/pageStore';
