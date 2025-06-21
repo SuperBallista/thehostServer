@@ -26,33 +26,171 @@
 
 ## 디렉토리 구조
 
+### 프로젝트 루트
+```
+thehost/nest-server/
+├── src/                    # 백엔드 소스 코드
+├── Frontend/               # 프론트엔드 애플리케이션
+├── docs/                   # 프로젝트 문서
+├── dist/                   # 백엔드 빌드 출력
+├── front/                  # 프론트엔드 빌드 출력
+├── docker-compose.yml      # Docker 설정
+├── docker-compose-mysql.yml
+└── package.json            # 백엔드 의존성
+```
+
 ### 백엔드 (src/)
 ```
 src/
-├── auth/               # 인증 모듈 (Google OAuth, JWT)
-├── socket/             # Socket.io 실시간 통신
-├── redis/              # Redis 연결 및 Pub/Sub
-├── user/               # 사용자 관리
-├── game/               # 게임 로직
-├── common/             # 공통 유틸리티
-├── database/           # DB 설정
-└── main.ts             # 앱 진입점
+├── auth/                   # 인증 모듈
+│   ├── auth.controller.ts
+│   ├── auth.service.ts
+│   ├── auth.module.ts
+│   └── providers/
+│       └── google-auth.provider.ts
+├── socket/                 # Socket.io 실시간 통신
+│   ├── socket.gateway.ts   # WebSocket 게이트웨이
+│   ├── socket.module.ts
+│   ├── connection.service.ts
+│   ├── lobby.service.ts
+│   ├── game/               # 게임 관련 서비스
+│   │   ├── game.service.ts
+│   │   └── game.types.ts
+│   └── utils/              # 소켓 유틸리티
+│       ├── socketRoomManager.ts
+│       └── randomManager.ts
+├── redis/                  # Redis 연결 및 Pub/Sub
+│   ├── redis.service.ts
+│   ├── redisPubSub.service.ts
+│   └── redisPubSubHelper.ts
+├── user/                   # 사용자 관리
+│   ├── user.service.ts
+│   ├── user.repository.ts
+│   ├── user-cache.service.ts
+│   ├── user-init.service.ts
+│   └── tag/
+│       └── tag.service.ts
+├── jwt/                    # JWT 인증
+│   ├── jwt.service.ts
+│   ├── guards/
+│   │   └── jwt-auth.guard.ts
+│   └── decorators/
+│       └── current-user.decorator.ts
+├── database/               # 데이터베이스 설정
+│   ├── database.module.ts
+│   ├── database.provider.ts
+│   └── schema/
+│       └── users.sql
+├── common/                 # 공통 유틸리티
+│   ├── types/
+│   │   └── jwt.type.ts
+│   └── utils/
+│       ├── encryption.service.ts
+│       └── json.services.ts
+├── utils/                  # 유틸리티 함수
+│   └── base32.ts
+├── app.module.ts           # 루트 모듈
+├── app.controller.ts       # 루트 컨트롤러
+└── main.ts                 # 애플리케이션 진입점
 ```
 
 ### 프론트엔드 (Frontend/src/)
 ```
 Frontend/src/
-├── components/         # 재사용 가능한 컴포넌트
-├── pages/              # 페이지 컴포넌트
-│   ├── Login.svelte    # 로그인 페이지
-│   ├── NewUser.svelte  # 신규 유저 설정
-│   ├── Lobby.svelte    # 게임 방 목록
-│   ├── WaitRoom.svelte # 대기실
-│   └── Game.svelte     # 게임 플레이 화면
-├── stores/             # Svelte stores (상태 관리)
-├── services/           # API 및 Socket 통신
-├── types/              # TypeScript 타입 정의
-└── App.svelte          # 루트 컴포넌트
+├── page/                   # 페이지 컴포넌트
+│   ├── login/
+│   │   └── login.svelte    # 로그인 페이지
+│   ├── newUser/
+│   │   └── newUser.svelte  # 신규 유저 설정
+│   ├── lobby/
+│   │   ├── lobby.svelte    # 로비 메인
+│   │   ├── LobbyMain.svelte
+│   │   └── RoomList.svelte # 방 목록
+│   ├── waitRoom/
+│   │   ├── waitRoom.svelte # 대기실
+│   │   └── playerCard.svelte
+│   └── game/               # 게임 화면
+│       ├── gameLayout.svelte
+│       ├── gameMenu.svelte
+│       ├── chat/           # 채팅 관련
+│       │   ├── chatInput.svelte
+│       │   ├── chatLog.svelte
+│       │   └── regionInfo.svelte
+│       ├── menu/           # 게임 메뉴
+│       │   ├── actionModal.svelte
+│       │   ├── inventoryModal.svelte
+│       │   ├── survivorModal.svelte
+│       │   ├── sidebarMenu.svelte
+│       │   └── mobileNav.svelte
+│       └── selectModal/    # 선택 모달
+│           ├── playerSelector.svelte
+│           └── selectOptionBox.svelte
+├── common/                 # 공통 컴포넌트 및 유틸리티
+│   ├── component/
+│   │   ├── footer.svelte
+│   │   ├── userInfoHeader.svelte
+│   │   └── api/
+│   │       └── logout.ts
+│   ├── messagebox/         # 메시지박스 시스템
+│   │   ├── MessageBox.svelte
+│   │   ├── InputBox.svelte
+│   │   ├── BoxOverlay.svelte
+│   │   ├── LoadingSpinner.svelte
+│   │   ├── SlideToggle.svelte
+│   │   ├── ImageUpload.svelte
+│   │   └── customStore.ts
+│   ├── store/              # 상태 관리 (Svelte stores)
+│   │   ├── authStore.ts
+│   │   ├── gameStore.ts
+│   │   ├── gameStateStore.ts
+│   │   ├── lobbyStore.ts
+│   │   ├── pageStore.ts
+│   │   ├── socketStore.ts
+│   │   ├── waitRoomStore.ts
+│   │   └── selectOptionStore.ts
+│   ├── handleCode/
+│   │   └── errorHandle.ts
+│   └── utils/
+│       ├── fetch.ts
+│       └── awaitSocketReady.ts
+├── App.svelte              # 루트 컴포넌트
+├── main.ts                 # 앱 진입점
+├── app.css                 # 전역 스타일
+└── vite-env.d.ts           # Vite 타입 정의
+```
+
+### 정적 자산 (Frontend/public/, front/)
+```
+img/
+├── logo.png
+├── google-icon.svg
+├── items/                  # 게임 아이템 이미지
+│   ├── medicine.jpg        # 응급치료제
+│   ├── vaccine.jpg         # 백신
+│   ├── shotgun.jpg         # 산탄총
+│   ├── microphone.jpg      # 마이크
+│   ├── wireless.jpg        # 무전기
+│   ├── spray.jpg           # 스프레이
+│   ├── eraser.jpg          # 지우개
+│   ├── virusChecker.jpg    # 바이러스 체크기
+│   └── vaccineMaterial*.jpg # 백신 재료 A-E
+├── region/                 # 지역 배경 이미지
+│   ├── beach.jpg           # 해안가
+│   ├── building.jpg        # 폐건물
+│   ├── cave.jpg            # 동굴
+│   ├── hill.jpg            # 산 정상
+│   ├── jungle.jpg          # 정글
+│   └── river.jpg           # 개울가
+└── scence/                 # 게임 상황 이미지
+    ├── host.png            # 숙주
+    ├── survivor.png        # 생존자
+    ├── zombie.png          # 좀비
+    ├── infect.png          # 감염
+    ├── checkInfect.png     # 감염 확인
+    ├── vaccine.png         # 백신 투여
+    ├── killed.png          # 사망
+    ├── runaway.png         # 도주
+    └── hide.png            # 은신
 ```
 
 ## 게임 플로우

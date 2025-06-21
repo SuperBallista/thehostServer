@@ -25,7 +25,7 @@
     // 소켓 이벤트 리스너 등록
     const socket = $socketStore;
     if (socket) {
-      socket.on('game-update', (data) => {
+      socket.on('update', (data) => {
         syncWithServer(data);
       });
     }
