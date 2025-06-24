@@ -8,6 +8,7 @@ import { locationState, currentRoom, pageStore, type State, lobbyPage } from './
 import type { userDataResponse } from './synchronize.type';
 import { exitRoomState, rooms, setRoomState } from './lobbyStore';
 import { count, gameTurn, hostAct, myStatus, playerId, region, survivorList, useRegionsNumber } from './gameStore';
+import { setPlayerNicknames, Survivor } from '../../page/game/game.type';
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const wsHost = window.location.host;
@@ -125,11 +126,26 @@ function updateData(payload: userDataResponse) {
   if (payload.survivorList) {
     const sList = get(survivorList);
     const pList = payload.survivorList ?? [];
-    sList.forEach((s, i) => {
-      if (pList[i]) s.updateData(pList[i]);
-    });
+    
+    // 처음 게임 시작 시 survivorList가 비어있으면 새로 생성
+    if (sList.length === 0 && pList.length > 0) {
+      const newSurvivorList = pList.map(survivor => 
+        new Survivor(survivor.playerId, survivor.state, survivor.sameRegion, survivor.nickname)
+      );
+      survivorList.set(newSurvivorList);
+    } else {
+      // 기존 survivorList 업데이트
+      sList.forEach((s, i) => {
+        if (pList[i]) s.updateData(pList[i]);
+      });
+    }
   }
   if (payload.useRegionsNumber) useRegionsNumber.set(payload.useRegionsNumber);
+  
+  // 게임 시작 시 플레이어 닉네임 매핑 설정
+  if (payload.locationState === 'game' && payload.roomData) {
+    setPlayerNicknames(payload.roomData.players);
+  }
 
   // 알림 처리
   if (payload.alarm) {

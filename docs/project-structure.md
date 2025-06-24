@@ -36,7 +36,11 @@ thehost/nest-server/
 ├── front/                  # 프론트엔드 빌드 출력
 ├── docker-compose.yml      # Docker 설정
 ├── docker-compose-mysql.yml
-└── package.json            # 백엔드 의존성
+├── package.json            # 백엔드 의존성
+├── eslint.config.mjs       # ESLint 설정
+├── nest-cli.json           # NestJS CLI 설정
+├── tsconfig.json           # TypeScript 설정
+└── tsconfig.build.json     # TypeScript 빌드 설정
 ```
 
 ### 백엔드 (src/)
@@ -46,6 +50,7 @@ src/
 │   ├── auth.controller.ts
 │   ├── auth.service.ts
 │   ├── auth.module.ts
+│   ├── auth.type.ts        # 인증 타입 정의
 │   └── providers/
 │       └── google-auth.provider.ts
 ├── socket/                 # Socket.io 실시간 통신
@@ -53,24 +58,35 @@ src/
 │   ├── socket.module.ts
 │   ├── connection.service.ts
 │   ├── lobby.service.ts
+│   ├── data.types.ts       # 데이터 타입 정의
+│   ├── payload.types.ts    # 페이로드 타입 정의
 │   ├── game/               # 게임 관련 서비스
 │   │   ├── game.service.ts
 │   │   └── game.types.ts
-│   └── utils/              # 소켓 유틸리티
-│       ├── socketRoomManager.ts
-│       └── randomManager.ts
+│   ├── utils/              # 소켓 유틸리티
+│   │   ├── socketRoomManager.ts
+│   │   └── randomManager.ts
+│   └── types/              # 소켓 타입 정의
+│       └── pubsub-helper.ts
 ├── redis/                  # Redis 연결 및 Pub/Sub
+│   ├── redis.module.ts     # Redis 모듈
 │   ├── redis.service.ts
 │   ├── redisPubSub.service.ts
-│   └── redisPubSubHelper.ts
+│   ├── redisPubSubHelper.ts
+│   ├── pubsub-usage-guide.ts  # PubSub 사용 가이드
+│   └── pubsub.types.ts     # PubSub 타입 정의
 ├── user/                   # 사용자 관리
+│   ├── user.module.ts      # 사용자 모듈
 │   ├── user.service.ts
 │   ├── user.repository.ts
 │   ├── user-cache.service.ts
 │   ├── user-init.service.ts
+│   ├── dto/                # 데이터 전송 객체
+│   │   └── user.dto.ts
 │   └── tag/
 │       └── tag.service.ts
 ├── jwt/                    # JWT 인증
+│   ├── jwt.module.ts       # JWT 모듈
 │   ├── jwt.service.ts
 │   ├── guards/
 │   │   └── jwt-auth.guard.ts
@@ -112,6 +128,9 @@ Frontend/src/
 │   └── game/               # 게임 화면
 │       ├── gameLayout.svelte
 │       ├── gameMenu.svelte
+│       ├── game.type.ts    # 게임 타입 정의
+│       ├── common/         # 게임 공통 요소
+│       │   └── itemObject.ts  # 아이템 객체 정의
 │       ├── chat/           # 채팅 관련
 │       │   ├── chatInput.svelte
 │       │   ├── chatLog.svelte
@@ -131,6 +150,8 @@ Frontend/src/
 │   │   ├── userInfoHeader.svelte
 │   │   └── api/
 │   │       └── logout.ts
+│   ├── constant/           # 상수 정의
+│   │   └── theme.ts        # 테마 상수
 │   ├── messagebox/         # 메시지박스 시스템
 │   │   ├── MessageBox.svelte
 │   │   ├── InputBox.svelte
@@ -138,7 +159,10 @@ Frontend/src/
 │   │   ├── LoadingSpinner.svelte
 │   │   ├── SlideToggle.svelte
 │   │   ├── ImageUpload.svelte
-│   │   └── customStore.ts
+│   │   ├── customStore.ts
+│   │   ├── customStore.d.ts   # TypeScript 선언 파일
+│   │   └── config/
+│   │       └── messageBoxColor.json  # 메시지박스 색상 설정
 │   ├── store/              # 상태 관리 (Svelte stores)
 │   │   ├── authStore.ts
 │   │   ├── gameStore.ts
@@ -147,7 +171,9 @@ Frontend/src/
 │   │   ├── pageStore.ts
 │   │   ├── socketStore.ts
 │   │   ├── waitRoomStore.ts
-│   │   └── selectOptionStore.ts
+│   │   ├── selectOptionStore.ts
+│   │   ├── selectPlayerMessageBox.ts  # 플레이어 선택 메시지박스
+│   │   └── synchronize.type.ts        # 동기화 타입 정의
 │   ├── handleCode/
 │   │   └── errorHandle.ts
 │   └── utils/
@@ -157,6 +183,17 @@ Frontend/src/
 ├── main.ts                 # 앱 진입점
 ├── app.css                 # 전역 스타일
 └── vite-env.d.ts           # Vite 타입 정의
+```
+
+### 프론트엔드 설정 파일 (Frontend/)
+```
+Frontend/
+├── package.json
+├── vite.config.ts
+├── svelte.config.js        # Svelte 설정
+├── tsconfig.json            # TypeScript 기본 설정
+├── tsconfig.app.json        # TypeScript 앱 설정
+└── tsconfig.node.json       # TypeScript 노드 설정
 ```
 
 ### 정적 자산 (Frontend/public/, front/)
@@ -191,6 +228,20 @@ img/
     ├── killed.png          # 사망
     ├── runaway.png         # 도주
     └── hide.png            # 은신
+```
+
+### 프로젝트 문서 (docs/)
+```
+docs/
+├── project-structure.md    # 프로젝트 구조 문서 (현재 파일)
+├── planning.md             # 기획 문서
+├── updatePlan.md           # 업데이트 계획
+├── redis.erd               # Redis ERD 파일
+├── RedisERD.txt            # Redis ERD 텍스트 형식
+├── 상태동기화.txt           # 상태 동기화 노트
+├── 수정예정.txt             # 수정 예정 노트
+├── 이미지.txt               # 이미지 관련 노트
+└── 피드백.txt               # 피드백 노트
 ```
 
 ## 게임 플로우

@@ -47,11 +47,11 @@ nickname: string;
 state: PlayerState;
 sameRegion: boolean
 
-constructor(playerId:number, state:PlayerState, sameRegion: boolean){
+constructor(playerId:number, state:PlayerState, sameRegion: boolean, nickname?: string){
     this.playerId = playerId
     this.state = state
     this.sameRegion = sameRegion
-    this.nickname = nicknameList[playerId]
+    this.nickname = nickname || getPlayerNickname(playerId)
 }
 
 checkAndUpdateSurvivor(state:PlayerState){
@@ -64,8 +64,11 @@ disappearSurvivor(){
 } // 시야에서 사라짐
 
 updateData(Survivor: SurvivorInterface | undefined ){
-    if (Survivor && Survivor.sameRegion) this.checkAndUpdateSurvivor(Survivor.state)
-        else this.disappearSurvivor()
+    if (Survivor && Survivor.sameRegion) {
+        this.checkAndUpdateSurvivor(Survivor.state)
+        this.nickname = Survivor.nickname // 서버에서 받은 닉네임으로 업데이트
+    }
+    else this.disappearSurvivor()
 }
 }
 
@@ -132,7 +135,21 @@ interface Zombie{
 
 
 // 게임용 닉네임 리스트 20개
-const nicknameList = [`자책하는두더지`, `말많은다람쥐`, `웃는얼굴의하마`, `엿듣는호랑이`, `눈치빠른고양이`, `조용한여우`, `겁많은토끼`, `고집센너구리`, `유난떠는수달`, `낙서많은부엉이`, `분위기타는족제비`, `장난기있는펭귄`, `침착한판다`, `의심많은고슴도치`, `폭로하는까마귀`, `살금살금곰`, `혼잣말하는늑대`, `사람좋은삵`, `침묵하는도롱뇽`, `거짓말하는수리부엉이`]
+
+// 플레이어 ID와 닉네임 매핑을 저장하는 Map
+const playerNicknameMap = new Map<number, string>();
+
+// 플레이어 닉네임 매핑 함수
+export function setPlayerNicknames(players: {id: number, nickname: string}[]) {
+    players.forEach(player => {
+        playerNicknameMap.set(player.id, player.nickname);
+    });
+}
+
+// 플레이어 ID로 닉네임 가져오기
+export function getPlayerNickname(playerId: number): string {
+    return playerNicknameMap.get(playerId) || `Unknown Player ${playerId}`;
+}
 
 // 지역 정보 관리
 export class Region{
