@@ -28,19 +28,26 @@
 
 ### 프로젝트 루트
 ```
-thehost/nest-server/
+thehostServer/
 ├── src/                    # 백엔드 소스 코드
 ├── Frontend/               # 프론트엔드 애플리케이션
+│   ├── front/              # 프론트엔드 빌드 출력
+│   ├── src/                # 프론트엔드 소스 코드
+│   ├── public/             # 정적 자산
+│   ├── index.html          # HTML 진입점
+│   └── README.md           # 프론트엔드 README
 ├── docs/                   # 프로젝트 문서
 ├── dist/                   # 백엔드 빌드 출력
-├── front/                  # 프론트엔드 빌드 출력
+├── front/                  # 프론트엔드 빌드 출력 (복사본)
 ├── docker-compose.yml      # Docker 설정
-├── docker-compose-mysql.yml
+├── docker-compose-mysql.yml # MySQL Docker 설정
 ├── package.json            # 백엔드 의존성
+├── package-lock.json       # 백엔드 의존성 잠금
 ├── eslint.config.mjs       # ESLint 설정
 ├── nest-cli.json           # NestJS CLI 설정
 ├── tsconfig.json           # TypeScript 설정
-└── tsconfig.build.json     # TypeScript 빌드 설정
+├── tsconfig.build.json     # TypeScript 빌드 설정
+└── README.md               # 프로젝트 README
 ```
 
 ### 백엔드 (src/)
@@ -121,7 +128,8 @@ Frontend/src/
 │   ├── lobby/
 │   │   ├── lobby.svelte    # 로비 메인
 │   │   ├── LobbyMain.svelte
-│   │   └── RoomList.svelte # 방 목록
+│   │   ├── RoomList.svelte # 방 목록
+│   │   └── lobby.type.ts   # 로비 타입 정의
 │   ├── waitRoom/
 │   │   ├── waitRoom.svelte # 대기실
 │   │   └── playerCard.svelte
@@ -161,6 +169,7 @@ Frontend/src/
 │   │   ├── ImageUpload.svelte
 │   │   ├── customStore.ts
 │   │   ├── customStore.d.ts   # TypeScript 선언 파일
+│   │   ├── customStore.js.map # JavaScript 소스맵
 │   │   └── config/
 │   │       └── messageBoxColor.json  # 메시지박스 색상 설정
 │   ├── store/              # 상태 관리 (Svelte stores)
@@ -188,12 +197,15 @@ Frontend/src/
 ### 프론트엔드 설정 파일 (Frontend/)
 ```
 Frontend/
-├── package.json
-├── vite.config.ts
+├── package.json            # 프론트엔드 의존성
+├── package-lock.json       # 프론트엔드 의존성 잠금
+├── vite.config.ts          # Vite 빌드 설정
 ├── svelte.config.js        # Svelte 설정
-├── tsconfig.json            # TypeScript 기본 설정
-├── tsconfig.app.json        # TypeScript 앱 설정
-└── tsconfig.node.json       # TypeScript 노드 설정
+├── tsconfig.json           # TypeScript 기본 설정
+├── tsconfig.app.json       # TypeScript 앱 설정
+├── tsconfig.node.json      # TypeScript 노드 설정
+├── index.html              # HTML 진입점
+└── README.md               # 프론트엔드 문서
 ```
 
 ### 정적 자산 (Frontend/public/, front/)
