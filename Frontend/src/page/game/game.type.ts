@@ -43,15 +43,15 @@ export class GamePlayerStatus{ // 내 정보
 
 export class Survivor{ // 생존자 정보
 playerId: number;
-nickname: string;
 state: PlayerState;
-sameRegion: boolean
+sameRegion: boolean;
+nickname: string;
 
-constructor(playerId:number, state:PlayerState, sameRegion: boolean, nickname?: string){
+constructor(playerId:number, state:PlayerState, sameRegion: boolean){
     this.playerId = playerId
     this.state = state
     this.sameRegion = sameRegion
-    this.nickname = nickname || getPlayerNickname(playerId)
+    this.nickname = nicknameList[playerId]
 }
 
 checkAndUpdateSurvivor(state:PlayerState){
@@ -187,3 +187,5 @@ interface ChatMessage{
 } // 채팅메세지 형식
 
 type RegionMessage = string | null // 구역 메세지 형식
+
+export const nicknameList = [`자책하는두더지`, `말많은다람쥐`, `웃는얼굴의하마`, `엿듣는호랑이`, `눈치빠른고양이`, `조용한여우`, `겁많은토끼`, `고집센너구리`, `유난떠는수달`, `낙서많은부엉이`, `분위기타는족제비`, `장난기있는펭귄`, `침착한판다`, `의심많은고슴도치`, `폭로하는까마귀`, `살금살금곰`, `혼잣말하는늑대`, `사람좋은삵`, `침묵하는도롱뇽`, `거짓말하는수리부엉이`]

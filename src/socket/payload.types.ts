@@ -129,7 +129,7 @@ export interface ChatMessage{
 export type RegionMessage = string | null // 구역 메세지 형식
 
 
-export type PlayerState = 'alive' | 'host' | `zombie` | `dead` | 'you' // 생존자 상태
+export type PlayerState = 'alive' | 'host' | `zombie` | `killed` | 'you' // 생존자 상태
 export type Act = `runaway` | `hide` | `lure` // 좀비 대처 행동
 export type ItemInterface = `spray` | `virusChecker` | `vaccine` | `medicine` | `vaccineMaterialA` | `vaccineMaterialB` | `vaccineMaterialC` | `wireless` | `eraser`
 

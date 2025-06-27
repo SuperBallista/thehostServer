@@ -1,6 +1,6 @@
 // src/common/messagebox/selectPlayerStore.ts
 import { writable } from 'svelte/store';
-import type { Survivor } from '../game.type';
+import type { Survivor } from '../../page/game/game.type';
 
 type SelectorConfig = {
   title: string;

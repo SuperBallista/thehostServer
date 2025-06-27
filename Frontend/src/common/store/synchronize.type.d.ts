@@ -1,0 +1,104 @@
+export interface userRequest {
+    token: string;
+    user: AuthUser;
+    locationState?: State;
+    roomId?: string;
+    page?: number;
+    createRoom?: string;
+    joinRoom?: string;
+    exitRoom?: boolean;
+    room?: Room;
+    myStatus?: GamePlayerStatusInterface;
+    hostAct?: HostAct;
+    giveItem?: GiveItem;
+    useItem?: UseItem;
+    gameStart?: boolean;
+}
+interface GiveItem {
+    receiver: number;
+    item: ItemInterface;
+}
+interface UseItem {
+    item: ItemInterface;
+    targetPlayer?: number;
+    content?: string;
+    targetMessage?: number;
+}
+export interface userDataResponse {
+    token?: string;
+    user?: AuthUser;
+    locationState?: State;
+    page?: number;
+    roomList?: Room[];
+    joinRoom?: Room;
+    exitRoom?: boolean;
+    roomData?: Room;
+    playerId?: number;
+    myStatus?: GamePlayerStatusInterface;
+    useRegionsNumber?: number;
+    gameTurn?: number;
+    survivorList?: SurvivorInterface[];
+    hostAct?: HostAct;
+    region?: Region;
+    count?: number;
+    endGame?: `infected` | `killed` | `cure`;
+    alarm?: {
+        message: string;
+        img: string;
+    };
+}
+interface AuthUser {
+    id: number | null;
+    nickname: string | null;
+}
+type State = 'lobby' | 'host' | 'room' | 'game';
+interface Room {
+    id: string;
+    name: string;
+    hostUserId: number;
+    players: playerShortInfo[];
+    bot: boolean;
+}
+interface playerShortInfo {
+    nickname: string;
+    id: number;
+}
+export interface GamePlayerStatusInterface {
+    state: PlayerState;
+    items: ItemInterface[];
+    region: number;
+    next: number;
+    act: Act;
+}
+export interface SurvivorInterface {
+    playerId: number;
+    nickname: string;
+    state: PlayerState;
+    sameRegion: boolean;
+}
+interface HostAct {
+    infect: number | null;
+    canUseInfect: boolean;
+    zombieList: Zombie[];
+}
+interface Region {
+    chatLog: ChatMessage[];
+    regionMessageList: RegionMessage[];
+}
+interface Zombie {
+    playerId: number;
+    targetId: number;
+    next: number;
+    leftTurn: number;
+    region: number;
+}
+interface ChatMessage {
+    system: boolean;
+    message: string;
+    timeStamp: Date;
+}
+type RegionMessage = string | null;
+type PlayerState = 'alive' | 'host' | `zombie` | `dead` | 'you';
+type Act = `runaway` | `hide` | `lure`;
+export type ItemInterface = `spray` | `virusChecker` | `vaccine` | `medicine` | `vaccineMaterialA` | `vaccineMaterialB` | `vaccineMaterialC` | `wireless` | `eraser`;
+export {};

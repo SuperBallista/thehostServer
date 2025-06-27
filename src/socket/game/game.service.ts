@@ -6,7 +6,7 @@ import { RedisService } from 'src/redis/redis.service';
 import { UserService } from 'src/user/user.service';
 import { WsException } from '@nestjs/websockets';
 import { LocationState, userShortInfo } from '../data.types';
-import { Room, State } from '../payload.types';
+import { Room, State, SurvivorInterface } from '../payload.types';
 import { getOrderRandom } from '../utils/randomManager';
 import { userDataResponse } from '../payload.types';
 
@@ -31,7 +31,7 @@ export class GameService {
       throw new WsException('게임을 시작할 권한이 없습니다')
     }
     
-    const gameData: userDataResponse = await this.makeGameData(roomData)
+    const gameData: userDataResponse = await this.makeGameData(roomData) // 게임 데이터 생성
     if (!roomData.date) throw new WsException('색인 오류가 발생하였습니다')
     await this.deleteWaitingRoomList(roomData.id, roomData.date)
 
@@ -149,6 +149,7 @@ async subscribeGameStart(client: any, userId: number, users: userShortInfo[], ro
         }
       }
 
+
       // 내 게임 데이터를 찾았을 때만 게임 진입
       if (myPlayerData) {
         const response: userDataResponse = { 
@@ -162,8 +163,20 @@ async subscribeGameStart(client: any, userId: number, users: userShortInfo[], ro
             act: myPlayerData.act as any
           },
           gameTurn: gameData.turn,
-          count: gameData.turn < 5? 60 : 90 // 카운트다운시간 5턴 전에는 1분, 5턴 이후 1분 30초
+          count: gameData.turn < 5? 60 : 90, // 카운트다운시간 5턴 전에는 1분, 5턴 이후 1분 30초
         }
+        
+        const gamePlayerDto: SurvivorInterface[] = gamePlayerList.map(player => ({
+          playerId: player.playerId,
+          sameRegion: player.regionId === myPlayerData.regionId,
+          state: player.playerId === myPlayerData.playerId 
+            ? 'you' 
+            : player.state === 'host' 
+              ? 'alive' 
+              : player.state
+        }));
+
+        response.survivorList = gamePlayerDto
         
         console.log(`${roomId}방 게임 시작 - 유저 ${userId} (플레이어 ${myPlayerData.playerId})`)
         // 클라이언트에게 게임 데이터 전송

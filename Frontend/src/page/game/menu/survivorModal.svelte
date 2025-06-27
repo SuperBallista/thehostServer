@@ -1,7 +1,7 @@
 <script lang="ts">
   import { THEME } from '../../../common/constant/theme';
   import { survivorList, playerId, myStatus } from '../../../common/store/gameStore';
-  import type { Survivor } from '../game.type';
+  import { nicknameList, type Survivor } from '../game.type';
 
   export let isOpen: boolean = false;
   export let alwaysVisible: boolean = false;
@@ -16,14 +16,13 @@
     ...($myStatus && !$survivorList.some(s => s.playerId === $playerId) 
       ? [{
           playerId: $playerId || 0,
-          nickname: $myStatus ? '나' : 'Unknown',
           state: 'you' as const,
           sameRegion: true
         }] 
       : [])
   ];
 
-  function getClass(player: Survivor | {playerId: number, nickname: string, state: string, sameRegion: boolean}): string {
+  function getClass(player: Survivor | {playerId: number, state: string, sameRegion: boolean}): string {
     let result:string = ''
     
     // 내 캐릭터인 경우
@@ -32,7 +31,7 @@
     }
     
     // 사망한 경우
-    if (player.state === 'dead') {
+    if (player.state === 'killed') {
       result = `line-through`;
     }
     
@@ -72,7 +71,7 @@
     <ul class="space-y-1 text-sm">
       {#each allPlayers as player}
         <li class={getClass(player)}>
-          {player.nickname} 
+          { nicknameList[player.playerId] } 
           ({player.playerId === $playerId ? '나' : getStatusText(player.state)})
         </li>
       {/each}
@@ -92,7 +91,7 @@
       <ul class="space-y-1 text-sm">
         {#each allPlayers as player}
           <li class={getClass(player)}>
-            {player.nickname} 
+            { nicknameList[player.playerId] } 
             ({player.playerId === $playerId ? '나' : getStatusText(player.state)})
           </li>
         {/each}
