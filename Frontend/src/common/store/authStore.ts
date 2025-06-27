@@ -92,7 +92,6 @@ async function checkRefreshToken() {
 
     const data = await response.json();
     setAuthSuccess({ id: data.user.id, nickname: data.user.nickname }, data.token);
-    checkAccessToken(data.token);
     return true
   }
   catch (err) {
