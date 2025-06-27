@@ -8,6 +8,7 @@ import { locationState, currentRoom, pageStore, type State, lobbyPage } from './
 import type { userDataResponse } from './synchronize.type';
 import { exitRoomState, rooms, setRoomState } from './lobbyStore';
 import { count, gameTurn, hostAct, myStatus, playerId, region, survivorList, useRegionsNumber } from './gameStore';
+import { turnTimer } from './gameStateStore';
 import { setPlayerNicknames, Survivor } from '../../page/game/game.type';
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
@@ -118,7 +119,11 @@ function updateData(payload: userDataResponse) {
 
   // 게임 관련 업데이트
   if (payload.gameTurn) gameTurn.set(payload.gameTurn);
-  if (payload.count) count.set(payload.count);
+  if (payload.count) {
+    count.set(payload.count);
+    // turnTimer도 함께 업데이트
+    turnTimer.set(payload.count);
+  }
   if (payload.hostAct) get(hostAct)?.updateData(payload.hostAct.zombieList);
   if (payload.myStatus) get(myStatus)?.updateData(payload.myStatus);
   if (payload.playerId) playerId.set(payload.playerId);

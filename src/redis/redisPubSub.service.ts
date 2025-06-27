@@ -171,12 +171,20 @@ export class RedisPubSubService implements OnModuleInit {
   private async handleGameStart(message: InternalMessage): Promise<boolean> {
     const { roomId, gameId, playerIds } = message.data as any;
     
+    console.log(`🎮 handleGameStart 호출됨 - roomId: ${roomId}, playerIds: ${playerIds}`);
+    
     try {
       const roomData = await this.redisService.getAndParse(`room:data:${roomId}`);
+      console.log(`🔍 Redis에서 방 데이터 조회 결과:`, roomData ? '찾음' : '없음');
+      
       if (roomData && this.gameStartCallback) {
         this.gameStartCallback(roomData);
-        console.log(`📢 게임 시작 알림: ${roomId}`);
+        console.log(`📢 게임 시작 알림 성공: ${roomId}`);
         return true;
+      } else if (!roomData) {
+        console.error(`❌ 방 데이터를 찾을 수 없음: room:data:${roomId}`);
+      } else if (!this.gameStartCallback) {
+        console.error(`❌ gameStartCallback이 등록되지 않음`);
       }
     } catch (error) {
       console.error(`게임 시작 처리 실패: ${roomId}`, error);

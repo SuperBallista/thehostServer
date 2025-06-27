@@ -14,7 +14,7 @@ constructor(gameId: string, hostId: number) {
     this.action = [];
 }
 
-recordData(){
+recordData():GameInRedis {
    const gameData = {
     gameId: this.gameId,
     turn: this.turn,

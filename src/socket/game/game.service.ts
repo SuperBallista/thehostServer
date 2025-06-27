@@ -6,7 +6,7 @@ import { RedisService } from 'src/redis/redis.service';
 import { UserService } from 'src/user/user.service';
 import { WsException } from '@nestjs/websockets';
 import { LocationState, userShortInfo } from '../data.types';
-import { Room, State, SurvivorInterface } from '../payload.types';
+import { PlayerState, Room, State, SurvivorInterface } from '../payload.types';
 import { getOrderRandom } from '../utils/randomManager';
 import { userDataResponse } from '../payload.types';
 
@@ -17,7 +17,7 @@ export class GameService {
     private readonly redisService: RedisService,
     private readonly redisPubSubService: RedisPubSubService,
     private readonly userService: UserService,
-  ) {}
+ ) {}
 
 
   async gameStart(userId: number): Promise<userDataResponse>{
@@ -58,9 +58,12 @@ private async makeGameData(roomData: Room): Promise<userDataResponse> {
     // 게임 데이터 세팅 준비 완료
     await this.createNewGameData(roomData.id, hostPlayer, players) // 게임 생성
 
-    // ✅ 모든 플레이어에게 게임 시작 알림
+    // ✅ 모든 플레이어에게 게임 시작 알림 (방 데이터 삭제 전에 실행)
     const playerIds = roomData.players.map(p => p.id);
     await this.redisPubSubService.publishGameStart(roomData.id, roomData.id, playerIds);
+    
+    // PubSub 이벤트 처리를 위한 짧은 대기
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     return { locationState: 'game' }
 }
@@ -123,72 +126,142 @@ private async createNewGameData(gameId: string, hostPlayer: number, players: Gam
 }
 
 async subscribeGameStart(client: any, userId: number, users: userShortInfo[], roomId: string) {
-    const userIdList = users.map(user => user.id) // 유저 리스트
+    // 1. 유저 검증
+    if (!this.isUserInRoom(userId, users)) return;
     
-    if (!userIdList.includes(userId)) return
-    
-    // locationState 업데이트
-    const locationData: { state: State, roomId: string } = { state: 'game', roomId }
-    await this.redisService.stringifyAndSet(`locationState:${userId}`, locationData)
-
-    const gameDataIndex = `game:${roomId}` // 게임방 키값 변수로 저장
+    // 2. 위치 상태 업데이트
+    await this.updateLocationState(userId, roomId);
 
     try {
-      const gameData: GameInRedis = await this.redisService.getAndParse(`${gameDataIndex}`)
-      let gamePlayerList: GamePlayerInRedis[] = []
-      let myPlayerData: GamePlayerInRedis | undefined
+      // 3. 게임 데이터 로드
+      const gameData = await this.getGameData(roomId);
+      const playerDataResult = await this.loadAllPlayersWithRetry(roomId, userId);
+      
+      if (!playerDataResult.myPlayerData) {
+        throw new WsException(`게임 데이터를 찾을 수 없습니다. 잠시 후 다시 시도해주세요.`);
+      }
 
+      // 4. 응답 생성 및 전송
+      const response = this.createGameStartResponse(
+        gameData,
+        playerDataResult.myPlayerData,
+        playerDataResult.allPlayers
+      );
+      
+      console.log(`${roomId}방 게임 시작 - 유저 ${userId} (플레이어 ${playerDataResult.myPlayerData.playerId})`);
+      client.emit('update', response);
+      console.log(response)
+      return response;
+      
+    } catch (error) {
+      throw new WsException(`게임 시작 처리 중 오류: ${error}`);
+    }
+  }
+
+  // === Private Helper Methods ===
+  
+  private isUserInRoom(userId: number, users: userShortInfo[]): boolean {
+    return users.some(user => user.id === userId);
+  }
+
+  private async updateLocationState(userId: number, roomId: string): Promise<void> {
+    const locationData: { state: State, roomId: string } = { state: 'game', roomId };
+    await this.redisService.stringifyAndSet(`locationState:${userId}`, locationData);
+  }
+
+  private async getGameData(roomId: string): Promise<GameInRedis> {
+    const gameData = await this.redisService.getAndParse(`game:${roomId}`);
+    if (!gameData) throw new WsException('게임 데이터를 찾을 수 없습니다');
+    return gameData;
+  }
+
+  private async loadAllPlayersWithRetry(
+    roomId: string, 
+    userId: number
+  ): Promise<{ myPlayerData: GamePlayerInRedis | undefined, allPlayers: GamePlayerInRedis[] }> {
+    const MAX_RETRIES = 5;
+    const RETRY_DELAY_MS = 500;
+    const MAX_PLAYERS = 20;
+    
+    let myPlayerData: GamePlayerInRedis | undefined;
+    const playerMap = new Map<number, GamePlayerInRedis>();
+    
+    for (let retry = 0; retry < MAX_RETRIES && !myPlayerData; retry++) {
+      if (retry > 0) {
+        console.log(`유저 ${userId}의 데이터를 찾는 중... 재시도 ${retry}/${MAX_RETRIES}`);
+        await this.delay(RETRY_DELAY_MS);
+      }
+      
       // 플레이어 데이터 수집
-      for (let i = 0; i < 20; i++) {
-        const gamePlayerData: GamePlayerInRedis = await this.redisService.getAndParse(`${gameDataIndex}:player:${i}`)
-        if (gamePlayerData) {
-          gamePlayerList.push(gamePlayerData)
-          if (gamePlayerData.userId === userId) {
-            myPlayerData = gamePlayerData
+      for (let i = 0; i < MAX_PLAYERS; i++) {
+        const playerData = await this.getPlayerData(roomId, i);
+        if (playerData) {
+          playerMap.set(playerData.playerId, playerData);
+          if (playerData.userId === userId) {
+            myPlayerData = playerData;
           }
         }
       }
-
-
-      // 내 게임 데이터를 찾았을 때만 게임 진입
-      if (myPlayerData) {
-        const response: userDataResponse = { 
-          locationState: 'game',
-          playerId: myPlayerData.playerId,
-          myStatus: {
-            state: myPlayerData.state as any,
-            items: myPlayerData.items as any,
-            region: myPlayerData.regionId,
-            next: myPlayerData.next,
-            act: myPlayerData.act as any
-          },
-          gameTurn: gameData.turn,
-          count: gameData.turn < 5? 60 : 90, // 카운트다운시간 5턴 전에는 1분, 5턴 이후 1분 30초
-        }
-        
-        const gamePlayerDto: SurvivorInterface[] = gamePlayerList.map(player => ({
-          playerId: player.playerId,
-          sameRegion: player.regionId === myPlayerData.regionId,
-          state: player.playerId === myPlayerData.playerId 
-            ? 'you' 
-            : player.state === 'host' 
-              ? 'alive' 
-              : player.state
-        }));
-
-        response.survivorList = gamePlayerDto
-        
-        console.log(`${roomId}방 게임 시작 - 유저 ${userId} (플레이어 ${myPlayerData.playerId})`)
-        // 클라이언트에게 게임 데이터 전송
-        client.emit('update', response)
-        return response
-      } else {
-        console.warn(`유저 ${userId}의 게임 데이터를 찾을 수 없음`)
-      }
-    } catch (error) {
-      throw new WsException(`게임 시작 처리 중 오류: ${error}`)
     }
-    }
+    
+    return {
+      myPlayerData,
+      allPlayers: Array.from(playerMap.values())
+    };
+  }
+
+  private async getPlayerData(roomId: string, playerId: number): Promise<GamePlayerInRedis | null> {
+    return await this.redisService.getAndParse(`game:${roomId}:player:${playerId}`);
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private createGameStartResponse(
+    gameData: GameInRedis,
+    myPlayerData: GamePlayerInRedis,
+    allPlayers: GamePlayerInRedis[]
+  ): userDataResponse {
+    return {
+      locationState: 'game',
+      playerId: myPlayerData.playerId,
+      myStatus: {
+        state: myPlayerData.state as any,
+        items: myPlayerData.items as any,
+        region: myPlayerData.regionId,
+        next: myPlayerData.next,
+        act: myPlayerData.act as any
+      },
+      gameTurn: gameData.turn,
+      count: this.getTurnDuration(gameData.turn),
+      survivorList: this.createSurvivorList(allPlayers, myPlayerData)
+    };
+  }
+
+  private getTurnDuration(turn: number): number {
+    return turn < 5 ? 60 : 90;
+  }
+
+  private createSurvivorList(
+    allPlayers: GamePlayerInRedis[], 
+    myPlayerData: GamePlayerInRedis
+  ): SurvivorInterface[] {
+    return allPlayers.map(player => ({
+      playerId: player.playerId,
+      sameRegion: player.regionId === myPlayerData.regionId,
+      state: this.getPlayerDisplayState(player, myPlayerData)
+    }));
+  }
+
+  private getPlayerDisplayState(
+    player: GamePlayerInRedis, 
+    myPlayerData: GamePlayerInRedis
+  ): PlayerState {
+    if (player.playerId === myPlayerData.playerId) return 'you';
+    if (player.state === 'host') return 'alive';
+    return player.state;
+  }
 }
 
 
