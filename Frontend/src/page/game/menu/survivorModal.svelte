@@ -23,7 +23,6 @@
         playerId: $myStatus.playerId,
         state: 'you' as const,
         sameRegion: true,
-        nickname: $myStatus.nickname,
         region: $myStatus.region,
         nextRegion: $myStatus.nextRegion,
         act: $myStatus.act,
