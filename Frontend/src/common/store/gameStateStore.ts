@@ -29,7 +29,6 @@ export const regionNames = writable<string[]>([
 // 플레이어 상태
 export interface PlayerStatus {
   playerId: number;
-  nickname: string;
   state: 'alive' | 'host' | 'zombie' | 'killed' | 'infected' | 'you';
   region: number;
   nextRegion: number;
@@ -160,7 +159,6 @@ export function updateOtherPlayers(survivors: SurvivorInterface[]) {
     } else {
       updatedPlayers.set(survivor.playerId, {
         playerId: survivor.playerId,
-        nickname: survivor.nickname,
         state: survivor.state,
         region: survivor.sameRegion ? get(myStatus)?.region || 0 : -1,
         nextRegion: -1,

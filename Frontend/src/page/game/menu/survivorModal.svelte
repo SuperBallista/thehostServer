@@ -31,8 +31,19 @@
       });
     }
     
-    // playerId로 정렬하여 일관된 순서 유지
-    return players.sort((a, b) => a.playerId - b.playerId);
+    // 정렬: 1. 자기 자신, 2. 같은 구역 플레이어, 3. 다른 구역 플레이어
+    return players.sort((a, b) => {
+      // 자기 자신이 최우선
+      if (a.playerId === $myStatus?.playerId) return -1;
+      if (b.playerId === $myStatus?.playerId) return 1;
+      
+      // 같은 구역 여부로 정렬
+      if (a.sameRegion && !b.sameRegion) return -1;
+      if (!a.sameRegion && b.sameRegion) return 1;
+      
+      // 같은 조건이면 playerId로 정렬
+      return a.playerId - b.playerId;
+    });
   })();
 
   // 플레이어 상태에 따른 클래스 결정
