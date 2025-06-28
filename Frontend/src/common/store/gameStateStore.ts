@@ -4,11 +4,19 @@ import type {
   SurvivorInterface,
   ItemInterface 
 } from './synchronize.type';
+import { 
+  playerId, 
+  playerState, 
+  playerRegion, 
+  playerNextRegion, 
+  playerAct, 
+  playerItems 
+} from './playerStore';
 
 // 게임 기본 정보
 export const gameId = writable<string>('');
 export const gameTurn = writable<number>(1);
-export const turnTimer = writable<number>(90);
+export const turnTimer = writable<number>(60); // 기본값을 60초로 설정
 export const gamePhase = writable<'waiting' | 'playing' | 'ended'>('waiting');
 export const gameResult = writable<'infected' | 'killed' | 'cure' | null>(null);
 
@@ -22,7 +30,7 @@ export const regionNames = writable<string[]>([
 export interface PlayerStatus {
   playerId: number;
   nickname: string;
-  state: 'alive' | 'host' | 'zombie' | 'dead' | 'infected' | 'you';
+  state: 'alive' | 'host' | 'zombie' | 'killed' | 'infected' | 'you';
   region: number;
   nextRegion: number;
   act: 'runaway' | 'hide' | 'lure';
@@ -30,8 +38,23 @@ export interface PlayerStatus {
   infectedTurn?: number;
 }
 
-export const myPlayerId = writable<number>(0);
-export const myStatus = writable<PlayerStatus | null>(null);
+// myStatus를 playerStore의 값들을 합쳐서 파생 스토어로 제공
+export const myStatus = derived(
+  [playerId, playerState, playerRegion, playerNextRegion, playerAct, playerItems],
+  ([$playerId, $state, $region, $nextRegion, $act, $items]) => {
+    if ($playerId === undefined) return null;
+    
+    return {
+      playerId: $playerId,
+      nickname: '', // 서버에서 받아야 함
+      state: $state,
+      region: $region,
+      nextRegion: $nextRegion,
+      act: $act,
+      items: $items
+    } as PlayerStatus;
+  }
+);
 
 // 다른 플레이어들 상태
 export const otherPlayers = writable<Map<number, PlayerStatus>>(new Map());
@@ -44,7 +67,7 @@ export const playersInMyRegion = derived(
     
     const players: PlayerStatus[] = [];
     $otherPlayers.forEach(player => {
-      if (player.region === $myStatus.region && player.state !== 'dead') {
+      if (player.region === $myStatus.region && player.state !== 'killed') {
         players.push(player);
       }
     });
@@ -52,26 +75,17 @@ export const playersInMyRegion = derived(
   }
 );
 
-// 채팅 & 메시지
-export interface ChatMessage {
-  id: string;
-  playerId?: number;
-  nickname?: string;
-  message: string;
-  timestamp: Date;
-  type: 'chat' | 'system' | 'whisper' | 'broadcast';
-  region?: number;
-}
+// 채팅 & 메시지 - synchronize.type에서 import해서 사용
+// ChatMessage와 RegionMessage는 synchronize.type.ts에 정의됨
 
-export interface RegionMessage {
-  id: string;
+export const chatMessages = writable<any[]>([]);
+// 구역 메시지 인터페이스
+interface RegionMessage {
   message: string;
   region: number;
-  turn: number;
-  isErased: boolean;
+  isErased?: boolean;
 }
 
-export const chatMessages = writable<ChatMessage[]>([]);
 export const regionMessages = writable<RegionMessage[]>([]);
 
 // 무전기 연결
@@ -123,17 +137,12 @@ export function updateGameState(data: any) {
 }
 
 export function updateMyStatus(status: GamePlayerStatusInterface) {
-  const currentStatus = get(myStatus);
-  if (currentStatus) {
-    myStatus.set({
-      ...currentStatus,
-      state: status.state,
-      region: status.region,
-      nextRegion: status.next,
-      act: status.act,
-      items: status.items
-    });
-  }
+  // playerStore의 개별 스토어들을 업데이트
+  if (status.state !== undefined) playerState.set(status.state);
+  if (status.region !== undefined) playerRegion.set(status.region);
+  if (status.next !== undefined) playerNextRegion.set(status.next);
+  if (status.act !== undefined) playerAct.set(status.act);
+  if (status.items !== undefined) playerItems.set(status.items);
 }
 
 export function updateOtherPlayers(survivors: SurvivorInterface[]) {
@@ -164,31 +173,27 @@ export function updateOtherPlayers(survivors: SurvivorInterface[]) {
   otherPlayers.set(updatedPlayers);
 }
 
-export function addChatMessage(message: Omit<ChatMessage, 'id'>) {
-  const newMessage: ChatMessage = {
+export function addChatMessage(message: any) {
+  const newMessage = {
     ...message,
-    id: `${Date.now()}-${Math.random()}`
+    id: `${Date.now()}-${Math.random()}`,
+    timestamp: new Date()
   };
   chatMessages.update(messages => [...messages, newMessage]);
 }
 
 export function addRegionMessage(message: string, region: number) {
-  const newMessage: RegionMessage = {
-    id: `${Date.now()}-${Math.random()}`,
-    message,
-    region,
-    turn: get(gameTurn),
-    isErased: false
-  };
-  regionMessages.update(messages => [...messages, newMessage]);
+  regionMessages.update(messages => [...messages, { message, region, isErased: false }]);
 }
 
-export function eraseRegionMessage(messageId: string) {
-  regionMessages.update(messages => 
-    messages.map(msg => 
-      msg.id === messageId ? { ...msg, isErased: true } : msg
-    )
-  );
+export function eraseRegionMessage(messageIndex: number) {
+  regionMessages.update(messages => {
+    const newMessages = [...messages];
+    if (newMessages[messageIndex]) {
+      newMessages[messageIndex] = { ...newMessages[messageIndex], isErased: true };
+    }
+    return newMessages;
+  });
 }
 
 export function updateZombieInfo(zombieList: any[]) {
@@ -225,11 +230,11 @@ export function showGameNotification(
 export function resetGameState() {
   gameId.set('');
   gameTurn.set(1);
-  turnTimer.set(90);
+  turnTimer.set(60);
   gamePhase.set('waiting');
   gameResult.set(null);
-  myPlayerId.set(0);
-  myStatus.set(null);
+  playerId.set(0);
+  // myStatus는 derived store이므로 set할 수 없음
   otherPlayers.set(new Map());
   chatMessages.set([]);
   regionMessages.set([]);
@@ -264,4 +269,33 @@ export function syncWithServer(serverData: any) {
     );
   }
   updateGameState(serverData);
+}
+
+// === 카운트다운 로직 (playerStore에서 이동) ===
+let countdownInterval: number | null = null;
+
+export function startCountdown() {
+  stopCountdown(); // 기존 타이머 정리
+  
+  countdownInterval = setInterval(() => {
+    const currentCount = get(turnTimer);
+    if (currentCount > 0) {
+      turnTimer.set(currentCount - 1);
+    } else {
+      stopCountdown();
+    }
+  }, 1000);
+}
+
+export function stopCountdown() {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+}
+
+// 게임 시작 시 카운트다운 시작
+export function startGame() {
+  gamePhase.set('playing');
+  startCountdown();
 }

@@ -8,12 +8,14 @@ import {
   regionMessages,
   totalRegions
 } from '../../../common/store/gameStateStore';
+    import { nicknameList } from '../game.type';
   
   let targetEl: HTMLElement
   let showAllMessages = false;
 
   // 현재 구역 이름 계산
   $: nowRegionName = $myStatus && $regionNames[$myStatus.region] ? $regionNames[$myStatus.region] : '알 수 없음';
+  console.log('내 구역 정보 :' , $myStatus?.region)
   
   // 현재 구역의 메시지 필터링
   $: nowRegionInfo = $regionMessages
@@ -31,7 +33,7 @@ import {
 <div bind:this={targetEl} class={`${THEME.bgSecondary} ${THEME.textPrimary} p-3 border-b ${THEME.borderPrimary}`}>
     {#if $myStatus}
       <span class={`text-lg font-bold ${THEME.textAccent}`}>
-        {$myStatus.nickname} - 
+        {nicknameList[$myStatus.playerId]} - 
         {#if $myStatus.state === 'you'}
           생존자
         {:else if $myStatus.state === 'host'}
@@ -40,7 +42,7 @@ import {
           좀비
         {:else if $myStatus.state === 'infected'}
           감염자
-        {:else if $myStatus.state === 'dead'}
+        {:else if $myStatus.state === 'killed'}
           사망
         {:else}
           생존자

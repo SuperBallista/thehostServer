@@ -7,8 +7,8 @@ import { authStore } from './authStore';
 import { locationState, currentRoom, pageStore, type State, lobbyPage } from './pageStore';
 import type { userDataResponse } from './synchronize.type';
 import { exitRoomState, rooms, setRoomState } from './lobbyStore';
-import { count, gameTurn, hostAct, myStatus, playerId, region, survivorList, useRegionsNumber } from './gameStore';
-import { turnTimer } from './gameStateStore';
+import { playerId, playerState, playerRegion, playerNextRegion, playerAct, playerItems } from './playerStore';
+import { gameTurn, turnTimer, updateMyStatus, updateOtherPlayers, resetGameState } from './gameStateStore';
 import { setPlayerNicknames, Survivor } from '../../page/game/game.type';
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
@@ -120,32 +120,23 @@ function updateData(payload: userDataResponse) {
   // 게임 관련 업데이트
   if (payload.gameTurn) gameTurn.set(payload.gameTurn);
   if (payload.count) {
-    count.set(payload.count);
-    // turnTimer도 함께 업데이트
+    // turnTimer만 업데이트 (count는 제거됨)
     turnTimer.set(payload.count);
   }
-  if (payload.hostAct) get(hostAct)?.updateData(payload.hostAct.zombieList);
-  if (payload.myStatus) get(myStatus)?.updateData(payload.myStatus);
-  if (payload.playerId) playerId.set(payload.playerId);
-  if (payload.region) get(region).updateData(payload.region.chatLog, payload.region.regionMessageList);
-  if (payload.survivorList) {
-    const sList = get(survivorList);
-    const pList = payload.survivorList ?? [];
-    
-    // 처음 게임 시작 시 survivorList가 비어있으면 새로 생성
-    if (sList.length === 0 && pList.length > 0) {
-      const newSurvivorList = pList.map(survivor => 
-        new Survivor(survivor.playerId, survivor.state, survivor.sameRegion, survivor.nickname)
-      );
-      survivorList.set(newSurvivorList);
-    } else {
-      // 기존 survivorList 업데이트
-      sList.forEach((s, i) => {
-        if (pList[i]) s.updateData(pList[i]);
-      });
-    }
+  // 숙주 관련 데이터는 gameStateStore에서 처리해야 함
+  // if (payload.hostAct) get(hostAct)?.updateData(payload.hostAct.zombieList);
+  if (payload.myStatus) {
+    updateMyStatus(payload.myStatus);
   }
-  if (payload.useRegionsNumber) useRegionsNumber.set(payload.useRegionsNumber);
+  if (payload.playerId) playerId.set(payload.playerId);
+  // 구역 관련 데이터는 gameStateStore에서 처리해야 함
+  // if (payload.region) get(region).updateData(payload.region.chatLog, payload.region.regionMessageList);
+  // 생존자 목록 업데이트
+  if (payload.survivorList) {
+    updateOtherPlayers(payload.survivorList);
+  }
+  // 게임 관련 데이터는 gameStateStore에서 처리해야 함
+  // if (payload.useRegionsNumber) useRegionsNumber.set(payload.useRegionsNumber);
   
   // 게임 시작 시 플레이어 닉네임 매핑 설정
   if (payload.locationState === 'game' && payload.roomData) {

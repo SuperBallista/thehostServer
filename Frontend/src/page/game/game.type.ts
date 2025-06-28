@@ -1,5 +1,5 @@
 import { get } from "svelte/store";
-import { hostAct, myStatus, region, useRegionsNumber } from "../../common/store/gameStore";
+import { totalRegions } from "../../common/store/gameStateStore";
 import { Item } from "./common/itemObject";
 import type { GamePlayerStatusInterface, SurvivorInterface } from "../../common/store/synchronize.type";
 
@@ -14,7 +14,7 @@ export class GamePlayerStatus{ // 내 정보
   this.state = state
   this.items = []
   this.region = region
-  this.next = Math.floor(Math.random()*get(useRegionsNumber))
+  this.next = Math.floor(Math.random()*get(totalRegions))
   this.act = `lure`
  }
 
@@ -22,7 +22,9 @@ export class GamePlayerStatus{ // 내 정보
  this.state = payload.state;
  this.items =  payload.items.map(item => new Item(item))
  this.region = payload.region;
- myStatus.set(this)
+ this.next = payload.next || this.next;
+ this.act = payload.act || this.act;
+ // gameStateStore의 updateMyStatus를 사용해야 함
  }
 
  setNext(next:number){
@@ -35,7 +37,7 @@ export class GamePlayerStatus{ // 내 정보
 
  playNextTurn(item:Item){
   this.region = this.next
-  this.next = Math.floor(Math.random()* get(useRegionsNumber)) // 다음 구역으로 이동 및 다음 구역 무작위 설정
+  this.next = Math.floor(Math.random()* get(totalRegions)) // 다음 구역으로 이동 및 다음 구역 무작위 설정
   this.items.push(item)
  } // 다음 턴 진행
 
@@ -72,7 +74,7 @@ updateData(Survivor: SurvivorInterface | undefined ){
 }
 }
 
-type PlayerState = 'alive' | 'host' | `zombie` | `dead` | 'you' // 생존자 상태
+type PlayerState = 'alive' | 'host' | `zombie` | `killed` | 'you' // 생존자 상태
 type Act = `runaway` | `hide` | `lure` // 좀비 대처 행동
 
 
@@ -97,7 +99,7 @@ export class HostAct{
     }
     updateData(zombieList:Zombie[]){
         this.zombieList = zombieList
-        hostAct.set(this)
+        // gameStateStore에서 업데이트 처리해야 함
     }
     playNextTurn(){
         let targetId = this.infect
@@ -112,7 +114,7 @@ export class HostAct{
             if (zombie.leftTurn===0) {
                 zombie.leftTurn=4
                 zombie.region = zombie.next
-                zombie.next = Math.floor(Math.random() * get(useRegionsNumber))
+                zombie.next = Math.floor(Math.random() * get(totalRegions))
             } 
             zombie.leftTurn = zombie.leftTurn - 1 // 좀비의 이동 관리
         })
@@ -164,7 +166,7 @@ export class Region{
     updateData(chatLog:ChatMessage[], messageList:RegionMessage[]){
         this.chatLog = chatLog
         this.regionMessageList = messageList
-        region.set(this)
+        // gameStateStore에서 업데이트 처리해야 함
     }
 
     addMessage(message:RegionMessage){

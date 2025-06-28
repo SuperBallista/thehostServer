@@ -1,6 +1,7 @@
 <script lang="ts">
   import { THEME } from '../../../common/constant/theme';
-  import { survivorList, playerId, myStatus } from '../../../common/store/gameStore';
+  import { playerId } from '../../../common/store/playerStore';
+  import { myStatus, otherPlayers } from '../../../common/store/gameStateStore';
   import { nicknameList, type Survivor } from '../game.type';
 
   export let isOpen: boolean = false;
@@ -10,43 +11,46 @@
   let survivorListHTML:HTMLElement
 
   // 모든 플레이어 목록 (나 포함)
-  $: allPlayers = [
-    ...$survivorList,
-    // 내 정보가 survivorList에 없으면 추가
-    ...($myStatus && !$survivorList.some(s => s.playerId === $playerId) 
-      ? [{
-          playerId: $playerId || 0,
-          state: 'you' as const,
-          sameRegion: true
-        }] 
-      : [])
-  ];
-
-  function getClass(player: Survivor | {playerId: number, state: string, sameRegion: boolean}): string {
-    let result:string = ''
+  $: allPlayers = (() => {
+    const players = Array.from($otherPlayers.values()).map(p => ({
+      ...p,
+      sameRegion: p.region === $myStatus?.region
+    }));
     
-    // 내 캐릭터인 경우
-    if (player.playerId === $playerId) {
-      result = THEME.textAccent;
+    // 내 정보 추가 (중복 방지)
+    if ($myStatus && !players.some(p => p.playerId === $myStatus.playerId)) {
+      players.push({
+        playerId: $myStatus.playerId,
+        state: 'you' as const,
+        sameRegion: true,
+        nickname: $myStatus.nickname,
+        region: $myStatus.region,
+        nextRegion: $myStatus.nextRegion,
+        act: $myStatus.act,
+        items: $myStatus.items
+      });
     }
+    
+    // playerId로 정렬하여 일관된 순서 유지
+    return players.sort((a, b) => a.playerId - b.playerId);
+  })();
+
+  // 플레이어 상태에 따른 클래스 결정
+  function getPlayerClass(player: any): string {
+    // 내 캐릭터
+    if (player.playerId === $playerId) return THEME.textAccent;
     
     // 사망한 경우
-    if (player.state === 'killed') {
-      result = `line-through`;
-    }
+    if (player.state === 'killed') return `line-through ${THEME.textTertiary}`;
     
-    // 같은 구역에 없는 경우 (내가 아닌 경우만)
-    if (player.playerId !== $playerId && !player.sameRegion) {
-      result = result + ` ${THEME.textTertiary} italic`;
-    }
+    // 같은 구역의 좀비
+    if (player.state === 'zombie' && player.sameRegion) return THEME.textWarning;
     
-    // 같은 구역의 좀비인 경우
-    if (player.state === 'zombie' && player.sameRegion) {
-      result = THEME.textWarning;
-    }
+    // 같은 구역에 없는 경우
+    if (!player.sameRegion) return `${THEME.textTertiary} italic`;
     
-    if (result==='') result = THEME.textPrimary;
-    return result
+    // 기본 (생존자)
+    return THEME.textPrimary;
   }
 
   function getStatusText(state: string): string {
@@ -55,7 +59,7 @@
       case 'alive': return '생존자';
       case 'host': return '숙주';
       case 'zombie': return '좀비';
-      case 'dead': return '사망';
+      case 'killed': return '사망';
       default: return '알 수 없음';
     }
   }
@@ -70,7 +74,7 @@
     <h2 class="text-lg font-bold mb-2">👥 생존자 정보</h2>
     <ul class="space-y-1 text-sm">
       {#each allPlayers as player}
-        <li class={getClass(player)}>
+        <li class={getPlayerClass(player)}>
           { nicknameList[player.playerId] } 
           ({player.playerId === $playerId ? '나' : getStatusText(player.state)})
         </li>
@@ -90,7 +94,7 @@
       <h2 class="text-lg font-bold mb-2">👥 생존자 정보</h2>
       <ul class="space-y-1 text-sm">
         {#each allPlayers as player}
-          <li class={getClass(player)}>
+          <li class={getPlayerClass(player)}>
             { nicknameList[player.playerId] } 
             ({player.playerId === $playerId ? '나' : getStatusText(player.state)})
           </li>

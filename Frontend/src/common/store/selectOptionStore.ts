@@ -25,5 +25,5 @@ export function showSelectOptionBox(
 }
 
 
-export const deadByZombie = writable<string>('lure')
+export const killedByZombie = writable<string>('lure')
 

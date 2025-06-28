@@ -22,7 +22,7 @@ export declare class Survivor {
     disappearSurvivor(): void;
     updateData(Survivor: SurvivorInterface | undefined): void;
 }
-type PlayerState = 'alive' | 'host' | `zombie` | `dead` | 'you';
+type PlayerState = 'alive' | 'host' | `zombie` | `killed` | 'you';
 type Act = `runaway` | `hide` | `lure`;
 export declare class HostAct {
     infect: number | null;
