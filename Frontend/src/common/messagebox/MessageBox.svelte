@@ -79,7 +79,7 @@ let showTipButton = true;
           {#if $imageSrc}
           <img class="message-image" src={$imageSrc} alt="image"/>
           {/if}
-<p>{resolvedMessage}</p>
+<p class="message-text">{resolvedMessage}</p>
             {#if $messageType === "input"}
             {#each $messageInputs as input}
             <InputBox
@@ -203,6 +203,12 @@ let showTipButton = true;
   margin: 12px auto;
   object-fit: contain;
 }
+
+  .message-text {
+    text-align: left;
+    white-space: pre-line;
+    line-height: 1.5;
+  }
 
   .region-member {
     display: flex;

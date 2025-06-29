@@ -32,7 +32,7 @@ import {
 <!-- ✅ 상단 정보 + 최근 3개 메시지 -->
 <div bind:this={targetEl} class={`${THEME.bgSecondary} ${THEME.textPrimary} p-3 border-b ${THEME.borderPrimary}`}>
     {#if $myStatus}
-      <span class={`text-lg font-bold ${THEME.textAccent}`}>
+      <span class={`text-lg font-bold ${$myStatus.state === 'host' ? THEME.textWarning : THEME.textAccent}`}>
         {nicknameList[$myStatus.playerId]} - 
         {#if $myStatus.state === 'you'}
           생존자
