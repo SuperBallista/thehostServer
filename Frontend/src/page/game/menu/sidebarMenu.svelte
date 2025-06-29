@@ -4,6 +4,7 @@
     import { myStatus } from '../../../common/store/gameStateStore';
     import type { ItemInterface } from '../../../common/store/synchronize.type';
     import { itemList } from '../common/itemObject';
+    import { showMessageBox } from '../../../common/messagebox/customStore';
 
   let inventory:HTMLElement
   let action:HTMLElement
@@ -14,6 +15,17 @@
   const toggle = (section: typeof openSection) => {
     openSection = openSection === section ? null : section;
   };
+
+  function showItemInfo(item: ItemInterface) {
+    showMessageBox(
+      'tips',
+      itemList[item].name,
+      itemList[item].info,
+      undefined,
+      undefined,
+      `/img/items/${item}.jpg`
+    );
+  }
 
 
 
@@ -45,7 +57,7 @@ async function moveNextRegion() {
             <div class="flex items-center justify-between bg-gray-700 p-2 rounded">
               <div class="text-white font-medium">{itemList[item].name}</div>
               <div class="flex gap-1">
-                <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`}>안내</button>
+                <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`} on:click={() => showItemInfo(item)}>안내</button>
                 <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgAccent}`}>사용</button>
                 <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`}>주기</button>
               </div>

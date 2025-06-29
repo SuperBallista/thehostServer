@@ -3,11 +3,23 @@
     import { myStatus } from '../../../common/store/gameStateStore';
     import type { ItemInterface } from '../../../common/store/synchronize.type';
     import { itemList } from '../common/itemObject';
+    import { showMessageBox } from '../../../common/messagebox/customStore';
 
     export let isOpen = false;
 
     let selectedItem: ItemInterface | null = null;
     let showDescription = false;
+
+    function showItemInfo(item: ItemInterface) {
+      showMessageBox(
+        'tips',
+        itemList[item].name,
+        itemList[item].info,
+        undefined,
+        undefined,
+        `/img/items/${item}.jpg`
+      );
+    }
 </script>
 
 {#if isOpen}
@@ -36,10 +48,7 @@
               <div class="flex gap-1">
                 <button 
                   class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`}
-                  on:click={() => {
-                    selectedItem = item;
-                    showDescription = true;
-                  }}
+                  on:click={() => showItemInfo(item)}
                 >
                   안내
                 </button>

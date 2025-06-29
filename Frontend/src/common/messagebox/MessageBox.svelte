@@ -44,14 +44,6 @@
 
 let showTipButton = true;
 
-$: {
-  if ($messageType === "tips") {
-    showTipButton = false;
-    setTimeout(() => {
-      showTipButton = true;
-    }, 3000);
-  }
-}
 
 
   
