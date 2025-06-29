@@ -70,7 +70,7 @@ src/
 │   ├── game/               # 게임 관련 서비스
 │   │   ├── game.service.ts
 │   │   ├── game.types.ts
-│   │   ├── gameTurn.service.ts  # 턴별 아이템 지급 서비스
+│   │   ├── gameTurn.service.ts     # 턴별 아이템 지급 서비스
 │   │   └── itemProbabilities.json  # 아이템 확률 설정
 │   ├── utils/              # 소켓 유틸리티
 │   │   ├── socketRoomManager.ts
@@ -136,7 +136,7 @@ Frontend/src/
 │   │   ├── waitRoom.svelte # 대기실
 │   │   └── playerCard.svelte
 │   └── game/               # 게임 화면
-│       ├── gameLayout.svelte
+│       ├── gameLayout.svelte       # 게임 레이아웃 (배경음악 통합)
 │       ├── gameMenu.svelte
 │       ├── game.type.ts    # 게임 타입 정의
 │       ├── common/         # 게임 공통 요소
@@ -149,8 +149,8 @@ Frontend/src/
 │       │   ├── actionModal.svelte
 │       │   ├── inventoryModal.svelte
 │       │   ├── survivorModal.svelte
-│       │   ├── sidebarMenu.svelte
-│       │   └── mobileNav.svelte
+│       │   ├── sidebarMenu.svelte  # 사이드바 메뉴 (음악 토글 버튼 포함)
+│       │   └── mobileNav.svelte     # 모바일 네비게이션 (음악 토글 버튼 포함)
 │       └── selectModal/    # 선택 모달
 │           ├── playerSelector.svelte
 │           └── selectOptionBox.svelte
@@ -163,7 +163,7 @@ Frontend/src/
 │   ├── constant/           # 상수 정의
 │   │   └── theme.ts        # 테마 상수
 │   ├── messagebox/         # 메시지박스 시스템
-│   │   ├── MessageBox.svelte
+│   │   ├── MessageBox.svelte       # 메시지박스 (텍스트 왼쪽 정렬 및 줄바꿈 지원)
 │   │   ├── InputBox.svelte
 │   │   ├── BoxOverlay.svelte
 │   │   ├── LoadingSpinner.svelte
@@ -185,6 +185,7 @@ Frontend/src/
 │   │   ├── waitRoomStore.ts
 │   │   ├── selectOptionStore.ts
 │   │   ├── selectPlayerMessageBox.ts  # 플레이어 선택 메시지박스
+│   │   ├── musicStore.ts              # 배경음악 상태 관리
 │   │   └── synchronize.type.ts        # 동기화 타입 정의
 │   ├── handleCode/
 │   │   └── errorHandle.ts
@@ -213,38 +214,40 @@ Frontend/
 
 ### 정적 자산 (Frontend/public/, front/)
 ```
-img/
-├── logo.png
-├── google-icon.svg
-├── items/                  # 게임 아이템 이미지
-│   ├── medicine.jpg        # 응급치료제
-│   ├── vaccine.jpg         # 백신
-│   ├── shotgun.jpg         # 좀비사살용산탄총
-│   ├── microphone.jpg      # 마이크
-│   ├── wireless.jpg        # 무전기
-│   ├── spray.jpg           # 낙서스프레이
-│   ├── eraser.jpg          # 지우개
-│   ├── virusChecker.jpg    # 진단키트
-│   ├── vaccineMaterialA.jpg # 항바이러스혈청
-│   ├── vaccineMaterialB.jpg # 촉매정제물질
-│   └── vaccineMaterialC.jpg # 신경억제단백질
-├── region/                 # 지역 배경 이미지
-│   ├── beach.jpg           # 해안가
-│   ├── building.jpg        # 폐건물
-│   ├── cave.jpg            # 동굴
-│   ├── hill.jpg            # 산 정상
-│   ├── jungle.jpg          # 정글
-│   └── river.jpg           # 개울가
-└── scence/                 # 게임 상황 이미지
-    ├── host.png            # 숙주
-    ├── survivor.png        # 생존자
-    ├── zombie.png          # 좀비
-    ├── infect.png          # 감염
-    ├── checkInfect.png     # 감염 확인
-    ├── vaccine.png         # 백신 투여
-    ├── killed.png          # 사망
-    ├── runaway.png         # 도주
-    └── hide.png            # 은신
+Frontend/public/
+├── game_bgm.mp3            # 게임 배경음악
+└── img/
+    ├── logo.png
+    ├── google-icon.svg
+    ├── items/                  # 게임 아이템 이미지
+    │   ├── medicine.jpg        # 응급치료제
+    │   ├── vaccine.jpg         # 백신
+    │   ├── shotgun.jpg         # 좀비사살용산탄총
+    │   ├── microphone.jpg      # 마이크
+    │   ├── wireless.jpg        # 무전기
+    │   ├── spray.jpg           # 낙서스프레이
+    │   ├── eraser.jpg          # 지우개
+    │   ├── virusChecker.jpg    # 진단키트
+    │   ├── vaccineMaterialA.jpg # 항바이러스혈청
+    │   ├── vaccineMaterialB.jpg # 촉매정제물질
+    │   └── vaccineMaterialC.jpg # 신경억제단백질
+    ├── region/                 # 지역 배경 이미지
+    │   ├── beach.jpg           # 해안가
+    │   ├── building.jpg        # 폐건물
+    │   ├── cave.jpg            # 동굴
+    │   ├── hill.jpg            # 산 정상
+    │   ├── jungle.jpg          # 정글
+    │   └── river.jpg           # 개울가
+    └── scence/                 # 게임 상황 이미지
+        ├── host.png            # 숙주
+        ├── survivor.png        # 생존자
+        ├── zombie.png          # 좀비
+        ├── infect.png          # 감염
+        ├── checkInfect.png     # 감염 확인
+        ├── vaccine.png         # 백신 투여
+        ├── killed.png          # 사망
+        ├── runaway.png         # 도주
+        └── hide.png            # 은신
 ```
 
 ### 프로젝트 문서 (docs/)
