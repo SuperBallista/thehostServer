@@ -140,7 +140,8 @@ Frontend/src/
 │       ├── gameMenu.svelte
 │       ├── game.type.ts    # 게임 타입 정의
 │       ├── common/         # 게임 공통 요소
-│       │   └── itemObject.ts  # 아이템 객체 정의
+│       │   ├── itemObject.ts  # 아이템 객체 정의
+│       │   └── GameStartMessageBox.svelte  # 게임 시작 역할 안내 메시지박스
 │       ├── chat/           # 채팅 관련
 │       │   ├── chatInput.svelte
 │       │   ├── chatLog.svelte
