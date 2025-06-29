@@ -7,7 +7,7 @@
 
     export let isOpen = false;
 
-    let selectedItem: ItemInterface | null = null;
+    let selectedItem: ItemInterface | undefined ;
     let showDescription = false;
 
     function showItemInfo(item: ItemInterface) {
