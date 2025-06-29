@@ -7,9 +7,10 @@ import { RedisModule } from 'src/redis/redis.module';
 import { JwtModule } from 'src/jwt/jwt.module';
 import { UserModule } from 'src/user/user.module';
 import { GameService } from './game/game.service';
+import { GameTurnService } from './game/gameTurn.service';
 
 @Module({
   imports: [RedisModule, JwtModule, UserModule],
-  providers: [SocketGateway, LobbyService, ConnectionService, GameService],
+  providers: [SocketGateway, LobbyService, ConnectionService, GameService, GameTurnService],
 })
 export class SocketModule {}

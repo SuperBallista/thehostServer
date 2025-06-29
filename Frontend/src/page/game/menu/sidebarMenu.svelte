@@ -1,8 +1,22 @@
 <script lang="ts">
     import { THEME } from "../../../common/constant/theme";
     import { showSelectOptionBox } from "../../../common/store/selectOptionStore";
+    import { myStatus } from '../../../common/store/gameStateStore';
+    import type { ItemInterface } from '../../../common/store/synchronize.type';
 
-    let itemList = [{name: ''}]
+    // 아이템 한글 이름 매핑
+    const itemNames: Record<ItemInterface, string> = {
+      spray: '낙서 스프레이',
+      virusChecker: '자가진단키트',
+      vaccine: '백신',
+      medicine: '응급치료제',
+      vaccineMaterialA: '항바이러스혈청',
+      vaccineMaterialB: '촉매정제물질', 
+      vaccineMaterialC: '신경억제단백질',
+      wireless: '무전기',
+      eraser: '지우개',
+      shotgun: '좀비사살용산탄총'
+    };
 
   let inventory:HTMLElement
   let action:HTMLElement
@@ -36,19 +50,23 @@ async function moveNextRegion() {
 <div class="flex flex-col gap-y-2">
   <!-- 🎒 가방 -->
   <div bind:this={inventory}>
-    <button class="w-full text-left px-4 py-2 font-semibold">🎒 가방</button>
+    <button class="w-full text-left px-4 py-2 font-semibold" on:click={() => toggle('inventory')}>🎒 가방</button>
     {#if openSection === 'inventory'}
       <div class="pl-6 mt-1 space-y-1 text-sm flex flex-col">
-        {#each itemList as item}
-          <div class="flex items-center justify-between bg-gray-700 p-2 rounded">
-            <div class="text-white font-medium">{item.name}</div>
-            <div class="flex gap-1">
-              <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`}>안내</button>
-              <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgAccent}`}>사용</button>
-              <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`}>주기</button>
+        {#if $myStatus?.items && $myStatus.items.length > 0}
+          {#each $myStatus.items as item}
+            <div class="flex items-center justify-between bg-gray-700 p-2 rounded">
+              <div class="text-white font-medium">{itemNames[item]}</div>
+              <div class="flex gap-1">
+                <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`}>안내</button>
+                <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgAccent}`}>사용</button>
+                <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`}>주기</button>
+              </div>
             </div>
-          </div>
-        {/each}
+          {/each}
+        {:else}
+          <p class="text-gray-400 text-center py-2">아이템이 없습니다.</p>
+        {/if}
       </div>
     {/if}
   </div>

@@ -5,8 +5,6 @@
   import ChatInput from './chat/chatInput.svelte';
   import { THEME } from '../../common/constant/theme';
   import GameMenu from './gameMenu.svelte';
-  import InventoryModal from './menu/inventoryModal.svelte';
-  import ActionModal from './menu/actionModal.svelte';
   import PlayerSelector from './selectModal/playerSelector.svelte';
   import SelectOptionBox from './selectModal/selectOptionBox.svelte';
   import { pageStore } from '../../common/store/pageStore';
@@ -81,12 +79,6 @@
 
           <!-- 데스크탑이면 왼쪽 사이드, 모바일이면 하단 고정 -->
     <GameMenu/>
-
-
-
-  <InventoryModal/>
-    <ActionModal/>
-    
 
 </div>
 

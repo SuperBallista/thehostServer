@@ -1,0 +1,59 @@
+{
+  "items": [
+    {
+      "itemId": "spray",
+      "name": "낙서스프레이",
+      "probability": 25
+    },
+    {
+      "itemId": "virusChecker",
+      "name": "진단키트",
+      "probability": 10
+    },
+    {
+      "itemId": "medicine",
+      "name": "응급치료제",
+      "probability": 3
+    },
+    {
+      "itemId": "vaccineMaterialA",
+      "name": "항바이러스혈청",
+      "probability": 6
+    },
+    {
+      "itemId": "vaccineMaterialB",
+      "name": "촉매정제물질",
+      "probability": 6
+    },
+    {
+      "itemId": "vaccineMaterialC",
+      "name": "신경억제단백질",
+      "probability": 6
+    },
+    {
+      "itemId": "wireless",
+      "name": "무전기",
+      "probability": 15
+    },
+    {
+      "itemId": "eraser",
+      "name": "지우개",
+      "probability": 28
+    },
+    {
+      "itemId": "shotgun",
+      "name": "좀비사살용산탄총",
+      "probability": 1
+    },
+    {
+      "itemId": "microphone",
+      "name": "마이크",
+      "probability": 10
+    },
+    {
+      "itemId": "none",
+      "name": "없음",
+      "probability": 0
+    }
+  ]
+}

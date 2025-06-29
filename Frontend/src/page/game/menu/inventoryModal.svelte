@@ -11,11 +11,12 @@
       virusChecker: '자가진단키트',
       vaccine: '백신',
       medicine: '응급치료제',
-      vaccineMaterialA: '백신 재료 A',
-      vaccineMaterialB: '백신 재료 B', 
-      vaccineMaterialC: '백신 재료 C',
+      vaccineMaterialA: '항바이러스혈청',
+      vaccineMaterialB: '촉매정제물질', 
+      vaccineMaterialC: '신경억제단백질',
       wireless: '무전기',
-      eraser: '지우개'
+      eraser: '지우개',
+      shotgun: '좀비사살용산탄총'
     };
 
     // 아이템 설명
@@ -28,7 +29,8 @@
       vaccineMaterialB: '백신 제작에 필요한 재료입니다.',
       vaccineMaterialC: '백신 제작에 필요한 재료입니다.',
       wireless: '다른 플레이어와 1:1 통신을 할 수 있습니다.',
-      eraser: '구역의 낙서를 지울 수 있습니다.'
+      eraser: '구역의 낙서를 지울 수 있습니다.',
+      shotgun: '좀비를 즉사시킬 수 있는 산탄총입니다.'
     };
 
     let selectedItem: ItemInterface | null = null;

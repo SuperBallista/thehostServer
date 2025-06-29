@@ -1,14 +1,14 @@
 // src/socket/game/game.service.ts
 import { Injectable } from '@nestjs/common';
 import { RedisPubSubService } from '../../redis/redisPubSub.service';
-import { Game, GameInRedis, GamePlayer, GamePlayerInRedis, GameRegionInRedis, Host} from './game.types';
+import { Game, GameInRedis, GamePlayer, GamePlayerInRedis, Host} from './game.types';
 import { RedisService } from 'src/redis/redis.service';
-import { UserService } from 'src/user/user.service';
 import { WsException } from '@nestjs/websockets';
 import { LocationState, userShortInfo } from '../data.types';
 import { PlayerState, Room, State, SurvivorInterface } from '../payload.types';
 import { getOrderRandom } from '../utils/randomManager';
 import { userDataResponse } from '../payload.types';
+import { GameTurnService } from './gameTurn.service';
 
 
 @Injectable()
@@ -16,7 +16,7 @@ export class GameService {
   constructor(
     private readonly redisService: RedisService,
     private readonly redisPubSubService: RedisPubSubService,
-    private readonly userService: UserService,
+    private readonly gameTurnService: GameTurnService,
  ) {}
 
 
@@ -57,6 +57,9 @@ private async makeGameData(roomData: Room): Promise<userDataResponse> {
     
     // 게임 데이터 세팅 준비 완료
     await this.createNewGameData(roomData.id, hostPlayer, players) // 게임 생성
+    
+    // 첫 턴 아이템 지급 (게임 생성 직후, 플레이어들에게 알림 전에 실행)
+    await this.gameTurnService.onTurnStart(roomData.id, 1);
 
     // ✅ 모든 플레이어에게 게임 시작 알림 (방 데이터 삭제 전에 실행)
     const playerIds = roomData.players.map(p => p.id);
@@ -135,13 +138,15 @@ async subscribeGameStart(client: any, userId: number, users: userShortInfo[], ro
     try {
       // 3. 게임 데이터 로드
       const gameData = await this.getGameData(roomId);
+      
+      // 4. 플레이어 데이터 로드
       const playerDataResult = await this.loadAllPlayersWithRetry(roomId, userId);
       
       if (!playerDataResult.myPlayerData) {
         throw new WsException(`게임 데이터를 찾을 수 없습니다. 잠시 후 다시 시도해주세요.`);
       }
 
-      // 4. 응답 생성 및 전송
+      // 5. 응답 생성 및 전송
       const response = this.createGameStartResponse(
         gameData,
         playerDataResult.myPlayerData,

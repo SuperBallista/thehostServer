@@ -99,6 +99,10 @@ export class RedisPubSubService implements OnModuleInit {
           processed = await this.handlePlayerStatus(message);
           break;
 
+        case InternalUpdateType.TURN_UPDATE:
+          processed = await this.handleTurnUpdate(message);
+          break;
+
         default:
           console.warn(`🚨 처리되지 않은 메시지 타입: ${message.type}`);
       }
@@ -223,6 +227,33 @@ export class RedisPubSubService implements OnModuleInit {
   }
 
   /**
+   * 턴 업데이트 처리
+   */
+  private async handleTurnUpdate(message: InternalMessage): Promise<boolean> {
+    const { gameId, event, itemsDistributed, turn } = message.data as any;
+    
+    // 클라이언트가 기대하는 userDataResponse 형식으로 전송
+    const updatePayload: any = {};
+    
+    if (turn !== undefined) {
+      updatePayload.gameTurn = turn;
+    }
+    
+    // 아이템이 배포되었다면 알림 추가
+    if (itemsDistributed && event === 'turnStarted') {
+      updatePayload.alarm = {
+        message: '새로운 아이템을 획득했습니다!',
+        img: 'info'
+      };
+    }
+    
+    this.io?.to(`game:${gameId}`).emit('update', updatePayload);
+    
+    console.log(`⏱️ 턴 업데이트: ${gameId} - ${event}`);
+    return true;
+  }
+
+  /**
    * 메시지 발행 (통합된 방식)
    */
   async publishInternal(message: InternalMessage): Promise<void> {
@@ -250,6 +281,14 @@ export class RedisPubSubService implements OnModuleInit {
 
   async publishGameStart(roomId: string, gameId: string, playerIds: number[]): Promise<void> {
     const message = InternalMessageBuilder.gameStart(roomId, gameId, playerIds);
+    await this.publishInternal(message);
+  }
+
+  async publishTurnUpdate(gameId: string, data: { event: string; itemsDistributed?: boolean; turn?: number }): Promise<void> {
+    const message = InternalMessageBuilder.turnUpdate(gameId, data.event, { 
+      itemsDistributed: data.itemsDistributed,
+      turn: data.turn 
+    });
     await this.publishInternal(message);
   }
 

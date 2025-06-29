@@ -52,6 +52,12 @@ const itemList = {
     info: '낙서스프레이로 남긴 메세지를 읽지 못하게 흔적만 남기고 내용을 지워버립니다',
     method: useEraser,
   },
+    shotgun: {
+    name: '좀비사살용산탄총',
+    info: '좀비를 즉사시킬 수 있는 산탄총입니다',
+    method: useShotgun,
+  },
+
 };
 
 
@@ -121,5 +127,9 @@ async function useWireless() {
 
 
 async function useEraser() {
+return false;
+}
+
+async function useShotgun() {
 return false;
 }

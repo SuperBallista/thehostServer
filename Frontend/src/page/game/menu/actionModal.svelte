@@ -30,7 +30,7 @@ async function moveNextRegion() {
 );
 }
 }
-    let isOpen = false
+    export let isOpen = false
 
   </script>
   {#if isOpen}
@@ -44,7 +44,8 @@ async function moveNextRegion() {
           <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>좀비의 공격 대상 정하기</button>
           <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>좀비의 이동 구역 정하기</button>
         </div>
-        <button class={`mt-4 px-3 py-1 text-white rounded ${THEME.bgSecondary}`}>
+        <button class={`mt-4 px-3 py-1 text-white rounded ${THEME.bgSecondary}`}
+          on:click={() => isOpen = false}>
           닫기
         </button>
       </div>

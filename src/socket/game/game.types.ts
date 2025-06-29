@@ -125,7 +125,7 @@ export class GamePlayer{
 
 type State =  'alive' | 'host' | 'zombie' | 'killed';
 type Act = 'runaway' | 'hide' | 'lure';
-type ItemCode = `spray` | `vaccine` | `shotgun` | `eraser` | `medicine` | `microphone` | `vaccineMaterialA` | `vaccineMaterialB` | `vaccineMaterialC` | `virusChecker` | `wireless`
+export type ItemCode = `spray` | `vaccine` | `shotgun` | `eraser` | `medicine` | `microphone` | `vaccineMaterialA` | `vaccineMaterialB` | `vaccineMaterialC` | `virusChecker` | `wireless`
 type UseMethod = () => Promise<boolean>
 
 export class ItemObject{

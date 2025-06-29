@@ -128,6 +128,6 @@ type RegionMessage = string | null // 구역 메세지 형식
 
 type PlayerState = 'alive' | 'host' | `zombie` | `killed` | 'you' // 생존자 상태
 type Act = `runaway` | `hide` | `lure` // 좀비 대처 행동
-export type ItemInterface = `spray` | `virusChecker` | `vaccine` | `medicine` | `vaccineMaterialA` | `vaccineMaterialB` | `vaccineMaterialC` | `wireless` | `eraser`
+export type ItemInterface = `spray` | `virusChecker` | `vaccine` | `medicine` | `vaccineMaterialA` | `vaccineMaterialB` | `vaccineMaterialC` | `wireless` | `eraser` | 'shotgun'
 
 

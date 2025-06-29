@@ -9,7 +9,8 @@ export enum InternalUpdateType {
   ROOM_DELETE = 'ROOM_DELETE',
   GAME_START = 'GAME_START',
   USER_LOCATION = 'USER_LOCATION',
-  PLAYER_STATUS = 'PLAYER_STATUS'
+  PLAYER_STATUS = 'PLAYER_STATUS',
+  TURN_UPDATE = 'TURN_UPDATE'
 }
 
 /**
@@ -32,7 +33,8 @@ export type InternalMessageData =
   | RoomDeleteData
   | GameStartData
   | UserLocationData
-  | PlayerStatusData;
+  | PlayerStatusData
+  | TurnUpdateData;
 
 // 각 메시지 타입별 데이터 인터페이스
 export interface RoomListUpdateData {
@@ -66,6 +68,13 @@ export interface PlayerStatusData {
   gameId: string;
   playerId: number;
   status: any;
+}
+
+export interface TurnUpdateData {
+  gameId: string;
+  event: string;
+  itemsDistributed?: boolean;
+  turn?: number;
 }
 
 /**
@@ -121,6 +130,15 @@ export class InternalMessageBuilder {
     return {
       type: InternalUpdateType.PLAYER_STATUS,
       data: { gameId, playerId, status },
+      timestamp: Date.now()
+    };
+  }
+
+  static turnUpdate(gameId: string, event: string, additionalData?: any): InternalMessage {
+    return {
+      type: InternalUpdateType.TURN_UPDATE,
+      data: { gameId, event, ...additionalData },
+      targetRoomId: gameId,
       timestamp: Date.now()
     };
   }
