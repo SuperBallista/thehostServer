@@ -18,11 +18,15 @@
   } from '../../common/store/gameStateStore';
   import { socketStore } from '../../common/store/socketStore';
   import { showMessageBox } from '../../common/messagebox/customStore';
+  import { initMusic, cleanupMusic } from '../../common/store/musicStore';
     
   let showSurvivorModal = false;
   let hasShownRoleMessage = false;
 
   onMount(() => {
+    // 배경음악 초기화
+    initMusic('/game_bgm.mp3');
+
     // 소켓 이벤트 리스너 등록
     const socket = $socketStore;
     if (socket) {
@@ -35,6 +39,7 @@
   // myStatus가 설정되면 역할 안내 메시지 표시
   $: if ($myStatus && !hasShownRoleMessage) {
     hasShownRoleMessage = true;
+    
     if ($myStatus.state === 'host') {
       showMessageBox(
         'alert',
@@ -68,6 +73,9 @@
   }
 
   onDestroy(() => {
+    // 배경음악 정리
+    cleanupMusic();
+    
     // 게임 페이지를 떠날 때 상태 초기화
     resetGameState();
   });

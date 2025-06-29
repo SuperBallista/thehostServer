@@ -5,6 +5,7 @@
     import type { ItemInterface } from '../../../common/store/synchronize.type';
     import { itemList } from '../common/itemObject';
     import { showMessageBox } from '../../../common/messagebox/customStore';
+    import { musicStore, toggleMusic } from '../../../common/store/musicStore';
 
   let inventory:HTMLElement
   let action:HTMLElement
@@ -87,6 +88,14 @@ async function moveNextRegion() {
       ⏭️ 넘기기
     </button>
       <button class="w-full ${THEME.textAccent} text-left px-4 py-2 font-semibold">🚪 나가기</button>
+      
+      <!-- 음악 토글 버튼 -->
+      <button 
+        class={`w-full text-left px-4 py-2 font-semibold ${$musicStore.isPlaying ? THEME.textAccent : THEME.textSecondary}`}
+        on:click={toggleMusic}
+      >
+        {$musicStore.isPlaying ? '🔊' : '🔇'} 배경음악 {$musicStore.isPlaying ? 'ON' : 'OFF'}
+      </button>
 </div>
 </div>
 </div>

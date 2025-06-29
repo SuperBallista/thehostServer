@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { musicStore, toggleMusic } from '../../../common/store/musicStore';
+  
   export let onInventoryClick = () => {};
   export let onActionClick = () => {};
   export let onSurvivorClick = () => {};
@@ -28,5 +30,10 @@
   <button
     class="h-full flex flex-col justify-center items-center text-lg "
   >🚪<br />나가기
+  </button>
+  <button
+    class="h-full flex flex-col justify-center items-center text-lg"
+    on:click={toggleMusic}
+  >{$musicStore.isPlaying ? '🔊' : '🔇'}<br />음악
   </button>
 </nav>
