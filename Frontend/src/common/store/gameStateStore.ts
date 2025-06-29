@@ -232,6 +232,9 @@ export function showGameNotification(
 
 // 게임 상태 초기화
 export function resetGameState() {
+  // 타이머 정리
+  stopCountdown();
+  
   gameId.set('');
   gameTurn.set(1);
   turnTimer.set(60);
@@ -255,7 +258,9 @@ export function syncWithServer(serverData: any) {
   if (serverData.myStatus) updateMyStatus(serverData.myStatus);
   if (serverData.survivorList) updateOtherPlayers(serverData.survivorList);
   if (serverData.gameTurn) gameTurn.set(serverData.gameTurn);
-  if (serverData.count) turnTimer.set(serverData.count);
+  if (serverData.count) {
+    turnTimer.set(serverData.count);
+  }
   if (serverData.useRegionsNumber) totalRegions.set(serverData.useRegionsNumber);
   if (serverData.hostAct && get(isHost)) {
     canInfect.set(serverData.hostAct.canUseInfect);
@@ -278,18 +283,24 @@ export function syncWithServer(serverData: any) {
 // === 카운트다운 로직 (playerStore에서 이동) ===
 let countdownInterval: number | null = null;
 
-export function startCountdown() {
-  stopCountdown(); // 기존 타이머 정리
-  
-  countdownInterval = setInterval(() => {
-    const currentCount = get(turnTimer);
-    if (currentCount > 0) {
-      turnTimer.set(currentCount - 1);
-    } else {
-      stopCountdown();
-    }
-  }, 1000);
-}
+// turnTimer 값 변경 감지하여 자동으로 카운트다운 시작/중지
+turnTimer.subscribe(value => {
+  if (value > 0 && !countdownInterval) {
+    // 타이머가 0보다 크고 카운트다운이 실행중이 아니면 시작
+    countdownInterval = setInterval(() => {
+      const currentCount = get(turnTimer);
+      if (currentCount > 0) {
+        turnTimer.set(currentCount - 1);
+      } else {
+        // 0이 되면 카운트다운 중지
+        stopCountdown();
+      }
+    }, 1000);
+  } else if (value === 0) {
+    // 0이 되면 카운트다운 중지
+    stopCountdown();
+  }
+});
 
 export function stopCountdown() {
   if (countdownInterval) {
@@ -301,5 +312,4 @@ export function stopCountdown() {
 // 게임 시작 시 카운트다운 시작
 export function startGame() {
   gamePhase.set('playing');
-  startCountdown();
 }
