@@ -69,7 +69,9 @@ src/
 │   ├── payload.types.ts    # 페이로드 타입 정의
 │   ├── game/               # 게임 관련 서비스
 │   │   ├── game.service.ts
-│   │   └── game.types.ts
+│   │   ├── game.types.ts
+│   │   ├── gameTurn.service.ts  # 턴별 아이템 지급 서비스
+│   │   └── itemProbabilities.json  # 아이템 확률 설정
 │   ├── utils/              # 소켓 유틸리티
 │   │   ├── socketRoomManager.ts
 │   │   └── randomManager.ts
@@ -178,6 +180,7 @@ Frontend/src/
 │   │   ├── gameStateStore.ts
 │   │   ├── lobbyStore.ts
 │   │   ├── pageStore.ts
+│   │   ├── playerStore.ts     # 플레이어 상태 관리
 │   │   ├── socketStore.ts
 │   │   ├── waitRoomStore.ts
 │   │   ├── selectOptionStore.ts
@@ -216,13 +219,15 @@ img/
 ├── items/                  # 게임 아이템 이미지
 │   ├── medicine.jpg        # 응급치료제
 │   ├── vaccine.jpg         # 백신
-│   ├── shotgun.jpg         # 산탄총
+│   ├── shotgun.jpg         # 좀비사살용산탄총
 │   ├── microphone.jpg      # 마이크
 │   ├── wireless.jpg        # 무전기
-│   ├── spray.jpg           # 스프레이
+│   ├── spray.jpg           # 낙서스프레이
 │   ├── eraser.jpg          # 지우개
-│   ├── virusChecker.jpg    # 바이러스 체크기
-│   └── vaccineMaterial*.jpg # 백신 재료 A-E
+│   ├── virusChecker.jpg    # 진단키트
+│   ├── vaccineMaterialA.jpg # 항바이러스혈청
+│   ├── vaccineMaterialB.jpg # 촉매정제물질
+│   └── vaccineMaterialC.jpg # 신경억제단백질
 ├── region/                 # 지역 배경 이미지
 │   ├── beach.jpg           # 해안가
 │   ├── building.jpg        # 폐건물
@@ -298,9 +303,10 @@ docs/
 ### 4. 아이템 시스템
 - **진단/치료**: 자가진단키트, 응급치료제
 - **통신**: 무전기, 마이크
-- **백신**: 백신 재료 3종
-- **무기**: 산탄총
+- **백신**: 백신 재료 3종 (항바이러스혈청, 촉매정제물질, 신경억제단백질)
+- **무기**: 좀비사살용산탄총
 - **기타**: 낙서 스프레이, 지우개
+- **획득 방식**: 매 턴 시작 시 자동 지급 (100% 확률)
 
 ### 5. 커뮤니케이션
 - 구역 내 채팅
