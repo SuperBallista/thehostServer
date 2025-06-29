@@ -7,7 +7,7 @@ interface MusicState {
 }
 
 const initialState: MusicState = {
-  isPlaying: true,  // 기본값을 true로 변경
+  isPlaying: false,  // 🔥 초기값을 false로 수정 (음악이 재생 중이 아님)
   volume: 0.3,
   audio: null
 };

@@ -9,6 +9,7 @@
   import SelectOptionBox from './selectModal/selectOptionBox.svelte';
   import { pageStore } from '../../common/store/pageStore';
   import { onMount, onDestroy } from 'svelte';
+  import GameStartMessageBox from './common/GameStartMessageBox.svelte'; // 🔥 새 컴포넌트 import
   import { 
     gamePhase,
     gameResult,
@@ -17,11 +18,16 @@
     myStatus
   } from '../../common/store/gameStateStore';
   import { socketStore } from '../../common/store/socketStore';
-  import { showMessageBox } from '../../common/messagebox/customStore';
-  import { initMusic, cleanupMusic, toggleMusic } from '../../common/store/musicStore';
+  import { initMusic, cleanupMusic } from '../../common/store/musicStore'; // 🔥 toggleMusic 제거
     
   let showSurvivorModal = false;
   let hasShownRoleMessage = false;
+  
+  // 🔥 GameStartMessageBox 상태 관리
+  let showRoleMessage = false;
+  let roleMessageTitle = '';
+  let roleMessageContent = '';
+  let roleMessageImage = '';
 
   onMount(() => {
     // 배경음악 초기화
@@ -40,48 +46,29 @@
   $: if ($myStatus && !hasShownRoleMessage) {
     hasShownRoleMessage = true;
     
-    // 메시지 표시 후 확인 버튼 클릭 시 음악 재생
-    const showRoleMessageAndPlayMusic = async () => {
-      let messagePromise;
-      
-      if ($myStatus.state === 'host') {
-        messagePromise = showMessageBox(
-          'alert',
-          '당신은 숙주입니다!',
-          '당신은 좀비 바이러스의 숙주입니다.\n\n' +
-          '• 2 턴마다 같은 구역의 생존자 1명을 감염시킬 수 있습니다.\n' +
-          '• 감염된 생존자는 5턴 후 좀비로 변이됩니다.\n' +
-          '• 좀비를 조종하여 생존자를 공격할 수 있습니다.\n' +
-          '• 정체를 들키지 않고 모든 생존자를 감염시키세요!\n\n' +
-          '승리 조건: 모든 생존자를 감염 또는 사망시키면 승리합니다.',
-          undefined,
-          undefined,
-          '/img/scence/host.png'
-        );
-      } else {
-        messagePromise = showMessageBox(
-          'tips',
-          '당신은 생존자입니다!',
-          '당신은 좀비 바이러스로부터 살아남아야 하는 생존자입니다.\n\n' +
-          '• 백신 재료 3종을 모아 백신을 제작하세요.\n' +
-          '• 숙주를 찾아 백신을 투여하면 승리합니다.\n' +
-          '• 진단키트로 감염 여부를 확인할 수 있습니다.\n' +
-          '• 감염되었다면 응급치료제로 치료하세요.\n' +
-          '• 다른 생존자와 협력하되, 누구도 믿지 마세요!\n\n' +
-          '승리 조건: 숙주에게 백신을 투여하면 승리합니다.',
-          undefined,
-          undefined,
-          '/img/scence/survivor.png'
-        );
-      }
-      
-      // 확인 버튼 클릭 시 음악 재생
-      messagePromise.then(() => {
-        toggleMusic(); // 음악 재생 시작
-      });
-    };
+    // 🔥 새로운 GameStartMessageBox 사용
+    if ($myStatus.state === 'host') {
+      roleMessageTitle = '당신은 숙주입니다!';
+      roleMessageContent = '당신은 좀비 바이러스의 숙주입니다.\n\n' +
+        '• 2 턴마다 같은 구역의 생존자 1명을 감염시킬 수 있습니다.\n' +
+        '• 감염된 생존자는 5턴 후 좀비로 변이됩니다.\n' +
+        '• 좀비를 조종하여 생존자를 공격할 수 있습니다.\n' +
+        '• 정체를 들키지 않고 모든 생존자를 감염시키세요!\n\n' +
+        '승리 조건: 모든 생존자를 감염 또는 사망시키면 승리합니다.';
+      roleMessageImage = '/img/scence/host.png';
+    } else {
+      roleMessageTitle = '당신은 생존자입니다!';
+      roleMessageContent = '당신은 좀비 바이러스로부터 살아남아야 하는 생존자입니다.\n\n' +
+        '• 백신 재료 3종을 모아 백신을 제작하세요.\n' +
+        '• 숙주를 찾아 백신을 투여하면 승리합니다.\n' +
+        '• 진단키트로 감염 여부를 확인할 수 있습니다.\n' +
+        '• 감염되었다면 응급치료제로 치료하세요.\n' +
+        '• 다른 생존자와 협력하되, 누구도 믿지 마세요!\n\n' +
+        '승리 조건: 숙주에게 백신을 투여하면 승리합니다.';
+      roleMessageImage = '/img/scence/survivor.png';
+    }
     
-    showRoleMessageAndPlayMusic();
+    showRoleMessage = true;
   }
 
   onDestroy(() => {
@@ -96,6 +83,15 @@
 {#if $pageStore === 'game'}
 <PlayerSelector/>
 <SelectOptionBox/>
+
+<!-- 🔥 게임 시작 메시지박스 -->
+<GameStartMessageBox 
+  isOpen={showRoleMessage}
+  title={roleMessageTitle}
+  message={roleMessageContent}
+  imageSrc={roleMessageImage}
+  onClose={() => showRoleMessage = false}
+/>
 
 
 <!-- 게임 종료 모달 -->
