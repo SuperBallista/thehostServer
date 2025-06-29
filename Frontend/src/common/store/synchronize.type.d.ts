@@ -100,5 +100,5 @@ interface ChatMessage {
 type RegionMessage = string | null;
 type PlayerState = 'alive' | 'host' | `zombie` | `killed` | 'you';
 type Act = `runaway` | `hide` | `lure`;
-export type ItemInterface = `spray` | `virusChecker` | `vaccine` | `medicine` | `vaccineMaterialA` | `vaccineMaterialB` | `vaccineMaterialC` | `wireless` | `eraser`;
+export type ItemInterface = `spray` | `virusChecker` | `vaccine` | `medicine` | `vaccineMaterialA` | `vaccineMaterialB` | `vaccineMaterialC` | `wireless` | `eraser` | `microphone`;
 export {};

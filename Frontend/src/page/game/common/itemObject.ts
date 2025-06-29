@@ -6,7 +6,7 @@ import type { ItemInterface } from "../../../common/store/synchronize.type";
 
 type UseMethod = () => Promise<boolean>;
 
-const itemList = {
+export const itemList = {
   spray: {
     name: '낙서스프레이',
     info: '구역에 낙서를 남겨 다음 턴부터 다른 생존자가 읽을 수 있습니다',
@@ -57,6 +57,12 @@ const itemList = {
     info: '좀비를 즉사시킬 수 있는 산탄총입니다',
     method: useShotgun,
   },
+
+  microphone: {
+    name: '마이크',
+    info: '섬 전체에 한번 메세지를 전송할 수 있는 무선 마이크입니다',
+    method: useMicrophone,
+  }
 
 };
 
@@ -125,6 +131,9 @@ async function useWireless() {
   return true
 }
 
+async function useMicrophone() {
+  return true
+}
 
 async function useEraser() {
 return false;

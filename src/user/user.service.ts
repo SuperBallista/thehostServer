@@ -71,6 +71,14 @@ export class UserService {
       throw new WsException('해당 계정을 찾을 수 없습니다');
     }
 
+    // DB에서 가져온 user에 nickname 복호화하여 추가
+    if (user.encryptedNickname && user.ivNickname) {
+      user.nickname = this.encryptionService.decryptNickname(
+        user.encryptedNickname,
+        user.ivNickname
+      );
+    }
+
     await this.userCache.setUser(userId, user);
     return user;
   }

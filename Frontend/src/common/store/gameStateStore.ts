@@ -94,6 +94,12 @@ export interface WirelessConnection {
   active: boolean;
 }
 
+// 마이크 메세지
+export interface MicrophoneMessage {
+  message: string;
+  timeStamp: Date
+}
+
 export const wirelessConnections = writable<WirelessConnection[]>([]);
 
 // 좀비 관련 (숙주 전용)

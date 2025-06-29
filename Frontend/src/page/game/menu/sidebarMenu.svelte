@@ -3,20 +3,7 @@
     import { showSelectOptionBox } from "../../../common/store/selectOptionStore";
     import { myStatus } from '../../../common/store/gameStateStore';
     import type { ItemInterface } from '../../../common/store/synchronize.type';
-
-    // 아이템 한글 이름 매핑
-    const itemNames: Record<ItemInterface, string> = {
-      spray: '낙서 스프레이',
-      virusChecker: '자가진단키트',
-      vaccine: '백신',
-      medicine: '응급치료제',
-      vaccineMaterialA: '항바이러스혈청',
-      vaccineMaterialB: '촉매정제물질', 
-      vaccineMaterialC: '신경억제단백질',
-      wireless: '무전기',
-      eraser: '지우개',
-      shotgun: '좀비사살용산탄총'
-    };
+    import { itemList } from '../common/itemObject';
 
   let inventory:HTMLElement
   let action:HTMLElement
@@ -56,7 +43,7 @@ async function moveNextRegion() {
         {#if $myStatus?.items && $myStatus.items.length > 0}
           {#each $myStatus.items as item}
             <div class="flex items-center justify-between bg-gray-700 p-2 rounded">
-              <div class="text-white font-medium">{itemNames[item]}</div>
+              <div class="text-white font-medium">{itemList[item].name}</div>
               <div class="flex gap-1">
                 <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`}>안내</button>
                 <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgAccent}`}>사용</button>
