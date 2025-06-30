@@ -15,7 +15,7 @@ thehostgame.com {
     # 자동 HTTPS 활성화 (Let's Encrypt)
     
     # NestJS 서버로 프록시 (PM2 클러스터 모드)
-    reverse_proxy * localhost:{$SERVER_PORT:3000} {
+    reverse_proxy * host.docker.internal:4000 {
         # WebSocket 지원
         header_up Upgrade {http.request.header.Upgrade}
         header_up Connection {http.request.header.Connection}
