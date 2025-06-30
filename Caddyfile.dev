@@ -1,0 +1,24 @@
+# 개발 환경용 Caddyfile
+# HTTP만 사용 (HTTPS 인증서 없이)
+
+:80 {
+    # NestJS 서버로 프록시
+    reverse_proxy * host.docker.internal:3000 {
+        # WebSocket 지원
+        header_up Upgrade {http.request.header.Upgrade}
+        header_up Connection {http.request.header.Connection}
+    }
+    
+    # CORS 설정 (개발 환경용)
+    header {
+        Access-Control-Allow-Origin *
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type, Authorization"
+    }
+    
+    # 개발 환경 로그
+    log {
+        output stdout
+        format console
+    }
+}

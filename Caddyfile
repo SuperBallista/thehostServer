@@ -1,0 +1,49 @@
+# Caddyfile for The Host Game Server
+
+# 개발 환경 설정 (localhost)
+# localhost {
+#     # NestJS 서버로 프록시
+#     reverse_proxy * host.docker.internal:{$SERVER_PORT:3000} {
+#         # WebSocket 지원
+#         header_up Upgrade {http.request.header.Upgrade}
+#         header_up Connection {http.request.header.Connection}
+#     }
+# }
+
+# 프로덕션 환경 설정 (도메인이 있을 경우)
+thehostgame.com {
+    # 자동 HTTPS 활성화 (Let's Encrypt)
+    
+    # NestJS 서버로 프록시 (PM2 클러스터 모드)
+    reverse_proxy * localhost:{$SERVER_PORT:3000} {
+        # WebSocket 지원
+        header_up Upgrade {http.request.header.Upgrade}
+        header_up Connection {http.request.header.Connection}
+        
+        # 헤더 설정
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
+        header_up X-Forwarded-Proto {scheme}
+        
+        # 헬스체크 (선택사항)
+        # health_uri /health
+        # health_interval 10s
+        # health_timeout 2s
+        # health_status 200
+    }
+    
+    # 압축 활성화
+    encode gzip
+    
+    # 로그 설정
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+}
+
+# HTTP에서 HTTPS로 리다이렉트 (프로덕션)
+http://thehostgame.com {
+    redir https://thehostgame.com{uri} permanent
+}
