@@ -1,7 +1,7 @@
 <script lang="ts">
     import { THEME } from "../../../common/constant/theme";
     import { showSelectOptionBox } from "../../../common/store/selectOptionStore";
-    import { myStatus } from '../../../common/store/gameStateStore';
+    import { myStatus, isHost, canInfect, zombies } from '../../../common/store/gameStateStore';
     import type { ItemInterface } from '../../../common/store/synchronize.type';
     import { itemList } from '../common/itemObject';
     import { showMessageBox } from '../../../common/messagebox/customStore';
@@ -77,9 +77,18 @@ async function moveNextRegion() {
       <div class="pl-6 mt-1 space-y-1 text-sm flex flex-col">
         <button on:click={() => moveNextRegion()} class={`block w-full py-2 rounded ${THEME.bgAccent}`}>다음 턴 이동 장소 설정</button>
           <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>좀비 대처 행동</button>
-          <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>감염시키기(숙주 전용)</button>
-          <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>좀비의 공격 대상 정하기(숙주 전용)</button>
-          <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>좀비의 이동 구역 정하기(숙주 전용)</button>
+          <button 
+            class={`block w-full py-2 rounded ${$isHost && $canInfect ? THEME.bgAccent : THEME.bgDisabled}`}
+            disabled={!$isHost || !$canInfect}
+          >감염시키기(숙주 전용)</button>
+          <button 
+            class={`block w-full py-2 rounded ${$isHost && $zombies.length > 0 ? THEME.bgAccent : THEME.bgDisabled}`}
+            disabled={!$isHost || $zombies.length === 0}
+          >좀비의 공격 대상 정하기(숙주 전용)</button>
+          <button 
+            class={`block w-full py-2 rounded ${$isHost && $zombies.length > 0 ? THEME.bgAccent : THEME.bgDisabled}`}
+            disabled={!$isHost || $zombies.length === 0}
+          >좀비의 이동 구역 정하기(숙주 전용)</button>
       </div>
   <!-- ⏭️ 넘기기 -->
   <div bind:this={skip} class="mt-4">

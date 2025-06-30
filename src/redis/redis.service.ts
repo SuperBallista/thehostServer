@@ -18,7 +18,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     });
   
     await this.redisClient.flushdb(); // ✅ 전체 초기화
-    console.log('🧹 Redis 전체 초기화 완료');
+    // console.log('🧹 Redis 전체 초기화 완료');
   }
   
   onModuleDestroy() {

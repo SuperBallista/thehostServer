@@ -54,6 +54,12 @@ private async deleteWaitingRoomList(roomId: string, timeStamp: number) {
 private async makeGameData(roomData: Room): Promise<userDataResponse> {
     roomData.players = await this.fillBotPlayer(roomData) // 봇 채우기
     const hostPlayer = await this.selectHost(roomData.players) // 숙주 뽑기
+    const selectedHost = roomData.players[hostPlayer];
+    const isRealPlayer = selectedHost.id > 0;
+    console.log(`\n=== 숙주 선택 ===`);
+    console.log(`인덱스: ${hostPlayer}, ${isRealPlayer ? '🎮 실제 플레이어' : '🤖 봇'}: ${selectedHost.nickname} (ID: ${selectedHost.id})`);
+    console.log(`실제 플레이어 목록:`, roomData.players.filter(p => p.id > 0).map(p => `${p.nickname}(ID:${p.id})`));
+    console.log(`==================\n`);
     const shuffledPlayer = getOrderRandom(roomData.players) // 유저 섞기
     const players = await this.setPlayerInformation(shuffledPlayer, hostPlayer) // 게임 플레이어 세팅
     
@@ -161,9 +167,9 @@ async subscribeGameStart(client: any, userId: number, users: userShortInfo[], ro
         roomId
       );
       
-      console.log(`${roomId}방 게임 시작 - 유저 ${userId} (플레이어 ${playerDataResult.myPlayerData.playerId})`);
+      // console.log(`${roomId}방 게임 시작 - 유저 ${userId} (플레이어 ${playerDataResult.myPlayerData.playerId})`);
       client.emit('update', response);
-      console.log(response)
+      // console.log(response)
       return response;
       
     } catch (error) {
@@ -201,7 +207,7 @@ async subscribeGameStart(client: any, userId: number, users: userShortInfo[], ro
     
     for (let retry = 0; retry < MAX_RETRIES && !myPlayerData; retry++) {
       if (retry > 0) {
-        console.log(`유저 ${userId}의 데이터를 찾는 중... 재시도 ${retry}/${MAX_RETRIES}`);
+        // console.log(`유저 ${userId}의 데이터를 찾는 중... 재시도 ${retry}/${MAX_RETRIES}`);
         await this.delay(RETRY_DELAY_MS);
       }
       

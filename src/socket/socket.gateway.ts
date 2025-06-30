@@ -43,7 +43,7 @@ afterInit(server: Server) {
 
   // ✅ 게임 시작 pub/sub 처리 - 서버에서 바로 처리
   this.redisPubSubService.registerGameStartCallback(async (roomData: Room) => {
-    console.log(`📢 게임 시작 알림: ${roomData.id} - 서버에서 직접 처리`)
+    // console.log(`📢 게임 시작 알림: ${roomData.id} - 서버에서 직접 처리`)
     
     // 각 플레이어에게 직접 subscribeGameStart 호출
     for (const player of roomData.players) {
@@ -56,7 +56,7 @@ afterInit(server: Server) {
           roomData.id
         );
       } else {
-        console.warn(`⚠️ 플레이어 ${player.id}의 소켓을 찾을 수 없음`);
+        // console.warn(`⚠️ 플레이어 ${player.id}의 소켓을 찾을 수 없음`);
       }
     }
   });
@@ -70,14 +70,14 @@ afterInit(server: Server) {
       // 초기 연결 시 상태 전송
       client.emit('update', result);
     } catch (err) {
-      console.warn('연결 오류:', err);
+      // console.warn('연결 오류:', err);
       client.disconnect();
     }
   }
     
   async handleDisconnect(@ConnectedSocket() client: Socket) {
     await this.connectionService.handleDisconnect(client);
-    console.log(`❌ 유저 ${client.data?.userId} 접속 해제`);
+    // console.log(`❌ 유저 ${client.data?.userId} 접속 해제`);
   }
 
 @SubscribeMessage('request')
