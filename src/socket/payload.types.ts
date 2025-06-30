@@ -103,7 +103,7 @@ sameRegion: boolean
 
 export interface HostAct{
     infect: number | null
-    canUseInfect: boolean
+    canInfect: boolean  // canUseInfect를 canInfect로 통일
     zombieList: Zombie[]
 }
 
@@ -114,7 +114,7 @@ export interface Region{
 
 export interface Zombie{
     playerId: number
-    targetId: number
+    targetId: number | null
     next: number
     leftTurn: number
     region: number

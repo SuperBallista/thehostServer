@@ -1,6 +1,14 @@
 <script lang="ts">
     import { THEME } from "../../../common/constant/theme";
     import { showSelectOptionBox } from '../../../common/store/selectOptionStore';
+    import { isHost, zombies, canInfect } from '../../../common/store/gameStateStore';
+    
+    // 디버깅용 로그
+    $: console.log('ActionModal 상태:', {
+        isHost: $isHost,
+        canInfect: $canInfect,
+        zombiesLength: $zombies.length
+    });
 
 async function copeWithZombie() {
   const result = await showSelectOptionBox(
@@ -38,11 +46,21 @@ async function moveNextRegion() {
       <div class={`${THEME.bgTertiary} p-4 rounded-lg w-3/4 max-w-md shadow-md`}>
         <h2 class="text-lg text-purple-400 mb-2">🧭 행동 선택</h2>
         <div class="space-y-2">
-          <button class={`block w-full py-2 rounded ${THEME.bgAccent}`}>다음 턴 이동 장소 설정</button>
-          <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>좀비 대처 행동</button>
-          <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>감염시키기</button>
-          <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>좀비의 공격 대상 정하기</button>
-          <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>좀비의 이동 구역 정하기</button>
+          <button class={`block w-full py-2 rounded ${THEME.bgAccent} hover:${THEME.bgAccentHover} ${THEME.textWhite}`}>다음 턴 이동 장소 설정</button>
+          <button class={`block w-full py-2 rounded ${THEME.bgDisabled} ${THEME.textSecondary}`}>좀비 대처 행동</button>
+          <button 
+            class={`block w-full py-2 rounded ${$isHost && $canInfect ? `${THEME.bgAccent} hover:${THEME.bgAccentHover} ${THEME.textWhite}` : `${THEME.bgDisabled} ${THEME.textSecondary}`}`}
+            on:click={() => {
+              console.log('감염시키기 클릭:', { isHost: $isHost, canInfect: $canInfect });
+              if ($isHost && $canInfect) {
+                // TODO: 감염시키기 기능 구현
+                console.log('감염시키기 실행 가능');
+              }
+            }}
+            disabled={!$isHost || !$canInfect}
+          >감염시키기</button>
+          <button class={`block w-full py-2 rounded ${$isHost && $zombies.length > 0 ? `${THEME.bgAccent} hover:${THEME.bgAccentHover} ${THEME.textWhite}` : `${THEME.bgDisabled} ${THEME.textSecondary}`}`}>좀비의 공격 대상 정하기</button>
+          <button class={`block w-full py-2 rounded ${$isHost && $zombies.length > 0 ? `${THEME.bgAccent} hover:${THEME.bgAccentHover} ${THEME.textWhite}` : `${THEME.bgDisabled} ${THEME.textSecondary}`}`}>좀비의 이동 구역 정하기</button>
         </div>
         <button class={`mt-4 px-3 py-1 text-white rounded ${THEME.bgSecondary}`}
           on:click={() => isOpen = false}>

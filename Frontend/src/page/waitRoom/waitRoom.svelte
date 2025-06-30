@@ -41,8 +41,11 @@
       <div class="mt-4 text-center flex justify-evenly">
   <button
     on:click={startGame}
-    
-    class={`px-4 py-2 ${THEME.bgAccent} text-white font-semibold rounded-lg shadow-md transition`}
+    disabled={$currentRoom?.hostUserId !== $authStore.user?.id}
+    class={`px-4 py-2 font-semibold rounded-lg shadow-md transition text-white
+      ${$currentRoom?.hostUserId === $authStore.user?.id 
+        ? `${THEME.bgAccent} hover:${THEME.bgAccentHover}` 
+        : `${THEME.bgDisabled} ${THEME.textSecondary} cursor-not-allowed`}`}
   >
     🚀 게임 시작
   </button>

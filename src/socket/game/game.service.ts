@@ -9,6 +9,7 @@ import { PlayerState, Room, State, SurvivorInterface } from '../payload.types';
 import { getOrderRandom } from '../utils/randomManager';
 import { userDataResponse } from '../payload.types';
 import { GameTurnService } from './gameTurn.service';
+import { ZombieService, HostZombieInfo } from './zombie.service';
 
 
 @Injectable()
@@ -17,6 +18,7 @@ export class GameService {
     private readonly redisService: RedisService,
     private readonly redisPubSubService: RedisPubSubService,
     private readonly gameTurnService: GameTurnService,
+    private readonly zombieService: ZombieService,
  ) {}
 
 
@@ -110,7 +112,12 @@ private async createNewGameData(gameId: string, hostPlayer: number, players: Gam
     
     await this.redisService.stringifyAndSet(gameDataIndex, gameData.recordData()) // 게임 생성
     
-    const newHost: Host = { hostId: hostPlayer, turn: true, infect: null }
+    const newHost: Host = { 
+      hostId: hostPlayer, 
+      canInfect: true,  // 첫 턴에는 감염 가능
+      infect: null,
+      zombieList: []  // 초기에는 좀비 없음
+    }
     await this.redisService.stringifyAndSet(`${gameDataIndex}:host`, newHost) // 숙주 데이터 생성
     
     for (const player of players) {
@@ -147,10 +154,11 @@ async subscribeGameStart(client: any, userId: number, users: userShortInfo[], ro
       }
 
       // 5. 응답 생성 및 전송
-      const response = this.createGameStartResponse(
+      const response = await this.createGameStartResponse(
         gameData,
         playerDataResult.myPlayerData,
-        playerDataResult.allPlayers
+        playerDataResult.allPlayers,
+        roomId
       );
       
       console.log(`${roomId}방 게임 시작 - 유저 ${userId} (플레이어 ${playerDataResult.myPlayerData.playerId})`);
@@ -223,12 +231,17 @@ async subscribeGameStart(client: any, userId: number, users: userShortInfo[], ro
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  private createGameStartResponse(
+  private async createGameStartResponse(
     gameData: GameInRedis,
     myPlayerData: GamePlayerInRedis,
-    allPlayers: GamePlayerInRedis[]
-  ): userDataResponse {
-    return {
+    allPlayers: GamePlayerInRedis[],
+    roomId: string
+  ): Promise<userDataResponse> {
+    // 사용 중인 지역 수 계산
+    const uniqueRegions = new Set(allPlayers.map(p => p.regionId));
+    const useRegionsNumber = Math.max(...Array.from(uniqueRegions)) + 1;
+    
+    const response: userDataResponse = {
       locationState: 'game',
       playerId: myPlayerData.playerId,
       myStatus: {
@@ -240,8 +253,26 @@ async subscribeGameStart(client: any, userId: number, users: userShortInfo[], ro
       },
       gameTurn: gameData.turn,
       count: this.getTurnDuration(gameData.turn),
+      useRegionsNumber: useRegionsNumber,
       survivorList: this.createSurvivorList(allPlayers, myPlayerData)
     };
+
+    // 호스트 플레이어인 경우에만 hostAct 데이터 추가
+    if (myPlayerData.state === 'host') {
+      const hostData = await this.getHostData(roomId);
+      if (hostData) {
+        // ZombieService를 사용하여 좀비 정보 가져오기
+        const zombieList = await this.zombieService.getZombiesForHost(roomId);
+        
+        response.hostAct = {
+          infect: hostData.infect,
+          canInfect: hostData.canInfect,
+          zombieList: zombieList
+        };
+      }
+    }
+
+    return response;
   }
 
   private getTurnDuration(turn: number): number {
@@ -266,6 +297,107 @@ async subscribeGameStart(client: any, userId: number, users: userShortInfo[], ro
     if (player.playerId === myPlayerData.playerId) return 'you';
     if (player.state === 'host') return 'alive';
     return player.state;
+  }
+
+  private async getHostData(roomId: string): Promise<Host | null> {
+    return await this.redisService.getAndParse(`game:${roomId}:host`);
+  }
+
+  // 게임 업데이트 시 플레이어별 데이터 생성
+  async createPlayerGameUpdate(
+    gameId: string, 
+    userId: number,
+    updateData: any
+  ): Promise<userDataResponse> {
+    // 플레이어 데이터 가져오기
+    const playerData = await this.getPlayerDataByUserId(gameId, userId);
+    if (!playerData) {
+      throw new WsException('플레이어 데이터를 찾을 수 없습니다');
+    }
+
+    const response: userDataResponse = {
+      ...updateData
+    };
+
+    // 호스트 플레이어인 경우에만 hostAct 데이터 추가
+    if (playerData.state === 'host') {
+      const hostData = await this.getHostData(gameId);
+      if (hostData) {
+        // ZombieService를 사용하여 좀비 정보 가져오기
+        const zombieList = await this.zombieService.getZombiesForHost(gameId);
+        
+        response.hostAct = {
+          infect: hostData.infect,
+          canInfect: hostData.canInfect,
+          zombieList: zombieList
+        };
+      }
+    }
+
+    return response;
+  }
+
+  private async getPlayerDataByUserId(gameId: string, userId: number): Promise<GamePlayerInRedis | null> {
+    // 모든 플레이어를 순회하며 userId로 찾기
+    for (let i = 0; i < 20; i++) {
+      const playerData = await this.getPlayerData(gameId, i);
+      if (playerData && playerData.userId === userId) {
+        return playerData;
+      }
+    }
+    return null;
+  }
+
+  // 호스트 액션 처리 (감염, 좀비 명령)
+  async handleHostAction(userId: number, hostAct: any): Promise<userDataResponse> {
+    // 현재 위치 상태 확인
+    const locationState: LocationState = await this.redisService.getAndParse(`locationState:${userId}`);
+    if (!locationState || locationState.state !== 'game' || !locationState.roomId) {
+      throw new WsException('게임 중이 아닙니다');
+    }
+
+    const gameId = locationState.roomId;
+    
+    // 플레이어가 호스트인지 확인
+    const playerData = await this.getPlayerDataByUserId(gameId, userId);
+    if (!playerData || playerData.state !== 'host') {
+      throw new WsException('호스트 권한이 없습니다');
+    }
+
+    // 호스트 데이터 가져오기
+    const hostKey = `game:${gameId}:host`;
+    const hostData = await this.redisService.getAndParse(hostKey) as Host | null;
+    if (!hostData) {
+      throw new WsException('호스트 데이터를 찾을 수 없습니다');
+    }
+
+    // 감염 대상 설정
+    if (hostAct.infect !== undefined) {
+      if (!hostData.canInfect) {
+        throw new WsException('이번 턴에는 감염시킬 수 없습니다');
+      }
+      hostData.infect = hostAct.infect;
+      await this.redisService.stringifyAndSet(hostKey, hostData);
+    }
+
+    // 좀비 명령 처리
+    if (hostAct.zombieList && Array.isArray(hostAct.zombieList)) {
+      for (const zombieCommand of hostAct.zombieList) {
+        await this.zombieService.setZombieCommand(gameId, {
+          playerId: zombieCommand.playerId,
+          targetId: zombieCommand.targetId,
+          nextRegion: zombieCommand.next
+        });
+      }
+    }
+
+    // 업데이트된 상태 반환
+    return this.createPlayerGameUpdate(gameId, userId, {
+      alarm: {
+        message: '명령이 성공적으로 처리되었습니다',
+        img: 'success'
+      }
+    });
   }
 }
 

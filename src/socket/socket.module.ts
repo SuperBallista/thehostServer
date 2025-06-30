@@ -8,9 +8,10 @@ import { JwtModule } from 'src/jwt/jwt.module';
 import { UserModule } from 'src/user/user.module';
 import { GameService } from './game/game.service';
 import { GameTurnService } from './game/gameTurn.service';
+import { ZombieService } from './game/zombie.service';
 
 @Module({
   imports: [RedisModule, JwtModule, UserModule],
-  providers: [SocketGateway, LobbyService, ConnectionService, GameService, GameTurnService],
+  providers: [SocketGateway, LobbyService, ConnectionService, GameService, GameTurnService, ZombieService],
 })
 export class SocketModule {}

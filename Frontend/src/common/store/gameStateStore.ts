@@ -143,7 +143,13 @@ export function updateGameState(data: any) {
 
 export function updateMyStatus(status: GamePlayerStatusInterface) {
   // playerStore의 개별 스토어들을 업데이트
-  if (status.state !== undefined) playerState.set(status.state);
+  if (status.state !== undefined) {
+    playerState.set(status.state);
+    // 'host' 상태일 때 isHost 설정
+    if (status.state === 'host') {
+      isHost.set(true);
+    }
+  }
   if (status.region !== undefined) playerRegion.set(status.region);
   if (status.next !== undefined) playerNextRegion.set(status.next);
   if (status.act !== undefined) playerAct.set(status.act);
@@ -255,6 +261,7 @@ export function resetGameState() {
 
 // 서버와 동기화를 위한 함수
 export function syncWithServer(serverData: any) {
+  // myStatus를 먼저 업데이트하여 isHost가 설정되도록 함
   if (serverData.myStatus) updateMyStatus(serverData.myStatus);
   if (serverData.survivorList) updateOtherPlayers(serverData.survivorList);
   if (serverData.gameTurn) gameTurn.set(serverData.gameTurn);
@@ -262,9 +269,22 @@ export function syncWithServer(serverData: any) {
     turnTimer.set(serverData.count);
   }
   if (serverData.useRegionsNumber) totalRegions.set(serverData.useRegionsNumber);
-  if (serverData.hostAct && get(isHost)) {
-    canInfect.set(serverData.hostAct.canUseInfect);
-    updateZombieInfo(serverData.hostAct.zombieList);
+  
+  // isHost가 설정된 후에 hostAct 처리
+  if (serverData.hostAct) {
+    // 현재 플레이어가 숙주이거나, myStatus.state가 'host'인 경우
+    const currentIsHost = get(isHost) || (serverData.myStatus?.state === 'host');
+    console.log('Host Act 처리:', {
+      hostAct: serverData.hostAct,
+      currentIsHost,
+      isHostValue: get(isHost),
+      myStatusState: serverData.myStatus?.state
+    });
+    if (currentIsHost) {
+      canInfect.set(serverData.hostAct.canInfect);  // canUseInfect를 canInfect로 변경
+      updateZombieInfo(serverData.hostAct.zombieList);
+      console.log('canInfect 설정됨:', serverData.hostAct.canInfect);
+    }
   }
   if (serverData.region) {
     chatMessages.set(serverData.region.chatLog || []);

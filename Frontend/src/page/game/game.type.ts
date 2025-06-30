@@ -81,11 +81,11 @@ type Act = `runaway` | `hide` | `lure` // 좀비 대처 행동
 // 숙주 행동 객체
 export class HostAct{
     infect: number | null
-    canUseInfect: boolean
+    canInfect: boolean  // canUseInfect를 canInfect로 통일
     zombieList: Zombie[]
     constructor(){
         this.infect = null
-        this.canUseInfect = true
+        this.canInfect = true
         this.zombieList = []
     }
     useInfect(playerId:number){ // 감염대상 세팅
@@ -105,9 +105,9 @@ export class HostAct{
         let targetId = this.infect
         if (targetId){
             this.infect = null
-            this.canUseInfect = false
+            this.canInfect = false
         } else {
-            this.canUseInfect = true
+            this.canInfect = true
         } // 턴 넘길 때 감염시키기 기능 적용       
         
          this.zombieList.forEach(zombie => {

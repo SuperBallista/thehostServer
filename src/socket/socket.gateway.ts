@@ -113,6 +113,11 @@ afterInit(server: Server) {
         response = await this.gameService.gameStart(data.user.id)
       }
 
+      // 호스트 액션 처리
+      if (data.hostAct && data.user.id) {
+        response = await this.gameService.handleHostAction(data.user.id, data.hostAct)
+      }
+
       // ✅ 응답 전송
       client.emit('update', response);
       

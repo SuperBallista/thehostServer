@@ -100,7 +100,7 @@ sameRegion: boolean
 
 interface HostAct{
     infect: number | null
-    canUseInfect: boolean
+    canInfect: boolean  // canUseInfect를 canInfect로 통일
     zombieList: Zombie[]
 }
 

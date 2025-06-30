@@ -8,7 +8,7 @@ import { locationState, currentRoom, pageStore, type State, lobbyPage } from './
 import type { userDataResponse } from './synchronize.type';
 import { exitRoomState, rooms, setRoomState } from './lobbyStore';
 import { playerId, playerState, playerRegion, playerNextRegion, playerAct, playerItems } from './playerStore';
-import { gameTurn, turnTimer, updateMyStatus, updateOtherPlayers, resetGameState } from './gameStateStore';
+import { gameTurn, turnTimer, updateMyStatus, updateOtherPlayers, resetGameState, syncWithServer } from './gameStateStore';
 import { setPlayerNicknames, Survivor } from '../../page/game/game.type';
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
@@ -119,24 +119,20 @@ function updateData(payload: userDataResponse) {
 
   // 게임 관련 업데이트
   if (payload.gameTurn) gameTurn.set(payload.gameTurn);
-  if (payload.count) {
-    // turnTimer만 업데이트 (count는 제거됨)
-    turnTimer.set(payload.count);
+  // count는 syncWithServer에서 처리됨
+  // playerId는 별도로 설정 (playerStore에서 관리)
+  if (payload.playerId !== undefined) {
+    playerId.set(payload.playerId);
   }
-  // 숙주 관련 데이터는 gameStateStore에서 처리해야 함
-  // if (payload.hostAct) get(hostAct)?.updateData(payload.hostAct.zombieList);
-  if (payload.myStatus) {
-    updateMyStatus(payload.myStatus);
+  
+  // 게임 관련 모든 업데이트는 syncWithServer로 통합 처리
+  const hasGameData = payload.myStatus || payload.survivorList || payload.gameTurn || 
+                     payload.region || payload.hostAct || payload.count || 
+                     payload.useRegionsNumber || payload.endGame;
+  
+  if (hasGameData) {
+    syncWithServer(payload);
   }
-  if (payload.playerId) playerId.set(payload.playerId);
-  // 구역 관련 데이터는 gameStateStore에서 처리해야 함
-  // if (payload.region) get(region).updateData(payload.region.chatLog, payload.region.regionMessageList);
-  // 생존자 목록 업데이트
-  if (payload.survivorList) {
-    updateOtherPlayers(payload.survivorList);
-  }
-  // 게임 관련 데이터는 gameStateStore에서 처리해야 함
-  // if (payload.useRegionsNumber) useRegionsNumber.set(payload.useRegionsNumber);
   
   // 게임 시작 시 플레이어 닉네임 매핑 설정
   if (payload.locationState === 'game' && payload.roomData) {

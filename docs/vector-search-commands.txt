@@ -1,0 +1,27 @@
+VECTOR_SEARCH_COMMANDS
+
+ENV_VARS:
+REDIS_PORT=3407
+OPENAI_API_KEY=required
+
+COMMANDS:
+# 벡터화
+npx tsx scripts/vectorize-project-docs.ts
+
+# 데이터확인
+npx tsx scripts/read-vector-data.ts
+
+# 검색스크립트
+cat > scripts/search-docs.ts << 'EOF'
+import{DocumentVectorizer}from'../src/utils/vectorize-docs';import*as dotenv from'dotenv';dotenv.config();async function searchDocs(query:string){const redisUrl=process.env.REDIS_URL||`redis://localhost:${process.env.REDIS_PORT||6379}`;const openaiApiKey=process.env.OPENAI_API_KEY;if(!openaiApiKey){console.error('OPENAI_API_KEY required');process.exit(1);}const vectorizer=new DocumentVectorizer(redisUrl,openaiApiKey);try{await vectorizer.initialize();console.log(`Searching:"${query}"\n`);const results=await vectorizer.searchSimilarDocuments(query,5);if(results.length===0){console.log('No results');return;}results.forEach((result,index)=>{console.log(`\n---Result${index+1}---`);console.log(`Source:${result.source}`);console.log(`Content:\n${result.content}\n`);});}catch(error){console.error('Error:',error);}finally{await vectorizer.close();}}const query=process.argv.slice(2).join(' ');if(!query){console.error('Usage:npx tsx scripts/search-docs.ts <query>');process.exit(1);}searchDocs(query);
+EOF
+
+# 검색실행
+npx tsx scripts/search-docs.ts 프로젝트 구조
+npx tsx scripts/search-docs.ts Redis 설정
+npx tsx scripts/search-docs.ts 게임 진행
+
+ERRORS:
+ECONNREFUSED->Redis포트확인
+FT.CREATE->RediSearch모듈필요
+No API KEY->환경변수확인

@@ -1452,20 +1452,20 @@
       "dMa_hrHWO8glvpkTx8GhX": {
         "id": "dMa_hrHWO8glvpkTx8GhX",
         "tableId": "T_jcaWmUrjrDvtmsR-f9C",
-        "name": "turn",
-        "comment": "",
-        "dataType": "INT",
+        "name": "canInfect",
+        "comment": "감염 가능 여부",
+        "dataType": "BOOLEAN",
         "default": "",
         "options": 0,
         "ui": {
           "keys": 0,
           "widthName": 60,
-          "widthComment": 60,
+          "widthComment": 80,
           "widthDataType": 60,
           "widthDefault": 60
         },
         "meta": {
-          "updateAt": 1748860331225,
+          "updateAt": 1750080000000,
           "createAt": 1748859773317
         }
       },

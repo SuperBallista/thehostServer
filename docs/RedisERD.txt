@@ -54,7 +54,8 @@ act - enum(runaway / hide / lure )
 
 game:gameId:host
 id - pk
+canInfect - boolean (감염 가능 여부)
 infect - playerId
-zombie - [{playerId, targetId, next}]
+zombieList - [{playerId, targetId, next, leftTurn, region}]
 
 

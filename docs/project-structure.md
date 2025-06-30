@@ -14,14 +14,16 @@
 - **데이터베이스**: 
   - MySQL: 사용자 정보 저장 (users 테이블)
   - Redis: 게임 상태 관리 및 Pub/Sub
+  - Redis Search: 문서 벡터 검색 (선택적)
 - **인증**: JWT + Google OAuth
-- **포트**: 4000
+- **포트**: 3000
+- **외부 API**: OpenAI API (문서 벡터화, 선택적)
 
 ### 프론트엔드 (Svelte)
 - **Framework**: Svelte + TypeScript
 - **빌드 도구**: Vite
 - **상태 관리**: Svelte stores
-- **스타일링**: CSS
+- **스타일링**: CSS + Tailwind-like 유틸리티 클래스
 - **포트**: 5173 (개발)
 
 ## 디렉토리 구조
@@ -37,6 +39,7 @@ thehostServer/
 │   ├── index.html          # HTML 진입점
 │   └── README.md           # 프론트엔드 README
 ├── docs/                   # 프로젝트 문서
+├── scripts/                # 유틸리티 스크립트
 ├── dist/                   # 백엔드 빌드 출력
 ├── front/                  # 프론트엔드 빌드 출력 (복사본)
 ├── docker-compose.yml      # Docker 설정
@@ -47,6 +50,8 @@ thehostServer/
 ├── nest-cli.json           # NestJS CLI 설정
 ├── tsconfig.json           # TypeScript 설정
 ├── tsconfig.build.json     # TypeScript 빌드 설정
+├── .env                    # 환경 변수
+├── .env.example            # 환경 변수 예시
 └── README.md               # 프로젝트 README
 ```
 
@@ -84,6 +89,8 @@ src/
 │   ├── redisPubSubHelper.ts
 │   ├── pubsub-usage-guide.ts  # PubSub 사용 가이드
 │   └── pubsub.types.ts     # PubSub 타입 정의
+├── services/               # 추가 서비스
+│   └── document-search.service.ts  # 문서 벡터 검색 서비스
 ├── user/                   # 사용자 관리
 │   ├── user.module.ts      # 사용자 모듈
 │   ├── user.service.ts
@@ -113,7 +120,8 @@ src/
 │       ├── encryption.service.ts
 │       └── json.services.ts
 ├── utils/                  # 유틸리티 함수
-│   └── base32.ts
+│   ├── base32.ts
+│   └── vectorize-docs.ts   # 문서 벡터화 유틸리티
 ├── app.module.ts           # 루트 모듈
 ├── app.controller.ts       # 루트 컨트롤러
 └── main.ts                 # 애플리케이션 진입점
@@ -178,16 +186,17 @@ Frontend/src/
 │   ├── store/              # 상태 관리 (Svelte stores)
 │   │   ├── authStore.ts
 │   │   ├── gameStore.ts
-│   │   ├── gameStateStore.ts
+│   │   ├── gameStateStore.ts      # 게임 상태 통합 관리
 │   │   ├── lobbyStore.ts
 │   │   ├── pageStore.ts
-│   │   ├── playerStore.ts     # 플레이어 상태 관리
-│   │   ├── socketStore.ts
+│   │   ├── playerStore.ts         # 플레이어 상태 관리
+│   │   ├── socketStore.ts         # Socket.io 연결 관리
 │   │   ├── waitRoomStore.ts
 │   │   ├── selectOptionStore.ts
 │   │   ├── selectPlayerMessageBox.ts  # 플레이어 선택 메시지박스
 │   │   ├── musicStore.ts              # 배경음악 상태 관리
-│   │   └── synchronize.type.ts        # 동기화 타입 정의
+│   │   ├── synchronize.type.ts        # 동기화 타입 정의
+│   │   └── synchronize.type.d.ts      # TypeScript 선언 파일
 │   ├── handleCode/
 │   │   └── errorHandle.ts
 │   └── utils/
@@ -259,10 +268,19 @@ docs/
 ├── updatePlan.md           # 업데이트 계획
 ├── redis.erd               # Redis ERD 파일
 ├── RedisERD.txt            # Redis ERD 텍스트 형식
+├── vector-search-commands.txt  # 벡터 검색 명령어 가이드
 ├── 상태동기화.txt           # 상태 동기화 노트
 ├── 수정예정.txt             # 수정 예정 노트
 ├── 이미지.txt               # 이미지 관련 노트
 └── 피드백.txt               # 피드백 노트
+```
+
+### 유틸리티 스크립트 (scripts/)
+```
+scripts/
+├── vectorize-project-docs.ts  # 프로젝트 문서 벡터화
+├── read-vector-data.ts        # 벡터 데이터 읽기
+└── search-docs.ts             # 문서 검색
 ```
 
 ## 게임 플로우
@@ -281,28 +299,34 @@ docs/
 
 4. **대기실** (WaitRoom.svelte)
    - 플레이어 대기
-   - 게임 설정
-   - 게임 시작
+   - 게임 설정 (봇 허용 여부)
+   - 게임 시작 (방장만 가능)
 
-5. **게임** (Game.svelte)
+5. **게임** (GameLayout.svelte)
    - 실시간 게임 진행
    - 채팅/아이템/이동
+   - 배경음악 재생 (토글 가능)
 
 ## 주요 게임 메커니즘
 
 ### 1. 팀 구성
 - **생존자팀**: 숙주를 찾아 백신 투여가 목표
 - **좀비팀**: 모든 생존자 감염/사망이 목표
+- **익명성**: 인게임에서는 동물 닉네임 사용 (20개 미리 정의)
 
 ### 2. 감염 시스템
-- 숙주가 같은 구역의 생존자 감염 가능 (턴당 1명)
+- 숙주가 같은 구역의 생존자 감염 가능 (2턴당 1명)
 - 감염자는 자신의 감염 상태를 모름
 - 5턴 후 좀비로 변이
 
 ### 3. 구역 시스템
-- 3~6개 구역 (해안가, 폐건물, 정글, 동굴, 산 정상, 개울가)
+- 3~6개 구역 (플레이어 수에 따라 자동 조정)
+  - 8-9명: 3구역
+  - 10-13명: 4구역
+  - 14-17명: 5구역
+  - 18-20명: 6구역
 - 같은 구역 내에서만 상호작용 가능
-- 매 턴(90초)마다 구역 이동 가능
+- 매 턴마다 구역 이동 가능 (1-4턴: 60초, 5턴 이후: 90초)
 
 ### 4. 아이템 시스템
 - **진단/치료**: 자가진단키트, 응급치료제
@@ -310,7 +334,7 @@ docs/
 - **백신**: 백신 재료 3종 (항바이러스혈청, 촉매정제물질, 신경억제단백질)
 - **무기**: 좀비사살용산탄총
 - **기타**: 낙서 스프레이, 지우개
-- **획득 방식**: 매 턴 시작 시 자동 지급 (100% 확률)
+- **획득 방식**: 매 턴 시작 시 자동 지급 (가중치 기반 확률)
 
 ### 5. 커뮤니케이션
 - 구역 내 채팅
@@ -318,13 +342,19 @@ docs/
 - 마이크로 전체 방송
 - 익명 낙서 시스템
 
+### 6. 승리 조건
+- **생존자 승리**: 백신 3종 재료를 모아 숙주에게 투여
+- **좀비 승리**: 모든 생존자 감염 또는 사망
+- **무승부**: 20턴 경과
+
 ## Redis 데이터 구조
 
 ### 게임 상태
 - `game:{gameId}` - 게임 전체 상태 (턴, 호스트, 기록)
 - `game:{gameId}:player:{playerId}` - 플레이어 상태 (위치, 아이템, 감염)
-- `game:{gameId}:region:{turn}:{regionId}` - 구역 정보 (채팅, 낙서)
+- `game:{gameId}:region:{regionId}:turn:{turn}` - 구역 정보 (채팅, 낙서)
 - `game:{gameId}:zombie:{playerId}` - 좀비 정보 (타겟, 이동)
+- `game:{gameId}:host` - 숙주 정보 (감염 가능 여부, 타겟)
 
 ### 방 관리
 - `room:data:{roomId}` - 방 정보 (플레이어 목록, 설정)
@@ -334,23 +364,35 @@ docs/
 - `online:{userId}` - 사용자 접속 정보
 - `socket:{socketId}` - 소켓 연결 정보
 
+### 문서 벡터 (선택적)
+- `doc:chunk:{chunkId}` - 벡터화된 문서 청크
+- `idx:docs` - RediSearch 벡터 인덱스
+
 ## Socket.io 이벤트
 
 ### 클라이언트 → 서버
-- `join-room`: 방 참가
-- `leave-room`: 방 나가기
-- `start-game`: 게임 시작
-- `move-region`: 구역 이동
-- `use-item`: 아이템 사용
-- `send-message`: 채팅 메시지
+- `request`: 모든 요청 (타입별 처리)
+  - `createRoom`: 방 생성
+  - `joinRoom`: 방 참가
+  - `exitRoom`: 방 나가기
+  - `gameStart`: 게임 시작
+  - `myStatus`: 플레이어 상태 업데이트
+  - `hostAct`: 숙주 행동
+  - `giveItem`: 아이템 전달
+  - `useItem`: 아이템 사용
 
 ### 서버 → 클라이언트
-- `room-updated`: 방 정보 업데이트
-- `game-started`: 게임 시작 알림
-- `turn-changed`: 턴 변경
-- `player-moved`: 플레이어 이동
-- `item-used`: 아이템 사용 결과
-- `message-received`: 채팅 수신
+- `update`: 모든 업데이트 (페이로드 타입별)
+  - `locationState`: 페이지 상태
+  - `roomData`: 방 정보
+  - `playerId`: 플레이어 ID
+  - `myStatus`: 내 상태
+  - `survivorList`: 생존자 목록
+  - `gameTurn`: 현재 턴
+  - `count`: 남은 시간
+  - `region`: 구역 정보
+  - `hostAct`: 숙주 정보
+  - `alarm`: 알림 메시지
 
 ## 개발 환경 설정
 
@@ -368,11 +410,30 @@ npm run dev
 ```
 
 ### 환경 변수
-- `.env`: 백엔드 환경 변수 (DB, OAuth, Redis)
-- `Frontend/.env`: 프론트엔드 환경 변수 (API URL)
+- `.env`: 환경 변수 설정 (`.env.example` 참조)
+- 필수 환경 변수: DB 연결, Redis, JWT, Google OAuth
+- 선택적 환경 변수: OpenAI API (문서 벡터 검색용)
+
+## 최근 주요 업데이트
+
+### 게임 동기화 개선
+- 모든 게임 데이터를 `syncWithServer` 함수로 통합 처리
+- 숙주 상태(`isHost`) 동기화 문제 해결
+- 타이머 카운트다운 클라이언트 사이드 처리
+
+### UI/UX 개선
+- 방장만 게임 시작 버튼 활성화
+- 숙주 전용 버튼 조건부 활성화 (감염, 좀비 조작)
+- 익명성 유지를 위한 동물 닉네임 시스템
+
+### 문서 벡터 검색 (선택적)
+- OpenAI 임베딩을 사용한 문서 벡터화
+- RediSearch를 이용한 유사도 검색
+- 프로덕션 환경에서는 자동 비활성화
 
 ## 향후 계획
 - LLM API를 활용한 AI 봇 플레이어
 - 모바일 최적화
 - 게임 통계 및 랭킹 시스템
 - 추가 게임 모드
+- 실시간 음성 채팅
