@@ -11,7 +11,7 @@ Caddy는 자동 HTTPS를 지원하는 강력한 웹 서버/리버스 프록시�
 cp Caddyfile.dev Caddyfile
 
 # Caddy 실행
-docker-compose -f docker-compose-caddy.yml up -d
+docker compose -f docker-compose-caddy.yml up -d
 ```
 
 ### 2. 프로덕션 환경
@@ -25,7 +25,7 @@ export CADDY_HTTP_PORT=80
 export CADDY_HTTPS_PORT=443
 
 # Caddy 실행
-docker-compose -f docker-compose-caddy.yml up -d
+docker compose -f docker-compose-caddy.yml up -d
 ```
 
 ## Caddyfile 설정
@@ -74,12 +74,12 @@ reverse_proxy * {
 
 ### 로그 확인
 ```bash
-docker-compose -f docker-compose-caddy.yml logs -f caddy
+docker compose -f docker-compose-caddy.yml logs -f caddy
 ```
 
 ### Caddy 재시작
 ```bash
-docker-compose -f docker-compose-caddy.yml restart caddy
+docker compose -f docker-compose-caddy.yml restart caddy
 ```
 
 ### 설정 다시 로드
