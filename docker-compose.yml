@@ -5,6 +5,6 @@ services:
     image: redis:7
     container_name: hostgame-redis
     ports:
-      - "3407:6379"
+      - "${REDIS_PORT:-3407}:6379"
 
 
