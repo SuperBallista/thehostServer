@@ -2,15 +2,16 @@ module.exports = {
   apps: [{
     name: 'thehost-server',
     script: './dist/main.js',
+    cwd: __dirname,
     instances: 'max', // CPU 코어 수만큼 인스턴스 생성
     exec_mode: 'cluster', // 클러스터 모드 사용
     env: {
       NODE_ENV: 'production',
-      PORT: process.env.SERVER_PORT || 3000
+      PORT: process.env.SERVER_PORT || 4000
     },
     env_production: {
       NODE_ENV: 'production',
-      PORT: process.env.SERVER_PORT || 3000
+      PORT: process.env.SERVER_PORT || 4000
     },
     error_file: './logs/pm2-error.log',
     out_file: './logs/pm2-out.log',
