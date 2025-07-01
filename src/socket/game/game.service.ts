@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { RedisPubSubService } from '../../redis/redisPubSub.service';
 import { Game, GamePlayer, REGION_NAMES, ITEM_NAMES } from './game.types';
-import { Room } from '../payload.types';
+import { Room, ItemInterface } from '../payload.types';
 import { getOrderRandom } from '../utils/randomManager';
 import { userDataResponse } from '../payload.types';
 import { userShortInfo } from '../data.types';
@@ -13,6 +13,7 @@ import { GameDataService } from './game-data.service';
 import { GameStateService } from './game-state.service';
 import { ChatService } from './chat.service';
 import { HostActionService } from './host-action.service';
+import { ConnectionService } from '../connection.service';
 import { Socket } from 'socket.io';
 
 @Injectable()
@@ -25,6 +26,7 @@ export class GameService {
     private readonly gameStateService: GameStateService,
     private readonly chatService: ChatService,
     private readonly hostActionService: HostActionService,
+    private readonly connectionService: ConnectionService,
   ) {}
 
   /**
@@ -87,21 +89,7 @@ export class GameService {
         true
       );
       
-      // 6. 게임 시작 시 초기 시스템 메시지 전송
-      const regionName = REGION_NAMES[playerDataResult.myPlayerData.regionId] || '알 수 없는 지역';
-      let systemMessage = `${regionName}으로 진입하였습니다.`;
-      
-      // 플레이어의 현재 아이템 확인
-      if (playerDataResult.myPlayerData.items && playerDataResult.myPlayerData.items.length > 0) {
-        const lastItem = playerDataResult.myPlayerData.items[playerDataResult.myPlayerData.items.length - 1];
-        const itemName = ITEM_NAMES[lastItem] || '알 수 없는 아이템';
-        systemMessage += ` 이곳에서 ${itemName}을 획득하였습니다.`;
-      }
-      
-      // 시스템 메시지 전송
-      await this.chatService.sendSystemMessage(roomId, systemMessage, playerDataResult.myPlayerData.regionId);
-      
-      // 7. 응답 생성 및 전송
+      // 6. 응답 생성 (시스템 메시지는 응답에 포함)
       const response = await this.gameStateService.createGameStartResponse(
         gameData,
         playerDataResult.myPlayerData,
@@ -276,5 +264,101 @@ export class GameService {
     for (const player of players) {
       await this.gameDataService.savePlayerData(roomId, player.playerId, player.recordData());
     }
+  }
+
+  /**
+   * 아이템 전달 처리
+   */
+  async handleGiveItem(userId: number, giveItem: { receiver: number; item: ItemInterface }, gameId: string): Promise<userDataResponse> {
+    console.log('handleGiveItem 시작:', { userId, giveItem, gameId });
+    
+    // gameId가 직접 전달되므로 location state 확인 불필요
+    const playerData = await this.playerManagerService.getPlayerDataByUserId(gameId, userId);
+    if (!playerData) {
+      throw new Error('플레이어 데이터를 찾을 수 없습니다');
+    }
+
+    // 죽은 플레이어는 아이템을 줄 수 없음
+    if (playerData.state === 'killed') {
+      throw new Error('죽은 플레이어는 아이템을 전달할 수 없습니다');
+    }
+
+    // 아이템 소유 확인
+    const itemIndex = playerData.items.indexOf(giveItem.item);
+    if (itemIndex === -1) {
+      throw new Error('해당 아이템을 가지고 있지 않습니다');
+    }
+
+    // 받는 사람 데이터 가져오기
+    const receiverData = await this.playerManagerService.getPlayerData(gameId, giveItem.receiver);
+    if (!receiverData) {
+      throw new Error('받는 사람을 찾을 수 없습니다');
+    }
+
+    // 같은 지역인지 확인
+    if (playerData.regionId !== receiverData.regionId) {
+      throw new Error('같은 지역에 있는 플레이어에게만 아이템을 전달할 수 있습니다');
+    }
+
+    // 죽은 플레이어에게는 아이템을 줄 수 없음
+    if (receiverData.state === 'killed') {
+      throw new Error('죽은 플레이어에게는 아이템을 전달할 수 없습니다');
+    }
+
+    // 아이템 전달 처리
+    playerData.items.splice(itemIndex, 1);
+    receiverData.items.push(giveItem.item);
+
+    // 데이터 저장
+    await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+    await this.gameDataService.savePlayerData(gameId, receiverData.playerId, receiverData);
+
+    // 시스템 메시지 전송
+    const itemName = ITEM_NAMES[giveItem.item] || giveItem.item;
+    
+    // 닉네임 리스트 (프론트엔드와 동일)
+    const nicknameList = [`자책하는두더지`, `말많은다람쥐`, `웃는얼굴의하마`, `엿듣는호랑이`, `눈치빠른고양이`, `조용한여우`, `겁많은토끼`, `고집센너구리`, `유난떠는수달`, `낙서많은부엉이`, `분위기타는족제비`, `장난기있는펭귄`, `침착한판다`, `의심많은고슴도치`, `폭로하는까마귀`, `살금살금곰`, `혼잣말하는늑대`, `사람좋은삵`, `침묵하는도롱뇽`, `거짓말하는수리부엉이`];
+    
+    const giverNickname = nicknameList[playerData.playerId] || `플레이어${playerData.playerId}`;
+    const receiverNickname = nicknameList[receiverData.playerId] || `플레이어${receiverData.playerId}`;
+
+    // 같은 지역의 모든 플레이어에게 공개 메시지 전송
+    const publicMessage = `${giverNickname}이(가) ${receiverNickname}에게 ${itemName}을(를) 전달했습니다.`;
+    await this.chatService.sendSystemMessage(gameId, publicMessage, playerData.regionId);
+
+    // 주는 사람에게 개인 메시지 (현재 함수 호출자가 받음)
+    // 이미 return에서 처리됨
+
+    // 받는 사람이 실제 플레이어인 경우 개인 메시지와 아이템 목록 업데이트 전송
+    if (receiverData.userId > 0) {
+      await this.redisPubSubService.publishPlayerStatus(gameId, receiverData.playerId, {
+        myStatus: {
+          state: receiverData.state,
+          items: receiverData.items,
+          region: receiverData.regionId,
+          next: receiverData.next,
+          act: receiverData.act
+        },
+        alarm: {
+          message: `${giverNickname}으로부터 ${itemName}을(를) 받았습니다.`,
+          img: 'info'
+        }
+      }, receiverData.playerId);
+    }
+
+    // 아이템을 준 사람에게 업데이트된 상태와 개인 알림 반환
+    return this.gameStateService.createPlayerGameUpdate(gameId, userId, {
+      myStatus: {
+        state: playerData.state,
+        items: playerData.items,
+        region: playerData.regionId,
+        next: playerData.next,
+        act: playerData.act
+      },
+      alarm: {
+        message: `${receiverNickname}에게 ${itemName}을(를) 전달했습니다.`,
+        img: 'info'
+      }
+    });
   }
 }

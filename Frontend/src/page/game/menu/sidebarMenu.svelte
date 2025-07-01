@@ -1,14 +1,17 @@
 <script lang="ts">
     import { THEME } from "../../../common/constant/theme";
     import { showSelectOptionBox } from "../../../common/store/selectOptionStore";
-    import { myStatus, isHost, canInfect, zombies, regionNames } from '../../../common/store/gameStateStore';
+    import { myStatus, isHost, canInfect, zombies, regionNames, playersInMyRegion } from '../../../common/store/gameStateStore';
     import { socketStore } from '../../../common/store/socketStore';
     import { authStore } from '../../../common/store/authStore';
+    import { currentRoom } from '../../../common/store/pageStore';
     import { get } from 'svelte/store';
-    import type { ItemInterface, userRequest } from '../../../common/store/synchronize.type';
+    import type { ItemInterface, userRequest, PlayerState } from '../../../common/store/synchronize.type';
     import { itemList } from '../common/itemObject';
     import { showMessageBox } from '../../../common/messagebox/customStore';
     import { musicStore, toggleMusic } from '../../../common/store/musicStore';
+    import { nicknameList } from '../game.type';
+    import { selectPlayerMessageBox } from '../../../common/store/selectPlayerMessageBox';
 
   let inventory:HTMLElement
   let action:HTMLElement
@@ -62,7 +65,7 @@ async function moveNextRegion() {
       token,
       user,
       myStatus: {
-        state: currentStatus.state,
+        state: (currentStatus.state === 'infected' ? 'alive' : currentStatus.state) as PlayerState,
         items: currentStatus.items,
         region: currentStatus.region,
         next: selectedRegion, // 선택한 지역 번호
@@ -72,6 +75,76 @@ async function moveNextRegion() {
 
     socket.emit('request', requestData);
     console.log('서버로 전송:', requestData);
+  }
+}
+
+async function giveItem(item: ItemInterface) {
+  // 같은 지역에 있는 생존자들만 필터링
+  const playersInRegion = get(playersInMyRegion);
+  
+  if (!playersInRegion || playersInRegion.length === 0) {
+    await showMessageBox(
+      'error',
+      '알림',
+      '같은 지역에 다른 생존자가 없습니다.'
+    );
+    return;
+  }
+
+  // PlayerStatus를 Survivor 형태로 변환
+  const survivors = playersInRegion.map(player => ({
+    playerId: player.playerId,
+    state: (player.state === 'host' || player.state === 'infected') ? 'alive' : player.state, // host와 infected를 alive로 표시
+    sameRegion: true, // 이미 같은 지역 플레이어만 필터링됨
+    nickname: nicknameList[player.playerId] || `플레이어${player.playerId}`,
+    // Survivor 클래스의 메서드들은 필요없으므로 생략
+    checkAndUpdateSurvivor: () => {},
+    disappearSurvivor: () => {},
+    updateData: () => {}
+  }));
+
+  try {
+    // 플레이어 선택 모달 표시
+    const selectedPlayer = await selectPlayerMessageBox(
+      '아이템 전달',
+      `${itemList[item].name}을(를) 전달할 생존자를 선택하세요.`,
+      survivors,
+      `/img/items/${item}.jpg`
+    );
+
+    if (selectedPlayer) {
+      // 서버로 아이템 전달 요청
+      const socket = get(socketStore);
+      const token = get(authStore).token;
+      const user = get(authStore).user;
+      const currentStatus = get(myStatus);
+
+      if (!socket || !token || !user || !currentStatus) return;
+
+      console.log('아이템 전달:', { 
+        item, 
+        targetPlayer: selectedPlayer.playerId,
+        targetNickname: selectedPlayer.nickname 
+      });
+
+      const room = get(currentRoom);
+      
+      const requestData: userRequest = {
+        token,
+        user,
+        giveItem: {
+          item: item,
+          receiver: selectedPlayer.playerId
+        },
+        roomId: room?.id || ''
+      };
+
+      socket.emit('request', requestData);
+      console.log('서버로 아이템 전달 요청:', requestData);
+    }
+  } catch (error) {
+    // 사용자가 취소한 경우
+    console.log('아이템 전달 취소');
   }
 }
 
@@ -90,7 +163,7 @@ async function moveNextRegion() {
               <div class="flex gap-1">
                 <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`} on:click={() => showItemInfo(item)}>안내</button>
                 <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgAccent}`}>사용</button>
-                <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`}>주기</button>
+                <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`} on:click={() => giveItem(item)}>주기</button>
               </div>
             </div>
           {/each}

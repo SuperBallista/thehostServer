@@ -55,6 +55,8 @@ thehostServer/
 ├── tsconfig.build.json     # TypeScript 빌드 설정
 ├── .env                    # 환경 변수
 ├── .env.example            # 환경 변수 예시
+├── Caddyfile               # Caddy 설정
+├── Caddyfile.dev           # Caddy 개발 설정
 └── README.md               # 프로젝트 README
 ```
 
@@ -76,14 +78,14 @@ src/
 │   ├── data.types.ts       # 데이터 타입 정의
 │   ├── payload.types.ts    # 페이로드 타입 정의 (ChatMessage 포함)
 │   ├── game/               # 게임 관련 서비스
-│   │   ├── game.service.ts         # 게임 메인 오케스트레이터 (185줄)
+│   │   ├── game.service.ts         # 게임 메인 오케스트레이터 (378줄)
 │   │   ├── game.types.ts           # 게임 타입 정의
 │   │   ├── gameTurn.service.ts     # 턴별 아이템 지급 서비스
 │   │   ├── zombie.service.ts       # 좀비 관리 서비스
 │   │   ├── player-manager.service.ts    # 플레이어 데이터 관리 (127줄)
 │   │   ├── game-data.service.ts         # Redis 데이터 접근 계층 (119줄)
-│   │   ├── game-state.service.ts        # 게임 상태 응답 생성 (147줄)
-│   │   ├── chat.service.ts              # 채팅 메시지 처리 (102줄)
+│   │   ├── game-state.service.ts        # 게임 상태 응답 생성 (166줄)
+│   │   ├── chat.service.ts              # 채팅 메시지 처리 (98줄)
 │   │   ├── host-action.service.ts       # 호스트 액션 처리 (120줄)
 │   │   └── itemProbabilities.json       # 아이템 확률 설정
 │   ├── utils/              # 소켓 유틸리티
@@ -94,7 +96,7 @@ src/
 ├── redis/                  # Redis 연결 및 Pub/Sub
 │   ├── redis.module.ts     # Redis 모듈
 │   ├── redis.service.ts
-│   ├── redisPubSub.service.ts  # Pub/Sub 서비스 (CHAT_MESSAGE 처리 포함)
+│   ├── redisPubSub.service.ts  # Pub/Sub 서비스 (365줄)
 │   ├── redisPubSubHelper.ts
 │   ├── pubsub-usage-guide.ts  # PubSub 사용 가이드
 │   └── pubsub.types.ts     # PubSub 타입 정의 (InternalUpdateType 포함)
@@ -156,8 +158,10 @@ Frontend/src/
 │       ├── gameLayout.svelte       # 게임 레이아웃 (배경음악 통합)
 │       ├── gameMenu.svelte
 │       ├── game.type.ts    # 게임 타입 정의
+│       ├── game.type.d.ts  # 게임 타입 선언
 │       ├── common/         # 게임 공통 요소
 │       │   ├── itemObject.ts  # 아이템 객체 정의
+│       │   ├── itemObject.d.ts  # 아이템 타입 선언
 │       │   └── GameStartMessageBox.svelte  # 게임 시작 역할 안내 메시지박스
 │       ├── chat/           # 채팅 관련
 │       │   ├── chatInput.svelte
@@ -167,7 +171,7 @@ Frontend/src/
 │       │   ├── actionModal.svelte
 │       │   ├── inventoryModal.svelte
 │       │   ├── survivorModal.svelte
-│       │   ├── sidebarMenu.svelte  # 사이드바 메뉴 (음악 토글 버튼 포함)
+│       │   ├── sidebarMenu.svelte  # 사이드바 메뉴 (아이템 전달 기능 포함)
 │       │   └── mobileNav.svelte     # 모바일 네비게이션 (음악 토글 버튼 포함)
 │       └── selectModal/    # 선택 모달
 │           ├── playerSelector.svelte
@@ -194,7 +198,7 @@ Frontend/src/
 │   │       └── messageBoxColor.json  # 메시지박스 색상 설정
 │   ├── store/              # 상태 관리 (Svelte stores)
 │   │   ├── authStore.ts
-│   │   ├── gameStore.ts
+│   │   ├── gameStore.d.ts
 │   │   ├── gameStateStore.ts      # 게임 상태 통합 관리
 │   │   ├── lobbyStore.ts
 │   │   ├── pageStore.ts
@@ -203,6 +207,7 @@ Frontend/src/
 │   │   ├── waitRoomStore.ts
 │   │   ├── selectOptionStore.ts
 │   │   ├── selectPlayerMessageBox.ts  # 플레이어 선택 메시지박스
+│   │   ├── selectPlayerMessageBox.d.ts  # 플레이어 선택 타입 선언
 │   │   ├── musicStore.ts              # 배경음악 상태 관리
 │   │   ├── synchronize.type.ts        # 동기화 타입 정의
 │   │   └── synchronize.type.d.ts      # TypeScript 선언 파일
@@ -238,43 +243,47 @@ Frontend/public/
 └── img/
     ├── logo.png
     ├── google-icon.svg
-    ├── items/                  # 게임 아이템 이미지
-    │   ├── medicine.jpg        # 응급치료제
-    │   ├── vaccine.jpg         # 백신
-    │   ├── shotgun.jpg         # 좀비사살용산탄총
-    │   ├── microphone.jpg      # 마이크
-    │   ├── wireless.jpg        # 무전기
-    │   ├── spray.jpg           # 낙서스프레이
+    ├── items/              # 게임 아이템 이미지
     │   ├── eraser.jpg          # 지우개
+    │   ├── medicine.jpg        # 응급치료제
+    │   ├── microphone.jpg      # 마이크
+    │   ├── shotgun.jpg         # 산탄총
+    │   ├── spray.jpg           # 연막탄
+    │   ├── vaccine.jpg         # 백신
+    │   ├── vaccineMaterialA.jpg # 백신재료A
+    │   ├── vaccineMaterialB.jpg # 백신재료B
+    │   ├── vaccineMaterialC.jpg # 백신재료C
+    │   ├── vaccineMaterialD.jpg # 백신재료D
+    │   ├── vaccineMaterialE.jpg # 백신재료E
     │   ├── virusChecker.jpg    # 진단키트
-    │   ├── vaccineMaterialA.jpg # 항바이러스혈청
-    │   ├── vaccineMaterialB.jpg # 촉매정제물질
-    │   └── vaccineMaterialC.jpg # 신경억제단백질
-    ├── region/                 # 지역 배경 이미지
+    │   └── wireless.jpg        # 무전기
+    ├── region/             # 지역 배경 이미지
     │   ├── beach.jpg           # 해안가
     │   ├── building.jpg        # 폐건물
     │   ├── cave.jpg            # 동굴
     │   ├── hill.jpg            # 산 정상
     │   ├── jungle.jpg          # 정글
     │   └── river.jpg           # 개울가
-    └── scence/                 # 게임 상황 이미지
-        ├── host.png            # 숙주
-        ├── survivor.png        # 생존자
-        ├── zombie.png          # 좀비
-        ├── infect.png          # 감염
+    └── scence/             # 게임 상황 이미지
         ├── checkInfect.png     # 감염 확인
-        ├── vaccine.png         # 백신 투여
+        ├── hide.png            # 은신
+        ├── host.png            # 숙주
+        ├── infect.png          # 감염
         ├── killed.png          # 사망
         ├── runaway.png         # 도주
-        └── hide.png            # 은신
+        ├── survivor.png        # 생존자
+        ├── vaccine.png         # 백신
+        └── zombie.png          # 좀비
 ```
 
 ### 프로젝트 문서 (docs/)
 ```
 docs/
 ├── project-structure.md    # 프로젝트 구조 문서 (현재 파일)
+├── project-structure-tree.md  # 전체 디렉토리 트리
 ├── planning.md             # 기획 문서
 ├── updatePlan.md           # 업데이트 계획
+├── caddy-setup.md          # Caddy 설정 가이드
 ├── redis.erd               # Redis ERD 파일
 ├── RedisERD.txt            # Redis ERD 텍스트 형식
 ├── vector-search-commands.txt  # 벡터 검색 명령어 가이드
@@ -287,6 +296,7 @@ docs/
 ### 유틸리티 스크립트 (scripts/)
 ```
 scripts/
+├── start-pm2.sh               # PM2 시작 스크립트
 ├── vectorize-project-docs.ts  # 프로젝트 문서 벡터화
 ├── read-vector-data.ts        # 벡터 데이터 읽기
 └── search-docs.ts             # 문서 검색
@@ -338,11 +348,12 @@ scripts/
 - 매 턴마다 구역 이동 가능 (1-4턴: 60초, 5턴 이후: 90초)
 
 ### 4. 아이템 시스템
-- **진단/치료**: 자가진단키트, 응급치료제
+- **진단/치료**: 진단키트, 응급치료제
 - **통신**: 무전기, 마이크
-- **백신**: 백신 재료 3종 (항바이러스혈청, 촉매정제물질, 신경억제단백질)
-- **무기**: 좀비사살용산탄총
-- **기타**: 낙서 스프레이, 지우개
+- **백신**: 백신 재료 3종 (백신재료A, 백신재료B, 백신재료C)
+- **방어**: 덫, 연막탄
+- **무기**: 가짜백신, 철사
+- **기타**: 지우개
 - **획득 방식**: 매 턴 시작 시 자동 지급 (가중치 기반 확률)
 
 ### 5. 커뮤니케이션
@@ -482,8 +493,24 @@ npm run pm2:status   # PM2 프로세스 상태 확인
 
 ## 최근 주요 업데이트
 
+### 아이템 전달 기능 구현 (2025.01)
+- **giveItem** 핸들러 추가 - 같은 지역 플레이어에게 아이템 전달
+- **봇 플레이어 지원** - 음수 userId를 가진 봇도 아이템 수령 가능
+- **실시간 상태 동기화**:
+  - 지역 내 모든 플레이어에게 전달 사실 공지
+  - 주는 사람과 받는 사람에게 개별 알림
+  - Redis Pub/Sub을 통한 타겟 메시지 전송
+- **프론트엔드 타입 호환성** 수정:
+  - `PlayerStatus`를 `Survivor` 형식으로 변환
+  - `infected` 상태를 `alive`로 표시 (익명성 유지)
+
+### 게임 시작 메시지 중복 버그 수정 (2025.01)
+- **문제**: 같은 지역 플레이어 수만큼 중복 메시지 발생
+- **해결**: 게임 시작 응답에 개별 메시지 포함
+- `game-state.service.ts`에서 초기 메시지 생성
+
 ### 게임 서비스 리팩토링 (2025.01)
-- **game.service.ts** 책임 분리 (500줄 → 185줄)
+- **game.service.ts** 책임 분리 (500줄 → 378줄)
 - **단일 책임 원칙(SRP)** 적용:
   - `player-manager.service.ts`: 플레이어 데이터 및 위치 관리
   - `game-data.service.ts`: Redis 데이터 접근 계층

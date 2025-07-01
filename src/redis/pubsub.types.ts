@@ -70,6 +70,7 @@ export interface PlayerStatusData {
   gameId: string;
   playerId: number;
   status: any;
+  targetPlayerId?: number;
 }
 
 export interface TurnUpdateData {
@@ -136,10 +137,10 @@ export class InternalMessageBuilder {
     };
   }
 
-  static playerStatus(gameId: string, playerId: number, status: any): InternalMessage {
+  static playerStatus(gameId: string, playerId: number, status: any, targetPlayerId?: number): InternalMessage {
     return {
       type: InternalUpdateType.PLAYER_STATUS,
-      data: { gameId, playerId, status },
+      data: { gameId, playerId, status, targetPlayerId },
       timestamp: Date.now()
     };
   }

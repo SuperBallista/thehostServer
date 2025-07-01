@@ -10,7 +10,8 @@ import {
   InternalMessage, 
   InternalUpdateType, 
   InternalMessageBuilder,
-  MessageProcessResult
+  MessageProcessResult,
+  PlayerStatusData
 } from './pubsub.types';
 
 @Injectable()
@@ -219,14 +220,38 @@ export class RedisPubSubService implements OnModuleInit {
    * 플레이어 상태 업데이트 처리
    */
   private async handlePlayerStatus(message: InternalMessage): Promise<boolean> {
-    const { gameId, playerId, status } = message.data as any;
+    const playerStatusData = message.data as PlayerStatusData;
+    const { gameId, playerId, status, targetPlayerId } = playerStatusData;
     
-    this.io?.to(`game:${gameId}`).emit('update', {
-      playerId,
-      myStatus: status
-    });
+    // targetPlayerId가 있으면 특정 플레이어에게만 전송
+    if (targetPlayerId !== undefined) {
+      // targetPlayerId로 플레이어 데이터 찾기
+      const targetPlayerData = await this.redisService.getAndParse(`game:${gameId}:player:${targetPlayerId}`);
+      if (!targetPlayerData || targetPlayerData.userId <= 0) {
+        console.log(`🤖 봇 플레이어 또는 데이터 없음: ${targetPlayerId}`);
+        return true;
+      }
+      
+      // userId로 소켓 찾아서 전송
+      const sockets = await this.io?.sockets.sockets;
+      if (sockets) {
+        for (const [socketId, socket] of sockets) {
+          if (socket.data?.id === targetPlayerData.userId) {
+            socket.emit('update', status);
+            console.log(`📤 특정 플레이어(playerId: ${targetPlayerId}, userId: ${targetPlayerData.userId})에게 상태 업데이트 전송`);
+            return true;
+          }
+        }
+      }
+    } else {
+      // targetPlayerId가 없으면 게임 전체에 브로드캐스트
+      this.io?.to(`game:${gameId}`).emit('update', {
+        playerId,
+        myStatus: status
+      });
+      console.log(`📢 게임 전체에 플레이어 상태 업데이트: ${gameId}:${playerId}`);
+    }
     
-    console.log(`🎮 플레이어 상태 업데이트: ${gameId}:${playerId}`);
     return true;
   }
 
@@ -323,6 +348,11 @@ export class RedisPubSubService implements OnModuleInit {
   async publishChatMessage(gameId: string, playerId: number, message: string, region: number, system: boolean = false): Promise<void> {
     const chatMessage = InternalMessageBuilder.chatMessage(gameId, playerId, message, region, system);
     await this.publishInternal(chatMessage);
+  }
+
+  async publishPlayerStatus(gameId: string, playerId: number, status: any, targetPlayerId?: number): Promise<void> {
+    const message = InternalMessageBuilder.playerStatus(gameId, playerId, status, targetPlayerId);
+    await this.publishInternal(message);
   }
 
   /**

@@ -128,6 +128,12 @@ afterInit(server: Server) {
         response = await this.gameService.handleChatMessage(data.user.id, data.chatMessage)
       }
 
+      // 아이템 전달 처리
+      if (data.giveItem && data.user.id && data.roomId) {
+        console.log('아이템 전달 요청:', { userId: data.user.id, giveItem: data.giveItem, roomId: data.roomId });
+        response = await this.gameService.handleGiveItem(data.user.id, data.giveItem, data.roomId)
+      }
+
       // ✅ 응답 전송
       client.emit('update', response);
       

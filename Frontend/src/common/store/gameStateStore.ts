@@ -24,7 +24,7 @@ export const gameResult = writable<'infected' | 'killed' | 'cure' | null>(null);
 // 지역 관련
 export const totalRegions = writable<number>(6);
 export const regionNames = writable<string[]>([
-  '해안가', '폐건물', '정글', '동굴', '산 정상', '개울가'
+  '해안', '폐건물', '정글', '동굴', '산 정상', '개울'
 ]);
 
 // 플레이어 상태

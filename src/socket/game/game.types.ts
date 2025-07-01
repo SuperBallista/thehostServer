@@ -130,7 +130,7 @@ type UseMethod = () => Promise<boolean>
 
 // 지역 이름 상수
 export const REGION_NAMES = [
-    '해안가', '폐건물', '정글', '동굴', '산 정상', '개울가'
+    '해안', '폐건물', '정글', '동굴', '산 정상', '개울'
 ];
 
 // 아이템 이름 매핑

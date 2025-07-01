@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
-import { GameInRedis, GamePlayerInRedis } from './game.types';
+import { GameInRedis, GamePlayerInRedis, REGION_NAMES, ITEM_NAMES } from './game.types';
 import { PlayerState, SurvivorInterface } from '../payload.types';
 import { userDataResponse } from '../payload.types';
 import { PlayerManagerService } from './player-manager.service';
@@ -28,6 +28,17 @@ export class GameStateService {
     const uniqueRegions = new Set(allPlayers.map(p => p.regionId));
     const useRegionsNumber = Math.max(...Array.from(uniqueRegions)) + 1;
     
+    // 초기 시스템 메시지 생성
+    const regionName = REGION_NAMES[myPlayerData.regionId] || '알 수 없는 지역';
+    let systemMessage = `${regionName}으로 진입하였습니다.`;
+    
+    // 플레이어의 현재 아이템 확인
+    if (myPlayerData.items && myPlayerData.items.length > 0) {
+      const lastItem = myPlayerData.items[myPlayerData.items.length - 1];
+      const itemName = ITEM_NAMES[lastItem] || '알 수 없는 아이템';
+      systemMessage += ` 이곳에서 ${itemName}을 획득하였습니다.`;
+    }
+    
     const response: userDataResponse = {
       locationState: 'game',
       playerId: myPlayerData.playerId,
@@ -41,7 +52,15 @@ export class GameStateService {
       gameTurn: gameData.turn,
       count: this.getTurnDuration(gameData.turn),
       useRegionsNumber: useRegionsNumber,
-      survivorList: this.createSurvivorList(allPlayers, myPlayerData)
+      survivorList: this.createSurvivorList(allPlayers, myPlayerData),
+      region: {
+        chatLog: [{
+          system: true,
+          message: systemMessage,
+          timeStamp: new Date()
+        }],
+        regionMessageList: []
+      }
     };
 
     // 호스트 플레이어인 경우에만 hostAct 데이터 추가
