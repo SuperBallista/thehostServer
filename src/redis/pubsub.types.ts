@@ -10,7 +10,8 @@ export enum InternalUpdateType {
   GAME_START = 'GAME_START',
   USER_LOCATION = 'USER_LOCATION',
   PLAYER_STATUS = 'PLAYER_STATUS',
-  TURN_UPDATE = 'TURN_UPDATE'
+  TURN_UPDATE = 'TURN_UPDATE',
+  CHAT_MESSAGE = 'CHAT_MESSAGE'
 }
 
 /**
@@ -34,7 +35,8 @@ export type InternalMessageData =
   | GameStartData
   | UserLocationData
   | PlayerStatusData
-  | TurnUpdateData;
+  | TurnUpdateData
+  | ChatMessageData;
 
 // 각 메시지 타입별 데이터 인터페이스
 export interface RoomListUpdateData {
@@ -75,6 +77,13 @@ export interface TurnUpdateData {
   event: string;
   itemsDistributed?: boolean;
   turn?: number;
+}
+
+export interface ChatMessageData {
+  gameId: string;
+  playerId: number;
+  message: string;
+  region: number;
 }
 
 /**
@@ -138,6 +147,15 @@ export class InternalMessageBuilder {
     return {
       type: InternalUpdateType.TURN_UPDATE,
       data: { gameId, event, ...additionalData },
+      targetRoomId: gameId,
+      timestamp: Date.now()
+    };
+  }
+
+  static chatMessage(gameId: string, playerId: number, message: string, region: number): InternalMessage {
+    return {
+      type: InternalUpdateType.CHAT_MESSAGE,
+      data: { gameId, playerId, message, region },
       targetRoomId: gameId,
       timestamp: Date.now()
     };

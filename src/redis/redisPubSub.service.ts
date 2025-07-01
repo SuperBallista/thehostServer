@@ -103,6 +103,10 @@ export class RedisPubSubService implements OnModuleInit {
           processed = await this.handleTurnUpdate(message);
           break;
 
+        case InternalUpdateType.CHAT_MESSAGE:
+          processed = await this.handleChatMessage(message);
+          break;
+
         default:
           console.warn(`🚨 처리되지 않은 메시지 타입: ${message.type}`);
       }
@@ -254,6 +258,30 @@ export class RedisPubSubService implements OnModuleInit {
   }
 
   /**
+   * 채팅 메시지 처리
+   */
+  private async handleChatMessage(message: InternalMessage): Promise<boolean> {
+    const { gameId, playerId, message: chatMessage, region } = message.data as any;
+    
+    // ChatMessage 형식으로 변환
+    const chatData = {
+      system: false,
+      message: chatMessage,
+      timeStamp: new Date()
+    };
+    
+    // 같은 지역의 플레이어들에게만 메시지 전송
+    this.io?.to(`game:${gameId}:region:${region}`).emit('update', {
+      region: {
+        chatLog: [chatData]
+      }
+    });
+    
+    console.log(`💬 채팅 메시지: game:${gameId}, region:${region}, player:${playerId}`);
+    return true;
+  }
+
+  /**
    * 메시지 발행 (통합된 방식)
    */
   async publishInternal(message: InternalMessage): Promise<void> {
@@ -290,6 +318,11 @@ export class RedisPubSubService implements OnModuleInit {
       turn: data.turn 
     });
     await this.publishInternal(message);
+  }
+
+  async publishChatMessage(gameId: string, playerId: number, message: string, region: number): Promise<void> {
+    const chatMessage = InternalMessageBuilder.chatMessage(gameId, playerId, message, region);
+    await this.publishInternal(chatMessage);
   }
 
   /**

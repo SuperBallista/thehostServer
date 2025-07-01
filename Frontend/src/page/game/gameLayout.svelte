@@ -33,13 +33,7 @@
     // 배경음악 초기화
     initMusic('/game_bgm.mp3');
 
-    // 소켓 이벤트 리스너 등록
-    const socket = $socketStore;
-    if (socket) {
-      socket.on('update', (data) => {
-        syncWithServer(data);
-      });
-    }
+    // 소켓 이벤트 리스너는 socketStore.ts에서 이미 처리하고 있으므로 중복 등록하지 않음
   });
 
   // myStatus가 설정되면 역할 안내 메시지 표시

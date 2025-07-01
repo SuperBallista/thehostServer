@@ -5,11 +5,12 @@ import { Game, GameInRedis, GamePlayer, GamePlayerInRedis, Host} from './game.ty
 import { RedisService } from 'src/redis/redis.service';
 import { WsException } from '@nestjs/websockets';
 import { LocationState, userShortInfo } from '../data.types';
-import { PlayerState, Room, State, SurvivorInterface } from '../payload.types';
+import { PlayerState, Room, State, SurvivorInterface, ChatMessage } from '../payload.types';
 import { getOrderRandom } from '../utils/randomManager';
 import { userDataResponse } from '../payload.types';
 import { GameTurnService } from './gameTurn.service';
 import { ZombieService, HostZombieInfo } from './zombie.service';
+import { Socket } from 'socket.io';
 
 
 @Injectable()
@@ -159,7 +160,11 @@ async subscribeGameStart(client: any, userId: number, users: userShortInfo[], ro
         throw new WsException(`게임 데이터를 찾을 수 없습니다. 잠시 후 다시 시도해주세요.`);
       }
 
-      // 5. 응답 생성 및 전송
+      // 5. 플레이어를 게임 room과 region room에 join
+      client.join(`game:${roomId}`);
+      await this.movePlayerToRegion(client, roomId, userId, playerDataResult.myPlayerData.regionId, true);
+      
+      // 6. 응답 생성 및 전송
       const response = await this.createGameStartResponse(
         gameData,
         playerDataResult.myPlayerData,
@@ -404,6 +409,63 @@ async subscribeGameStart(client: any, userId: number, users: userShortInfo[], ro
         img: 'success'
       }
     });
+  }
+
+  // 채팅 메시지 처리
+  async handleChatMessage(userId: number, chatMessage: ChatMessage): Promise<userDataResponse> {
+    // 현재 위치 상태 확인
+    const locationState: LocationState = await this.redisService.getAndParse(`locationState:${userId}`);
+    if (!locationState || locationState.state !== 'game' || !locationState.roomId) {
+      throw new WsException('게임 중이 아닙니다');
+    }
+
+    const gameId = locationState.roomId;
+    
+    // 플레이어 데이터 가져오기
+    const playerData = await this.getPlayerDataByUserId(gameId, userId);
+    if (!playerData) {
+      throw new WsException('플레이어 데이터를 찾을 수 없습니다');
+    }
+
+    // Redis Pub/Sub을 통해 같은 지역의 플레이어들에게 메시지 전달
+    await this.redisPubSubService.publishChatMessage(
+      gameId,
+      playerData.playerId,
+      chatMessage.message,
+      playerData.regionId
+    );
+
+    console.log(`채팅 메시지 발행: gameId=${gameId}, playerId=${playerData.playerId}, region=${playerData.regionId}`);
+
+    // 빈 응답 반환 (메시지는 Pub/Sub을 통해 전달됨)
+    return {};
+  }
+
+  // 플레이어 region 이동 처리
+  async movePlayerToRegion(client: Socket, gameId: string, userId: number, newRegionId: number, isFirstJoin: boolean = false): Promise<void> {
+    try {
+      // 플레이어 데이터 가져오기
+      const playerData = await this.getPlayerDataByUserId(gameId, userId);
+      if (!playerData) {
+        throw new WsException('플레이어 데이터를 찾을 수 없습니다');
+      }
+
+      // 첫 입장이 아닌 경우에만 이전 region room에서 나가기
+      if (!isFirstJoin) {
+        const oldRegionRoom = `game:${gameId}:region:${playerData.regionId}`;
+        await client.leave(oldRegionRoom);
+      }
+
+      // 새로운 region room에 들어가기
+      const newRegionRoom = `game:${gameId}:region:${newRegionId}`;
+      await client.join(newRegionRoom);
+
+      const action = isFirstJoin ? '입장' : `이동: region ${playerData.regionId} →`;
+      console.log(`플레이어 ${playerData.playerId} ${action} ${newRegionId}`);
+    } catch (error) {
+      console.error(`플레이어 region 이동 중 오류: ${error}`);
+      throw error;
+    }
   }
 }
 

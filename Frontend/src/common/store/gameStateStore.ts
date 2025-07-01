@@ -287,8 +287,15 @@ export function syncWithServer(serverData: any) {
     }
   }
   if (serverData.region) {
-    chatMessages.set(serverData.region.chatLog || []);
-    regionMessages.set(serverData.region.regionMessageList || []);
+    // 채팅 메시지는 추가하는 방식으로 변경
+    if (serverData.region.chatLog && serverData.region.chatLog.length > 0) {
+      console.log('채팅 메시지 수신:', serverData.region.chatLog);
+      chatMessages.update(messages => [...messages, ...serverData.region.chatLog]);
+    }
+    // 지역 메시지는 전체 교체
+    if (serverData.region.regionMessageList !== undefined) {
+      regionMessages.set(serverData.region.regionMessageList || []);
+    }
   }
   if (serverData.alarm) {
     showGameNotification(

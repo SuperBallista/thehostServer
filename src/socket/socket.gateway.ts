@@ -118,6 +118,11 @@ afterInit(server: Server) {
         response = await this.gameService.handleHostAction(data.user.id, data.hostAct)
       }
 
+      // 채팅 메시지 처리
+      if (data.chatMessage && data.user.id) {
+        response = await this.gameService.handleChatMessage(data.user.id, data.chatMessage)
+      }
+
       // ✅ 응답 전송
       client.emit('update', response);
       

@@ -19,6 +19,8 @@ useItem?: UseItem
 
 gameStart?: boolean
 
+chatMessage?: ChatMessage
+
 
 }
 
