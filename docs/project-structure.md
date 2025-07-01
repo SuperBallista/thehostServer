@@ -42,8 +42,11 @@ thehostServer/
 ├── scripts/                # 유틸리티 스크립트
 ├── dist/                   # 백엔드 빌드 출력
 ├── front/                  # 프론트엔드 빌드 출력 (복사본)
+├── logs/                   # PM2 로그 디렉토리
 ├── docker-compose.yml      # Docker 설정
 ├── docker-compose-mysql.yml # MySQL Docker 설정
+├── docker-compose-caddy.yml # Caddy 리버스 프록시 설정
+├── ecosystem.config.js     # PM2 설정 (클러스터 모드)
 ├── package.json            # 백엔드 의존성
 ├── package-lock.json       # 백엔드 의존성 잠금
 ├── eslint.config.mjs       # ESLint 설정
@@ -71,11 +74,12 @@ src/
 │   ├── connection.service.ts
 │   ├── lobby.service.ts
 │   ├── data.types.ts       # 데이터 타입 정의
-│   ├── payload.types.ts    # 페이로드 타입 정의
+│   ├── payload.types.ts    # 페이로드 타입 정의 (ChatMessage 포함)
 │   ├── game/               # 게임 관련 서비스
-│   │   ├── game.service.ts
+│   │   ├── game.service.ts         # 게임 로직 (채팅, region 이동 포함)
 │   │   ├── game.types.ts
 │   │   ├── gameTurn.service.ts     # 턴별 아이템 지급 서비스
+│   │   ├── zombie.service.ts       # 좀비 관리 서비스
 │   │   └── itemProbabilities.json  # 아이템 확률 설정
 │   ├── utils/              # 소켓 유틸리티
 │   │   ├── socketRoomManager.ts
@@ -85,10 +89,10 @@ src/
 ├── redis/                  # Redis 연결 및 Pub/Sub
 │   ├── redis.module.ts     # Redis 모듈
 │   ├── redis.service.ts
-│   ├── redisPubSub.service.ts
+│   ├── redisPubSub.service.ts  # Pub/Sub 서비스 (CHAT_MESSAGE 처리 포함)
 │   ├── redisPubSubHelper.ts
 │   ├── pubsub-usage-guide.ts  # PubSub 사용 가이드
-│   └── pubsub.types.ts     # PubSub 타입 정의
+│   └── pubsub.types.ts     # PubSub 타입 정의 (InternalUpdateType 포함)
 ├── services/               # 추가 서비스
 │   └── document-search.service.ts  # 문서 벡터 검색 서비스
 ├── user/                   # 사용자 관리
@@ -380,6 +384,7 @@ scripts/
   - `hostAct`: 숙주 행동
   - `giveItem`: 아이템 전달
   - `useItem`: 아이템 사용
+  - `chatMessage`: 채팅 메시지 전송
 
 ### 서버 → 클라이언트
 - `update`: 모든 업데이트 (페이로드 타입별)
@@ -399,7 +404,7 @@ scripts/
 ### 백엔드
 ```bash
 npm install
-npm run start:dev
+npm run start:dev  # 개발 모드 (watch 모드)
 ```
 
 ### 프론트엔드
@@ -409,6 +414,15 @@ npm install
 npm run dev
 ```
 
+### 프로덕션 배포 (PM2)
+```bash
+npm run pm2:start    # PM2로 클러스터 모드 시작
+npm run pm2:restart  # 코드 업데이트 후 재시작 (ecosystem.config.js 변경사항 반영)
+npm run pm2:stop     # PM2 프로세스 중지
+npm run pm2:logs     # PM2 로그 확인
+npm run pm2:status   # PM2 프로세스 상태 확인
+```
+
 ### 환경 변수
 - `.env`: 환경 변수 설정 (`.env.example` 참조)
 - 필수 환경 변수: DB 연결, Redis, JWT, Google OAuth
@@ -416,10 +430,17 @@ npm run dev
 
 ## 최근 주요 업데이트
 
+### 채팅 시스템 구현
+- 구역별 실시간 채팅 기능 추가
+- Redis Pub/Sub을 통한 메시지 브로드캐스팅
+- 플레이어 region 이동 시 채팅방 자동 전환 (`movePlayerToRegion`)
+- 프론트엔드 동물 닉네임과 연동 (nicknameList 사용)
+
 ### 게임 동기화 개선
 - 모든 게임 데이터를 `syncWithServer` 함수로 통합 처리
 - 숙주 상태(`isHost`) 동기화 문제 해결
 - 타이머 카운트다운 클라이언트 사이드 처리
+- Socket 이벤트 중복 등록 버그 수정 (gameLayout.svelte)
 
 ### UI/UX 개선
 - 방장만 게임 시작 버튼 활성화
