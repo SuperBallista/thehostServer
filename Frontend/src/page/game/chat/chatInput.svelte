@@ -38,8 +38,9 @@
     message = '';
   }
 
-  function handleKeyPress(event: KeyboardEvent) {
-    if (event.key === 'Enter') {
+  function handleKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault(); // 기본 동작 방지
       sendMessage();
     }
   }
@@ -49,7 +50,7 @@
 
   <input
     bind:value={message}
-    on:keypress={handleKeyPress}
+    on:keydown={handleKeyDown}
     placeholder="메시지를 입력하세요..."
     class={`flex-1 mr-2 px-3 py-1 ${THEME.roundedDefault} ${THEME.bgDisabled} ${THEME.textWhite} focus:outline-none ${THEME.focusRing}`}
   />

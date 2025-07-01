@@ -1,0 +1,164 @@
+import { Injectable } from '@nestjs/common';
+import { WsException } from '@nestjs/websockets';
+import { GameInRedis, GamePlayerInRedis } from './game.types';
+import { PlayerState, SurvivorInterface } from '../payload.types';
+import { userDataResponse } from '../payload.types';
+import { PlayerManagerService } from './player-manager.service';
+import { GameDataService } from './game-data.service';
+import { ZombieService } from './zombie.service';
+
+@Injectable()
+export class GameStateService {
+  constructor(
+    private readonly playerManagerService: PlayerManagerService,
+    private readonly gameDataService: GameDataService,
+    private readonly zombieService: ZombieService,
+  ) {}
+
+  /**
+   * 게임 시작 응답 생성
+   */
+  async createGameStartResponse(
+    gameData: GameInRedis,
+    myPlayerData: GamePlayerInRedis,
+    allPlayers: GamePlayerInRedis[],
+    roomId: string
+  ): Promise<userDataResponse> {
+    // 사용 중인 지역 수 계산
+    const uniqueRegions = new Set(allPlayers.map(p => p.regionId));
+    const useRegionsNumber = Math.max(...Array.from(uniqueRegions)) + 1;
+    
+    const response: userDataResponse = {
+      locationState: 'game',
+      playerId: myPlayerData.playerId,
+      myStatus: {
+        state: myPlayerData.state as any,
+        items: myPlayerData.items as any,
+        region: myPlayerData.regionId,
+        next: myPlayerData.next,
+        act: myPlayerData.act as any
+      },
+      gameTurn: gameData.turn,
+      count: this.getTurnDuration(gameData.turn),
+      useRegionsNumber: useRegionsNumber,
+      survivorList: this.createSurvivorList(allPlayers, myPlayerData)
+    };
+
+    // 호스트 플레이어인 경우에만 hostAct 데이터 추가
+    if (myPlayerData.state === 'host') {
+      const hostData = await this.gameDataService.getHostData(roomId);
+      if (hostData) {
+        // ZombieService를 사용하여 좀비 정보 가져오기
+        const zombieList = await this.zombieService.getZombiesForHost(roomId);
+        
+        response.hostAct = {
+          infect: hostData.infect,
+          canInfect: hostData.canInfect,
+          zombieList: zombieList
+        };
+      }
+    }
+
+    return response;
+  }
+
+  /**
+   * 플레이어별 게임 업데이트 생성
+   */
+  async createPlayerGameUpdate(
+    gameId: string, 
+    userId: number,
+    updateData: any
+  ): Promise<userDataResponse> {
+    // 플레이어 데이터 가져오기
+    const playerData = await this.playerManagerService.getPlayerDataByUserId(gameId, userId);
+    if (!playerData) {
+      throw new WsException('플레이어 데이터를 찾을 수 없습니다');
+    }
+
+    const response: userDataResponse = {
+      ...updateData
+    };
+
+    // 호스트 플레이어인 경우에만 hostAct 데이터 추가
+    if (playerData.state === 'host') {
+      const hostData = await this.gameDataService.getHostData(gameId);
+      if (hostData) {
+        // ZombieService를 사용하여 좀비 정보 가져오기
+        const zombieList = await this.zombieService.getZombiesForHost(gameId);
+        
+        response.hostAct = {
+          infect: hostData.infect,
+          canInfect: hostData.canInfect,
+          zombieList: zombieList
+        };
+      }
+    }
+
+    return response;
+  }
+
+  /**
+   * 생존자 리스트 생성
+   */
+  private createSurvivorList(
+    allPlayers: GamePlayerInRedis[], 
+    myPlayerData: GamePlayerInRedis
+  ): SurvivorInterface[] {
+    return allPlayers
+      .filter(player => player.playerId !== myPlayerData.playerId) // 자신 제외
+      .map(player => ({
+        playerId: player.playerId,
+        state: this.getVisiblePlayerState(player, myPlayerData),
+        sameRegion: player.regionId === myPlayerData.regionId
+      }));
+  }
+
+  /**
+   * 다른 플레이어의 보이는 상태 결정
+   */
+  private getVisiblePlayerState(
+    player: GamePlayerInRedis, 
+    myPlayerData: GamePlayerInRedis
+  ): PlayerState {
+    if (player.playerId === myPlayerData.playerId) return 'you';
+    if (player.state === 'host') return 'alive';
+    return player.state;
+  }
+
+  /**
+   * 턴별 시간 계산
+   */
+  private getTurnDuration(turn: number): number {
+    return turn < 5 ? 60 : 90;
+  }
+
+  /**
+   * 게임 종료 상태 생성
+   */
+  createGameEndResponse(endType: 'infected' | 'killed' | 'cure'): userDataResponse {
+    return {
+      endGame: endType,
+      alarm: {
+        message: this.getEndGameMessage(endType),
+        img: endType === 'cure' ? 'success' : 'danger'
+      }
+    };
+  }
+
+  /**
+   * 게임 종료 메시지
+   */
+  private getEndGameMessage(endType: 'infected' | 'killed' | 'cure'): string {
+    switch (endType) {
+      case 'infected':
+        return '모든 생존자가 감염되었습니다. 좀비팀 승리!';
+      case 'killed':
+        return '모든 생존자가 사망했습니다. 좀비팀 승리!';
+      case 'cure':
+        return '백신이 투여되었습니다. 생존자팀 승리!';
+      default:
+        return '게임이 종료되었습니다.';
+    }
+  }
+}

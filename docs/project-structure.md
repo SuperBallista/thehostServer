@@ -76,11 +76,16 @@ src/
 │   ├── data.types.ts       # 데이터 타입 정의
 │   ├── payload.types.ts    # 페이로드 타입 정의 (ChatMessage 포함)
 │   ├── game/               # 게임 관련 서비스
-│   │   ├── game.service.ts         # 게임 로직 (채팅, region 이동 포함)
-│   │   ├── game.types.ts
+│   │   ├── game.service.ts         # 게임 메인 오케스트레이터 (185줄)
+│   │   ├── game.types.ts           # 게임 타입 정의
 │   │   ├── gameTurn.service.ts     # 턴별 아이템 지급 서비스
 │   │   ├── zombie.service.ts       # 좀비 관리 서비스
-│   │   └── itemProbabilities.json  # 아이템 확률 설정
+│   │   ├── player-manager.service.ts    # 플레이어 데이터 관리 (127줄)
+│   │   ├── game-data.service.ts         # Redis 데이터 접근 계층 (119줄)
+│   │   ├── game-state.service.ts        # 게임 상태 응답 생성 (147줄)
+│   │   ├── chat.service.ts              # 채팅 메시지 처리 (102줄)
+│   │   ├── host-action.service.ts       # 호스트 액션 처리 (120줄)
+│   │   └── itemProbabilities.json       # 아이템 확률 설정
 │   ├── utils/              # 소켓 유틸리티
 │   │   ├── socketRoomManager.ts
 │   │   └── randomManager.ts
@@ -372,6 +377,53 @@ scripts/
 - `doc:chunk:{chunkId}` - 벡터화된 문서 청크
 - `idx:docs` - RediSearch 벡터 인덱스
 
+## 서비스 아키텍처
+
+### 게임 서비스 레이어 구조
+
+```
+SocketGateway
+    ↓
+GameService (오케스트레이터)
+    ├── PlayerManagerService
+    │   ├── 플레이어 데이터 관리
+    │   ├── 위치 상태 관리
+    │   └── Region 이동 처리
+    │
+    ├── GameDataService
+    │   ├── Redis CRUD 작업
+    │   ├── 게임 데이터 저장/조회
+    │   └── 데이터 정리
+    │
+    ├── GameStateService
+    │   ├── 게임 상태 응답 생성
+    │   ├── 생존자 리스트 관리
+    │   └── 게임 종료 처리
+    │
+    ├── ChatService
+    │   ├── 채팅 메시지 처리
+    │   ├── Region별 브로드캐스트
+    │   └── 시스템 메시지
+    │
+    ├── HostActionService
+    │   ├── 호스트 권한 검증
+    │   ├── 감염 대상 설정
+    │   └── 좀비 명령 처리
+    │
+    ├── GameTurnService
+    │   └── 턴별 아이템 지급
+    │
+    └── ZombieService
+        ├── 좀비 생성/삭제
+        └── 좀비 상태 관리
+```
+
+### 서비스 간 의존성
+- `GameService`는 모든 서비스를 조정
+- 각 서비스는 필요한 서비스만 주입받음
+- 순환 의존성 없음
+- 명확한 계층 구조 유지
+
 ## Socket.io 이벤트
 
 ### 클라이언트 → 서버
@@ -430,11 +482,23 @@ npm run pm2:status   # PM2 프로세스 상태 확인
 
 ## 최근 주요 업데이트
 
+### 게임 서비스 리팩토링 (2025.01)
+- **game.service.ts** 책임 분리 (500줄 → 185줄)
+- **단일 책임 원칙(SRP)** 적용:
+  - `player-manager.service.ts`: 플레이어 데이터 및 위치 관리
+  - `game-data.service.ts`: Redis 데이터 접근 계층
+  - `game-state.service.ts`: 게임 상태 및 응답 생성
+  - `chat.service.ts`: 채팅 메시지 처리
+  - `host-action.service.ts`: 호스트 전용 기능
+- 테스트 용이성 및 유지보수성 향상
+- 각 서비스가 명확한 단일 책임 보유
+
 ### 채팅 시스템 구현
 - 구역별 실시간 채팅 기능 추가
 - Redis Pub/Sub을 통한 메시지 브로드캐스팅
 - 플레이어 region 이동 시 채팅방 자동 전환 (`movePlayerToRegion`)
 - 프론트엔드 동물 닉네임과 연동 (nicknameList 사용)
+- 크롬 브라우저 Enter 키 이벤트 호환성 수정 (`keypress` → `keydown`)
 
 ### 게임 동기화 개선
 - 모든 게임 데이터를 `syncWithServer` 함수로 통합 처리
