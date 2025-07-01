@@ -2,7 +2,7 @@
 import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { RedisPubSubService } from '../../redis/redisPubSub.service';
-import { Game, GamePlayer, REGION_NAMES, ITEM_NAMES } from './game.types';
+import { Game, GamePlayer, REGION_NAMES, ITEM_NAMES, ANIMAL_NICKNAMES } from './game.types';
 import { Room, ItemInterface } from '../payload.types';
 import { getOrderRandom } from '../utils/randomManager';
 import { userDataResponse } from '../payload.types';
@@ -267,6 +267,72 @@ export class GameService {
   }
 
   /**
+   * 게임 중 나가기 처리
+   */
+  async exitGame(userId: number, client?: Socket): Promise<userDataResponse> {
+    console.log('게임 나가기 요청:', { userId });
+    
+    // 현재 위치 상태 확인
+    const locationState = await this.playerManagerService.getPlayerLocationState(userId);
+    if (locationState.state !== 'game' || !locationState.roomId) {
+      throw new WsException('게임 중이 아닙니다');
+    }
+
+    const gameId = locationState.roomId;
+    
+    // 플레이어 데이터 가져오기
+    const playerData = await this.playerManagerService.getPlayerDataByUserId(gameId, userId);
+    if (!playerData) {
+      throw new WsException('플레이어 데이터를 찾을 수 없습니다');
+    }
+
+    // 플레이어 상태를 killed로 변경
+    playerData.state = 'killed';
+    await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+    
+    console.log('플레이어 게임 나가기 처리:', { 
+      userId, 
+      playerId: playerData.playerId,
+      gameId 
+    });
+
+    // 소켓에서 room 나가기 (client가 전달된 경우)
+    if (client) {
+      await client.leave(`game:${gameId}`);
+      await client.leave(`game:${gameId}:region:${playerData.regionId}`);
+    }
+
+    // 위치 상태를 로비로 변경
+    await this.playerManagerService.updateLocationState(userId, 'lobby', '');
+
+    // 방 데이터에서 플레이어 제거
+    const roomData = await this.gameDataService.getWaitRoomData(gameId);
+    if (roomData) {
+      roomData.players = roomData.players.filter(p => p.id !== userId);
+      await this.gameDataService.saveWaitRoomData(gameId, roomData);
+      
+      // 방이 비었으면 게임 데이터 정리
+      if (roomData.players.filter(p => p.id > 0).length === 0) {
+        await this.cleanupGameData(gameId);
+      }
+    }
+
+    return { 
+      exitRoom: true, 
+      locationState: 'lobby' 
+    };
+  }
+
+  /**
+   * 게임 데이터 정리
+   */
+  private async cleanupGameData(gameId: string): Promise<void> {
+    // 게임 데이터 정리는 GameDataService에 위임
+    await this.gameDataService.cleanupGameData(gameId);
+    console.log(`게임 데이터 정리 완료: ${gameId}`);
+  }
+
+  /**
    * 아이템 전달 처리
    */
   async handleGiveItem(userId: number, giveItem: { receiver: number; item: ItemInterface }, gameId: string): Promise<userDataResponse> {
@@ -316,11 +382,8 @@ export class GameService {
     // 시스템 메시지 전송
     const itemName = ITEM_NAMES[giveItem.item] || giveItem.item;
     
-    // 닉네임 리스트 (프론트엔드와 동일)
-    const nicknameList = [`자책하는두더지`, `말많은다람쥐`, `웃는얼굴의하마`, `엿듣는호랑이`, `눈치빠른고양이`, `조용한여우`, `겁많은토끼`, `고집센너구리`, `유난떠는수달`, `낙서많은부엉이`, `분위기타는족제비`, `장난기있는펭귄`, `침착한판다`, `의심많은고슴도치`, `폭로하는까마귀`, `살금살금곰`, `혼잣말하는늑대`, `사람좋은삵`, `침묵하는도롱뇽`, `거짓말하는수리부엉이`];
-    
-    const giverNickname = nicknameList[playerData.playerId] || `플레이어${playerData.playerId}`;
-    const receiverNickname = nicknameList[receiverData.playerId] || `플레이어${receiverData.playerId}`;
+    const giverNickname = ANIMAL_NICKNAMES[playerData.playerId] || `플레이어${playerData.playerId}`;
+    const receiverNickname = ANIMAL_NICKNAMES[receiverData.playerId] || `플레이어${receiverData.playerId}`;
 
     // 같은 지역의 모든 플레이어에게 공개 메시지 전송
     const publicMessage = `${giverNickname}이(가) ${receiverNickname}에게 ${itemName}을(를) 전달했습니다.`;

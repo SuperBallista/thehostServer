@@ -85,6 +85,8 @@ function setupDynamicSubscriptions(socket: Socket) {
 }
 
 function updateData(payload: userDataResponse) {
+  console.log('updateData received:', payload);
+  
   // 위치 상태 업데이트
   if (payload.locationState) {
     locationState.set(payload.locationState);
@@ -115,7 +117,12 @@ function updateData(payload: userDataResponse) {
 
   // 방 관련 업데이트
   if (payload.roomData) currentRoom.set(payload.roomData);
-  if (payload.exitRoom) exitRoomState();
+  
+  // exitRoom이 있으면 exitRoomState를 호출하되, locationState가 함께 전달된 경우는 건너뛴다
+  // (이미 위에서 locationState를 처리했으므로)
+  if (payload.exitRoom && !payload.locationState) {
+    exitRoomState();
+  }
 
   // 게임 관련 업데이트
   if (payload.gameTurn) gameTurn.set(payload.gameTurn);

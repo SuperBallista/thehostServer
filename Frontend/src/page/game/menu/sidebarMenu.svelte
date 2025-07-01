@@ -12,6 +12,7 @@
     import { musicStore, toggleMusic } from '../../../common/store/musicStore';
     import { nicknameList } from '../game.type';
     import { selectPlayerMessageBox } from '../../../common/store/selectPlayerMessageBox';
+    import { exitGame } from '../common/gameActions';
 
   let inventory:HTMLElement
   let action:HTMLElement
@@ -199,7 +200,10 @@ async function giveItem(item: ItemInterface) {
     <button class="w-full text-left px-4 py-2 font-semibold">
       ⏭️ 넘기기
     </button>
-      <button class="w-full ${THEME.textAccent} text-left px-4 py-2 font-semibold">🚪 나가기</button>
+      <button 
+        class={`w-full ${THEME.textAccent} text-left px-4 py-2 font-semibold`}
+        on:click={exitGame}
+      >🚪 나가기</button>
       
       <!-- 음악 토글 버튼 -->
       <button 

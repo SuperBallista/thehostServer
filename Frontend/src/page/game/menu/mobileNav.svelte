@@ -1,5 +1,6 @@
 <script lang="ts">
   import { musicStore, toggleMusic } from '../../../common/store/musicStore';
+  import { exitGame } from '../common/gameActions';
   
   export let onInventoryClick = () => {};
   export let onActionClick = () => {};
@@ -29,6 +30,7 @@
   </button>
   <button
     class="h-full flex flex-col justify-center items-center text-lg "
+    on:click={exitGame}
   >🚪<br />나가기
   </button>
   <button

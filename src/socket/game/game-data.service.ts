@@ -115,4 +115,34 @@ export class GameDataService {
     gameData.turn = newTurn;
     await this.saveGameData(gameId, gameData);
   }
+
+  /**
+   * 게임 대기실 데이터 저장
+   */
+  async saveWaitRoomData(roomId: string, roomData: Room): Promise<void> {
+    await this.redisService.stringifyAndSet(`room:data:${roomId}`, roomData);
+  }
+
+  /**
+   * 게임 데이터 정리
+   */
+  async cleanupGameData(gameId: string): Promise<void> {
+    // 게임 관련 모든 데이터 삭제
+    const patterns = [
+      `game:${gameId}`,
+      `game:${gameId}:*`,
+      `room:data:${gameId}`,
+      `room:list:*`
+    ];
+
+    for (const pattern of patterns) {
+      const keys = await this.redisService.scanKeys(pattern);
+      if (keys.length > 0) {
+        // Redis del 명령어 사용
+        const pipeline = this.redisService.pipeline();
+        keys.forEach(key => pipeline.del(key));
+        await pipeline.exec();
+      }
+    }
+  }
 }

@@ -96,8 +96,22 @@ afterInit(server: Server) {
         response = await this.lobbyService.joinRoom(client, data.joinRoom)
       }
       
-      if (data.exitRoom) {
-        response = await this.lobbyService.exitToLobby(client)
+      if (data.exitRoom && data.user.id) {
+        // 현재 위치 확인
+        const locationState = await this.connectionService.getLocationData(data.user.id);
+        console.log('exitRoom 요청 - 현재 위치:', locationState);
+        
+        if (locationState.state === 'game') {
+          // 게임 중이면 gameService의 exitGame 호출
+          response = await this.gameService.exitGame(data.user.id, client);
+        } else if (locationState.state === 'room') {
+          // 대기실이면 기존 lobbyService의 exitToLobby 호출
+          response = await this.lobbyService.exitToLobby(client);
+        } else {
+          // 이미 로비에 있는 경우
+          console.log('이미 로비에 있음');
+          response = { locationState: 'lobby' };
+        }
       }
 
       if (data.room) {
