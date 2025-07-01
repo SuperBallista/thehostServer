@@ -21,7 +21,6 @@
 
   function handleKey(event: KeyboardEvent) {
     if (event.key === "Escape") onClose();
-    if (event.key === "Enter") handleConfirm();
   }
 
   onMount(() => {
