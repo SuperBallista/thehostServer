@@ -51,13 +51,15 @@ export class ChatService {
     gameId: string, 
     playerId: number, 
     message: string, 
-    regionId: number
+    regionId: number,
+    system: boolean = false
   ): Promise<void> {
     await this.redisPubSubService.publishChatMessage(
       gameId,
       playerId,
       message,
-      regionId
+      regionId,
+      system
     );
   }
 
@@ -69,14 +71,8 @@ export class ChatService {
     message: string, 
     regionId: number
   ): Promise<void> {
-    const systemMessage: ChatMessage = {
-      system: true,
-      message,
-      timeStamp: new Date()
-    };
-
-    // 시스템 메시지는 playerId를 -1로 설정
-    await this.broadcastToRegion(gameId, -1, systemMessage.message, regionId);
+    // 시스템 메시지는 playerId를 -1로 설정하고 system 플래그를 true로
+    await this.broadcastToRegion(gameId, -1, message, regionId, true);
   }
 
   /**
@@ -93,7 +89,7 @@ export class ChatService {
     
     for (let regionId = 0; regionId < MAX_REGIONS; regionId++) {
       broadcasts.push(
-        this.broadcastToRegion(gameId, playerId, message, regionId)
+        this.broadcastToRegion(gameId, playerId, message, regionId, false)
       );
     }
     

@@ -128,6 +128,27 @@ type Act = 'runaway' | 'hide' | 'lure';
 export type ItemCode = `spray` | `vaccine` | `shotgun` | `eraser` | `medicine` | `microphone` | `vaccineMaterialA` | `vaccineMaterialB` | `vaccineMaterialC` | `virusChecker` | `wireless`
 type UseMethod = () => Promise<boolean>
 
+// 지역 이름 상수
+export const REGION_NAMES = [
+    '해안가', '폐건물', '정글', '동굴', '산 정상', '개울가'
+];
+
+// 아이템 이름 매핑
+export const ITEM_NAMES: { [key in ItemCode | 'none']?: string } = {
+    'spray': '낙서스프레이',
+    'virusChecker': '진단키트',
+    'medicine': '응급치료제',
+    'vaccineMaterialA': '항바이러스혈청',
+    'vaccineMaterialB': '촉매정제물질',
+    'vaccineMaterialC': '신경억제단백질',
+    'wireless': '무전기',
+    'eraser': '지우개',
+    'shotgun': '좀비사살용산탄총',
+    'microphone': '마이크',
+    'vaccine': '백신',
+    'none': '없음'
+};
+
 export class ItemObject{
     code: ItemCode
     useMethod: UseMethod

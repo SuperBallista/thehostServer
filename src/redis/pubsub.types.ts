@@ -84,6 +84,7 @@ export interface ChatMessageData {
   playerId: number;
   message: string;
   region: number;
+  system?: boolean;
 }
 
 /**
@@ -152,10 +153,10 @@ export class InternalMessageBuilder {
     };
   }
 
-  static chatMessage(gameId: string, playerId: number, message: string, region: number): InternalMessage {
+  static chatMessage(gameId: string, playerId: number, message: string, region: number, system: boolean = false): InternalMessage {
     return {
       type: InternalUpdateType.CHAT_MESSAGE,
-      data: { gameId, playerId, message, region },
+      data: { gameId, playerId, message, region, system },
       targetRoomId: gameId,
       timestamp: Date.now()
     };

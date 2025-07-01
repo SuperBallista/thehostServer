@@ -261,11 +261,11 @@ export class RedisPubSubService implements OnModuleInit {
    * 채팅 메시지 처리
    */
   private async handleChatMessage(message: InternalMessage): Promise<boolean> {
-    const { gameId, playerId, message: chatMessage, region } = message.data as any;
+    const { gameId, playerId, message: chatMessage, region, system } = message.data as any;
     
     // ChatMessage 형식으로 변환
     const chatData = {
-      system: false,
+      system: system || false,
       message: chatMessage,
       timeStamp: new Date()
     };
@@ -277,7 +277,7 @@ export class RedisPubSubService implements OnModuleInit {
       }
     });
     
-    console.log(`💬 채팅 메시지: game:${gameId}, region:${region}, player:${playerId}`);
+    console.log(`💬 채팅 메시지: game:${gameId}, region:${region}, player:${playerId}, system:${system}`);
     return true;
   }
 
@@ -320,8 +320,8 @@ export class RedisPubSubService implements OnModuleInit {
     await this.publishInternal(message);
   }
 
-  async publishChatMessage(gameId: string, playerId: number, message: string, region: number): Promise<void> {
-    const chatMessage = InternalMessageBuilder.chatMessage(gameId, playerId, message, region);
+  async publishChatMessage(gameId: string, playerId: number, message: string, region: number, system: boolean = false): Promise<void> {
+    const chatMessage = InternalMessageBuilder.chatMessage(gameId, playerId, message, region, system);
     await this.publishInternal(chatMessage);
   }
 

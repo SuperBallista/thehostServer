@@ -4,6 +4,7 @@ import type {
   SurvivorInterface,
   ItemInterface 
 } from './synchronize.type';
+import type { ChatMessage } from '../../page/game/game.type';
 import { 
   playerId, 
   playerState, 
@@ -74,10 +75,8 @@ export const playersInMyRegion = derived(
   }
 );
 
-// 채팅 & 메시지 - synchronize.type에서 import해서 사용
-// ChatMessage와 RegionMessage는 synchronize.type.ts에 정의됨
-
-export const chatMessages = writable<any[]>([]);
+// 채팅 & 메시지
+export const chatMessages = writable<ChatMessage[]>([]);
 // 구역 메시지 인터페이스
 interface RegionMessage {
   message: string;

@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { RedisService } from 'src/redis/redis.service';
 import { RedisPubSubService } from 'src/redis/redisPubSub.service';
-import { GamePlayerInRedis, ItemCode } from './game.types';
+import { GamePlayerInRedis, ItemCode, REGION_NAMES, ITEM_NAMES } from './game.types';
+import { ChatService } from './chat.service';
 import * as itemProbabilities from './itemProbabilities.json';
 
 
@@ -21,15 +22,31 @@ export class GameTurnService {
   constructor(
     private readonly redisService: RedisService,
     private readonly redisPubSubService: RedisPubSubService,
+    private readonly chatService: ChatService,
   ) {}
 
   async onTurnStart(gameId: string, currentTurn?: number): Promise<void> {
     try {
       const players = await this.getAllPlayersInGame(gameId);
       
+      // 플레이어별로 아이템 지급
       for (const player of players) {
         if (player.state === 'alive' || player.state === 'host') {
-          await this.giveItemToPlayer(gameId, player.playerId);
+          const givenItem = await this.giveItemToPlayer(gameId, player.playerId);
+          
+          // 2턴 이상에서만 시스템 메시지 전송 (1턴은 게임 참가 시 개별 전송)
+          if (currentTurn && currentTurn > 1) {
+            const regionName = REGION_NAMES[player.regionId] || '알 수 없는 지역';
+            let systemMessage = `${regionName}으로 진입하였습니다.`;
+            
+            if (givenItem && givenItem !== 'none') {
+              const itemName = ITEM_NAMES[givenItem] || '알 수 없는 아이템';
+              systemMessage += ` 이곳에서 ${itemName}을 획득하였습니다.`;
+            }
+            
+            // 해당 지역에 시스템 메시지 전송
+            await this.chatService.sendSystemMessage(gameId, systemMessage, player.regionId);
+          }
         }
       }
       
@@ -47,7 +64,7 @@ export class GameTurnService {
     }
   }
 
-  private async giveItemToPlayer(gameId: string, playerId: number): Promise<ItemCode | null> {
+  private async giveItemToPlayer(gameId: string, playerId: number): Promise<ItemCode | 'none' | null> {
     const selectedItem = this.selectRandomItem();
     
     if (selectedItem && selectedItem.itemId !== 'none') {
@@ -67,10 +84,10 @@ export class GameTurnService {
       await this.redisService.stringifyAndSet(playerKey, playerData);
       
       console.log(`플레이어 ${playerId}에게 아이템 ${selectedItem.name} 지급`);
-      return selectedItem.itemId as ItemCode;
+      return selectedItem.itemId;
     }
     
-    return null;
+    return selectedItem ? selectedItem.itemId : null;
   }
 
   private selectRandomItem(): ItemProbability | null {

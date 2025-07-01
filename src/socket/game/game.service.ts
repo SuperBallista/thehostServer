@@ -2,7 +2,7 @@
 import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { RedisPubSubService } from '../../redis/redisPubSub.service';
-import { Game, GamePlayer } from './game.types';
+import { Game, GamePlayer, REGION_NAMES, ITEM_NAMES } from './game.types';
 import { Room } from '../payload.types';
 import { getOrderRandom } from '../utils/randomManager';
 import { userDataResponse } from '../payload.types';
@@ -87,7 +87,21 @@ export class GameService {
         true
       );
       
-      // 6. 응답 생성 및 전송
+      // 6. 게임 시작 시 초기 시스템 메시지 전송
+      const regionName = REGION_NAMES[playerDataResult.myPlayerData.regionId] || '알 수 없는 지역';
+      let systemMessage = `${regionName}으로 진입하였습니다.`;
+      
+      // 플레이어의 현재 아이템 확인
+      if (playerDataResult.myPlayerData.items && playerDataResult.myPlayerData.items.length > 0) {
+        const lastItem = playerDataResult.myPlayerData.items[playerDataResult.myPlayerData.items.length - 1];
+        const itemName = ITEM_NAMES[lastItem] || '알 수 없는 아이템';
+        systemMessage += ` 이곳에서 ${itemName}을 획득하였습니다.`;
+      }
+      
+      // 시스템 메시지 전송
+      await this.chatService.sendSystemMessage(roomId, systemMessage, playerDataResult.myPlayerData.regionId);
+      
+      // 7. 응답 생성 및 전송
       const response = await this.gameStateService.createGameStartResponse(
         gameData,
         playerDataResult.myPlayerData,

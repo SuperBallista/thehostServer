@@ -182,7 +182,7 @@ export class Region{
     }
 }
 
-interface ChatMessage{
+export interface ChatMessage{
     system: boolean
     message: string
     timeStamp: Date
