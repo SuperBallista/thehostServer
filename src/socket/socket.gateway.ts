@@ -118,6 +118,11 @@ afterInit(server: Server) {
         response = await this.gameService.handleHostAction(data.user.id, data.hostAct)
       }
 
+      // 플레이어 상태 업데이트 (이동 장소 설정 포함)
+      if (data.myStatus && data.user.id) {
+        response = await this.gameService.updatePlayerStatus(data.user.id, data.myStatus)
+      }
+
       // 채팅 메시지 처리
       if (data.chatMessage && data.user.id) {
         response = await this.gameService.handleChatMessage(data.user.id, data.chatMessage)

@@ -132,6 +132,52 @@ export class GameService {
   }
 
   /**
+   * 플레이어 상태 업데이트 (이동 장소 설정 등)
+   */
+  async updatePlayerStatus(userId: number, status: any): Promise<userDataResponse> {
+    console.log('updatePlayerStatus 호출:', { userId, status });
+    
+    // 현재 위치 상태 확인
+    const locationState = await this.playerManagerService.getPlayerLocationState(userId);
+    if (locationState.state !== 'game' || !locationState.roomId) {
+      throw new WsException('게임 중이 아닙니다');
+    }
+
+    const gameId = locationState.roomId;
+    
+    // 플레이어 데이터 가져오기
+    const playerData = await this.playerManagerService.getPlayerDataByUserId(gameId, userId);
+    if (!playerData) {
+      throw new WsException('플레이어 데이터를 찾을 수 없습니다');
+    }
+
+    // next 필드가 있으면 다음 이동 장소 업데이트
+    if (status.next !== undefined && status.next !== playerData.next) {
+      console.log('이동 장소 업데이트:', {
+        currentNext: playerData.next,
+        newNext: status.next,
+        type: typeof status.next,
+        regionNames: REGION_NAMES
+      });
+      
+      // Redis에 다음 이동 장소 저장
+      playerData.next = Number(status.next); // 숫자로 변환
+      await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+      
+      // 시스템 메시지 전송
+      const nextRegion = Number(status.next);
+      const regionName = REGION_NAMES[nextRegion] || '알 수 없는 지역';
+      const systemMessage = `다음 턴에 ${regionName}으로 이동합니다.`;
+      console.log('시스템 메시지:', { nextRegion, regionName, systemMessage });
+      
+      await this.chatService.sendSystemMessage(gameId, systemMessage, playerData.regionId);
+    }
+
+    // 업데이트된 상태 반환
+    return this.gameStateService.createPlayerGameUpdate(gameId, userId, {});
+  }
+
+  /**
    * 플레이어 region 이동 위임
    */
   async movePlayerToRegion(

@@ -1,8 +1,11 @@
 <script lang="ts">
     import { THEME } from "../../../common/constant/theme";
     import { showSelectOptionBox } from "../../../common/store/selectOptionStore";
-    import { myStatus, isHost, canInfect, zombies } from '../../../common/store/gameStateStore';
-    import type { ItemInterface } from '../../../common/store/synchronize.type';
+    import { myStatus, isHost, canInfect, zombies, regionNames } from '../../../common/store/gameStateStore';
+    import { socketStore } from '../../../common/store/socketStore';
+    import { authStore } from '../../../common/store/authStore';
+    import { get } from 'svelte/store';
+    import type { ItemInterface, userRequest } from '../../../common/store/synchronize.type';
     import { itemList } from '../common/itemObject';
     import { showMessageBox } from '../../../common/messagebox/customStore';
     import { musicStore, toggleMusic } from '../../../common/store/musicStore';
@@ -31,18 +34,45 @@
 
 
 async function moveNextRegion() {
- await showSelectOptionBox(
-  '이동지역 선택',
-  '다음 지역은 어디로 이동하시겠습니까?',
-  [
-    { value: 'a', label: '언덕' },
-    { value: 'b', label: '폐건물' },
-    { value: 'c', label: '정글' },
-    { value: 'd', label: '해안가' },
-    { value: 'e', label: '동굴' },
-    { value: 'f', label: '개울' }
-  ]
-);
+  // 지역 이름 배열을 사용하여 선택지 생성
+  const regions = $regionNames.map((name, index) => ({
+    value: index.toString(),
+    label: name
+  }));
+
+  const result = await showSelectOptionBox(
+    '이동지역 선택',
+    '다음 지역은 어디로 이동하시겠습니까?',
+    regions
+  );
+
+  if (result && result.value) {
+    // 선택한 지역을 서버로 전송
+    const socket = get(socketStore);
+    const token = get(authStore).token;
+    const user = get(authStore).user;
+    const currentStatus = get(myStatus);
+
+    if (!socket || !token || !user || !currentStatus) return;
+
+    const selectedRegion = parseInt(result.value); // result.value를 사용
+    console.log('선택한 지역:', { result, selectedRegion, regionName: $regionNames[selectedRegion] });
+
+    const requestData: userRequest = {
+      token,
+      user,
+      myStatus: {
+        state: currentStatus.state,
+        items: currentStatus.items,
+        region: currentStatus.region,
+        next: selectedRegion, // 선택한 지역 번호
+        act: currentStatus.act
+      }
+    };
+
+    socket.emit('request', requestData);
+    console.log('서버로 전송:', requestData);
+  }
 }
 
 </script>
