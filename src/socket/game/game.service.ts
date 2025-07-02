@@ -2,8 +2,8 @@
 import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { RedisPubSubService } from '../../redis/redisPubSub.service';
-import { Game, GamePlayer, REGION_NAMES, ITEM_NAMES, ANIMAL_NICKNAMES } from './game.types';
-import { Room, ItemInterface } from '../payload.types';
+import { Game, GamePlayer, GamePlayerInRedis, REGION_NAMES, ITEM_NAMES, ANIMAL_NICKNAMES } from './game.types';
+import { Room, ItemInterface, MyPlayerState } from '../payload.types';
 import { getOrderRandom } from '../utils/randomManager';
 import { userDataResponse } from '../payload.types';
 import { userShortInfo } from '../data.types';
@@ -67,6 +67,7 @@ export class GameService {
 
     // 2. 위치 상태 업데이트
     await this.playerManagerService.updateLocationState(userId, 'game', roomId);
+    console.log(`[subscribeGameStart] 위치 상태 업데이트 완료 - userId: ${userId}, state: 'game', roomId: ${roomId}`);
     
     try {
       // 3. 게임 데이터 로드
@@ -286,8 +287,8 @@ export class GameService {
       throw new WsException('플레이어 데이터를 찾을 수 없습니다');
     }
 
-    // 플레이어 상태를 killed로 변경
-    playerData.state = 'killed';
+    // 플레이어 상태를 left로 변경
+    playerData.state = 'left';
     await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
     
     console.log('플레이어 게임 나가기 처리:', { 
@@ -295,6 +296,46 @@ export class GameService {
       playerId: playerData.playerId,
       gameId 
     });
+
+    // 동물 닉네임 가져오기 (게임 중에는 실제 닉네임 노출 금지)
+    const animalNickname = ANIMAL_NICKNAMES[playerData.playerId] || '알 수 없는 플레이어';
+
+    // 같은 지역의 플레이어들에게 시스템 메시지 전송
+    const exitMessage = `${animalNickname}님이 게임에서 나갔습니다`;
+    console.log(`시스템 메시지 전송 시도: ${exitMessage}, region: ${playerData.regionId}`);
+    await this.chatService.sendSystemMessage(gameId, exitMessage, playerData.regionId);
+
+    // 게임의 모든 플레이어 데이터 가져오기
+    const { allPlayers } = await this.playerManagerService.loadAllPlayersWithRetry(gameId, userId);
+    console.log(`전체 플레이어 수: ${allPlayers.length}`);
+    
+    // 생존자 리스트 업데이트를 위한 데이터 준비
+    const survivorListUpdates: { [userId: number]: any } = {};
+    
+    for (const player of allPlayers) {
+      if (player.userId > 0 && player.state !== 'left') {
+        const survivorList = await this.gameStateService.createSurvivorList(allPlayers, player);
+        survivorListUpdates[player.userId] = { survivorList };
+      }
+    }
+    
+    // Socket.IO 서버가 있는지 확인
+    if (!this.redisPubSubService.io) {
+      console.error('Socket.IO 서버가 초기화되지 않음');
+    } else {
+      // 게임 룸의 모든 소켓 가져오기
+      const gameSockets = await this.redisPubSubService.io.in(`game:${gameId}`).fetchSockets();
+      console.log(`게임 룸의 소켓 수: ${gameSockets.length}`);
+      
+      // 각 플레이어에게 개인화된 생존자 리스트 전송
+      for (const socket of gameSockets) {
+        const socketUserId = socket.data.id;
+        if (socketUserId && survivorListUpdates[socketUserId]) {
+          socket.emit('update', survivorListUpdates[socketUserId]);
+          console.log(`생존자 리스트 업데이트 전송: userId=${socketUserId}`);
+        }
+      }
+    }
 
     // 소켓에서 room 나가기 (client가 전달된 경우)
     if (client) {
@@ -305,16 +346,12 @@ export class GameService {
     // 위치 상태를 로비로 변경
     await this.playerManagerService.updateLocationState(userId, 'lobby', '');
 
-    // 방 데이터에서 플레이어 제거
-    const roomData = await this.gameDataService.getWaitRoomData(gameId);
-    if (roomData) {
-      roomData.players = roomData.players.filter(p => p.id !== userId);
-      await this.gameDataService.saveWaitRoomData(gameId, roomData);
-      
-      // 방이 비었으면 게임 데이터 정리
-      if (roomData.players.filter(p => p.id > 0).length === 0) {
-        await this.cleanupGameData(gameId);
-      }
+    // 게임 중에는 방 데이터가 없으므로 게임 데이터 정리만 확인
+    // 남은 실제 플레이어가 있는지 확인
+    const remainingPlayers = allPlayers.filter(p => p.userId > 0 && p.state !== 'left');
+    if (remainingPlayers.length === 0) {
+      console.log('남은 플레이어가 없음 - 게임 데이터 정리');
+      await this.cleanupGameData(gameId);
     }
 
     return { 
@@ -396,7 +433,7 @@ export class GameService {
     if (receiverData.userId > 0) {
       await this.redisPubSubService.publishPlayerStatus(gameId, receiverData.playerId, {
         myStatus: {
-          state: receiverData.state,
+          state: (receiverData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
           items: receiverData.items,
           region: receiverData.regionId,
           next: receiverData.next,
@@ -412,7 +449,7 @@ export class GameService {
     // 아이템을 준 사람에게 업데이트된 상태와 개인 알림 반환
     return this.gameStateService.createPlayerGameUpdate(gameId, userId, {
       myStatus: {
-        state: playerData.state,
+        state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
         items: playerData.items,
         region: playerData.regionId,
         next: playerData.next,

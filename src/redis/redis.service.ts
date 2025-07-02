@@ -17,7 +17,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       port: this.configService.get<number>('REDIS_PORT', 6379),
     });
   
-    await this.redisClient.flushdb(); // ✅ 전체 초기화
+    // await this.redisClient.flushdb(); // ✅ 전체 초기화
     // console.log('🧹 Redis 전체 초기화 완료');
   }
   

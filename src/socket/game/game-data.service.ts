@@ -131,8 +131,8 @@ export class GameDataService {
     const patterns = [
       `game:${gameId}`,
       `game:${gameId}:*`,
-      `room:data:${gameId}`,
-      `room:list:*`
+      `room:data:${gameId}`
+      // room:list:* 제거 - 다른 방의 리스트까지 삭제하면 안됨
     ];
 
     for (const pattern of patterns) {

@@ -1,5 +1,5 @@
 import { get, writable, derived } from "svelte/store";
-import type { GamePlayerStatusInterface, SurvivorInterface, ItemInterface } from "./synchronize.type";
+import type { GamePlayerStatusInterface, SurvivorInterface, ItemInterface, MyPlayerState } from "./synchronize.type";
 
 // === 내 플레이어 상태 스토어 ===
 // 이 파일은 오직 나(현재 플레이어)의 상태만 관리합니다.
@@ -7,7 +7,7 @@ import type { GamePlayerStatusInterface, SurvivorInterface, ItemInterface } from
 
 // 플레이어 기본 정보
 export const playerId = writable<number | undefined>(undefined);
-export const playerState = writable<'alive' | 'host' | 'zombie' | 'killed' | 'infected' | 'you'>('alive');
+export const playerState = writable<MyPlayerState>('alive'); // 자신의 상태는 alive 또는 host만 가능
 export const playerRegion = writable<number>(0);
 export const playerNextRegion = writable<number>(0);
 export const playerAct = writable<'runaway' | 'hide' | 'lure'>('lure');

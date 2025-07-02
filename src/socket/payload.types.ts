@@ -88,7 +88,7 @@ id: number;
 }
 
 export interface GamePlayerStatusInterface{ // 내 정보
- state: PlayerState;
+ state: MyPlayerState; // 자신의 상태는 alive 또는 host만 가능
  items: ItemInterface[];
  region: number;
  next: number;
@@ -98,7 +98,7 @@ export interface GamePlayerStatusInterface{ // 내 정보
 export interface SurvivorInterface{ // 생존자 정보
 playerId: number;
 nickname?: string;
-state: PlayerState;
+state: OtherPlayerState; // 다른 플레이어는 모든 상태 가능
 sameRegion: boolean
 }
 
@@ -131,7 +131,15 @@ export interface ChatMessage{
 export type RegionMessage = string | null // 구역 메세지 형식
 
 
-export type PlayerState = 'alive' | 'host' | `zombie` | `killed` | 'you' // 생존자 상태
+// myStatus에 들어갈 수 있는 상태 (자신의 상태)
+export type MyPlayerState = 'alive' | 'host'; // left, zombie, killed는 논리적으로 불가능
+// 참고: infected는 state가 아니라 infected 속성(number | null)으로 관리됨
+
+// survivorList에 들어갈 수 있는 상태 (다른 플레이어의 상태)
+export type OtherPlayerState = 'alive' | 'host' | 'zombie' | 'killed' | 'left' | 'you';
+
+// 전체 플레이어 상태 (기존 호환성 유지)
+export type PlayerState = 'alive' | 'host' | `zombie` | `killed` | 'left' | 'you' // 생존자 상태
 export type Act = `runaway` | `hide` | `lure` // 좀비 대처 행동
 export type ItemInterface = `spray` | `virusChecker` | `vaccine` | `medicine` | `vaccineMaterialA` | `vaccineMaterialB` | `vaccineMaterialC` | `wireless` | `eraser` | `microphone`
 

@@ -65,14 +65,18 @@ export class LobbyService {
   
     // Redis 저장
     await this.redisService.stringifyAndSet(`room:data:${roomData.id}`, roomData, 3600);
+    console.log(`[createRoom] 방 데이터 저장: room:data:${roomData.id}`);
+    
     if (!roomData.date) throw new WsException('날짜 생성 오류가 발생하였습니다')
     await this.redisService.stringifyAndSet(`room:list:${roomData.date}`, { id: roomData.id });
+    console.log(`[createRoom] 방 리스트 저장: room:list:${roomData.date} -> ${roomData.id}`);
       
     // 위치 기록 (room으로 변경)
     await this.redisService.stringifyAndSet(`locationState:${hostUser.id}`, { state: 'room', roomId: roomData.id }, 300);
   
     // PubSub 브로드캐스트
     await this.redisPubSubService.publishRoomListUpdate(roomData.id, 'create');
+    console.log(`[createRoom] 방 생성 완료 및 브로드캐스트: ${roomData.id}`);
 
     moveToRoom(client, roomData.id);
   
@@ -206,9 +210,15 @@ async exitToLobby(client: Socket): Promise<userDataResponse> {
       
   async getRooms(page: number = 1): Promise<userDataResponse> {
   const roomListKeys = await this.getPaginatedRoomListKeys(page);
+  console.log(`[getRooms] 조회된 방 리스트 키: ${roomListKeys.length}개`, roomListKeys);
+  
   const roomIds = await this.getRoomIdsFromKeys(roomListKeys);
+  console.log(`[getRooms] 추출된 방 ID: ${roomIds.length}개`, roomIds);
+  
   const roomList:Room[] = await this.getRoomsFromIds(roomIds)
-    return { roomList };
+  console.log(`[getRooms] 최종 방 목록: ${roomList.length}개`);
+  
+  return { roomList };
 }
 
 private async getPaginatedRoomListKeys(page: number): Promise<string[]> {

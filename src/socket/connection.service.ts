@@ -108,14 +108,23 @@ async verifyAndTrackConnection(client: Socket): Promise<userDataResponse> {
     const lobby = { state: 'lobby' as State, roomInfo: undefined, roomId: undefined }
     const raw: LocationState = await this.redisService.getAndParse(`locationState:${userId}`);
     
+    console.log(`[getLocationData] userId: ${userId}, raw locationState:`, raw);
+    
     if (!raw || !raw.roomId) return lobby
     
     let roomInfo: Room | undefined
+    
+    // 게임 상태인 경우 방 데이터 확인을 스킵
+    if (raw.state === 'game') {
+      console.log(`[getLocationData] 게임 상태 감지 - state: ${raw.state}, roomId: ${raw.roomId}`);
+      return { state: raw.state, roomInfo, roomId: raw.roomId };
+    }
     
     if (raw.state !== 'lobby' && raw.roomId) {
       roomInfo = await this.redisService.getAndParse(`room:data:${raw.roomId}`);
       if (!roomInfo) {
         // 방이 없으면 위치를 로비로 초기화
+        console.log(`[getLocationData] 방 데이터 없음 - 로비로 초기화`);
         await this.redisService.stringifyAndSet(`locationState:${userId}`, { state: 'lobby' });
         return lobby;
       }

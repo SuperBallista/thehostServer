@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { GameInRedis, GamePlayerInRedis, REGION_NAMES, ITEM_NAMES } from './game.types';
-import { PlayerState, SurvivorInterface } from '../payload.types';
+import { PlayerState, SurvivorInterface, MyPlayerState } from '../payload.types';
 import { userDataResponse } from '../payload.types';
 import { PlayerManagerService } from './player-manager.service';
 import { GameDataService } from './game-data.service';
@@ -43,7 +43,7 @@ export class GameStateService {
       locationState: 'game',
       playerId: myPlayerData.playerId,
       myStatus: {
-        state: myPlayerData.state as any,
+        state: (myPlayerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
         items: myPlayerData.items as any,
         region: myPlayerData.regionId,
         next: myPlayerData.next,
@@ -120,7 +120,7 @@ export class GameStateService {
   /**
    * 생존자 리스트 생성
    */
-  private createSurvivorList(
+  createSurvivorList(
     allPlayers: GamePlayerInRedis[], 
     myPlayerData: GamePlayerInRedis
   ): SurvivorInterface[] {

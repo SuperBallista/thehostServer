@@ -2,7 +2,9 @@ import { writable, derived, get } from 'svelte/store';
 import type { 
   GamePlayerStatusInterface, 
   SurvivorInterface,
-  ItemInterface 
+  ItemInterface,
+  MyPlayerState,
+  OtherPlayerState
 } from './synchronize.type';
 import type { ChatMessage } from '../../page/game/game.type';
 import { 
@@ -30,7 +32,7 @@ export const regionNames = writable<string[]>([
 // 플레이어 상태
 export interface PlayerStatus {
   playerId: number;
-  state: 'alive' | 'host' | 'zombie' | 'killed' | 'infected' | 'you';
+  state: OtherPlayerState; // 다른 플레이어들의 상태 (모든 상태 가능)
   region: number;
   nextRegion: number;
   act: 'runaway' | 'hide' | 'lure';
@@ -260,6 +262,12 @@ export function resetGameState() {
 
 // 서버와 동기화를 위한 함수
 export function syncWithServer(serverData: any) {
+  // 게임 시작 응답인 경우 채팅 초기화 (locationState가 'game'이고 gameTurn이 1인 경우)
+  if (serverData.locationState === 'game' && serverData.gameTurn === 1) {
+    chatMessages.set([]);
+    regionMessages.set([]);
+  }
+  
   // myStatus를 먼저 업데이트하여 isHost가 설정되도록 함
   if (serverData.myStatus) updateMyStatus(serverData.myStatus);
   if (serverData.survivorList) updateOtherPlayers(serverData.survivorList);

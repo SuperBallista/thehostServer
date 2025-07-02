@@ -99,17 +99,19 @@ afterInit(server: Server) {
       if (data.exitRoom && data.user.id) {
         // 현재 위치 확인
         const locationState = await this.connectionService.getLocationData(data.user.id);
-        console.log('exitRoom 요청 - 현재 위치:', locationState);
+        console.log(`[exitRoom] userId: ${data.user.id}, 현재 위치: ${locationState.state}, roomId: ${locationState.roomId}`);
         
         if (locationState.state === 'game') {
           // 게임 중이면 gameService의 exitGame 호출
+          console.log(`[exitRoom] 게임 나가기 처리 시작 - userId: ${data.user.id}`);
           response = await this.gameService.exitGame(data.user.id, client);
         } else if (locationState.state === 'room') {
           // 대기실이면 기존 lobbyService의 exitToLobby 호출
+          console.log(`[exitRoom] 방 나가기 처리 시작 - userId: ${data.user.id}`);
           response = await this.lobbyService.exitToLobby(client);
         } else {
           // 이미 로비에 있는 경우
-          console.log('이미 로비에 있음');
+          console.log(`[exitRoom] 이미 로비에 있음 - userId: ${data.user.id}`);
           response = { locationState: 'lobby' };
         }
       }

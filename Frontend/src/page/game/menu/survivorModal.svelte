@@ -70,6 +70,7 @@
       case 'host': return '숙주';
       case 'zombie': return '좀비';
       case 'killed': return '사망';
+      case 'left' : return '나감';
       default: return '알 수 없음';
     }
   }
