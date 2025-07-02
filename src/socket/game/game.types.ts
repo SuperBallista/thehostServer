@@ -185,7 +185,7 @@ export class ItemObject{
 export interface Host {
     hostId: number
     canInfect: boolean  // 감염 가능 여부 (turn 대체)
-    infect: number | null  // 감염 대상
+    infect?: number  // 감염 대상 (undefined 허용)
     zombieList: HostZombie[]  // 좀비 목록
 }
 

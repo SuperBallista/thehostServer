@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
-import { Host } from './game.types';
+import { Host, ANIMAL_NICKNAMES } from './game.types';
 import { userDataResponse } from '../payload.types';
 import { PlayerManagerService } from './player-manager.service';
 import { GameDataService } from './game-data.service';
 import { ZombieService } from './zombie.service';
 import { GameStateService } from './game-state.service';
+import { ChatService } from './chat.service';
 
 @Injectable()
 export class HostActionService {
@@ -14,6 +15,7 @@ export class HostActionService {
     private readonly gameDataService: GameDataService,
     private readonly zombieService: ZombieService,
     private readonly gameStateService: GameStateService,
+    private readonly chatService: ChatService,
   ) {}
 
   /**
@@ -43,6 +45,15 @@ export class HostActionService {
     // 감염 대상 설정
     if (hostAct.infect !== undefined) {
       await this.setInfectTarget(gameId, hostData, hostAct.infect);
+      
+      // 호스트에게만 시스템 메시지 전송
+      if (hostAct.infect !== undefined) {
+        const targetAnimalName = ANIMAL_NICKNAMES[hostAct.infect] || `플레이어${hostAct.infect}`;
+        const systemMessage = `${targetAnimalName}에게 좀비 바이러스를 감염시킵니다. (턴 종료시 적용)`;
+        
+        // 호스트의 현재 지역에만 시스템 메시지 전송
+        await this.chatService.sendSystemMessage(gameId, systemMessage, playerData.regionId);
+      }
     }
 
     // 좀비 명령 처리
@@ -51,23 +62,22 @@ export class HostActionService {
     }
 
     // 업데이트된 상태 반환
-    return this.gameStateService.createPlayerGameUpdate(gameId, userId, {
-      alarm: {
-        message: '명령이 성공적으로 처리되었습니다',
-        img: 'success'
-      }
-    });
+    return this.gameStateService.createPlayerGameUpdate(gameId, userId, {});
   }
 
   /**
    * 감염 대상 설정
    */
-  private async setInfectTarget(gameId: string, hostData: Host, targetId: number | null): Promise<void> {
+  private async setInfectTarget(gameId: string, hostData: Host, targetId: number | undefined): Promise<void> {
     if (!hostData.canInfect) {
       throw new WsException('이번 턴에는 감염시킬 수 없습니다');
     }
     
-    hostData.infect = targetId;
+    if (targetId !== undefined) {
+      hostData.infect = targetId;
+    } else {
+      delete hostData.infect;
+    }
     await this.gameDataService.saveHostData(gameId, hostData);
   }
 
@@ -91,7 +101,7 @@ export class HostActionService {
     const hostData: Host = {
       hostId: hostPlayerId,
       canInfect: true,
-      infect: null,
+      // infect는 초기에 undefined로 생략
       zombieList: []
     };
 
@@ -102,7 +112,7 @@ export class HostActionService {
    * 호스트 턴 처리
    */
   async processHostTurn(gameId: string): Promise<{
-    infectTarget: number | null,
+    infectTarget: number | undefined,
     zombieAttacks: (number | null)[]
   }> {
     const hostData = await this.gameDataService.getHostData(gameId);
@@ -112,8 +122,8 @@ export class HostActionService {
 
     // 감염 처리
     const infectTarget = hostData.infect;
-    if (infectTarget !== null) {
-      hostData.infect = null;
+    if (infectTarget !== undefined) {
+      delete hostData.infect;  // undefined로 만들기
       hostData.canInfect = false;
     } else {
       hostData.canInfect = true;

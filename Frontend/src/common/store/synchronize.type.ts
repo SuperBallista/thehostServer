@@ -99,9 +99,9 @@ sameRegion: boolean
 
 
 interface HostAct{
-    infect: number | null
-    canInfect: boolean  // canUseInfect를 canInfect로 통일
-    zombieList: Zombie[]
+    infect?: number  // 감염 대상 설정 시만 전송 (undefined 허용)
+    canInfect?: boolean     // 필요한 경우에만 전송
+    zombieList?: Zombie[]   // 좀비 명령 시에만 전송
 }
 
 interface Region{

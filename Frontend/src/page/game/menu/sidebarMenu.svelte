@@ -6,13 +6,13 @@
     import { authStore } from '../../../common/store/authStore';
     import { currentRoom } from '../../../common/store/pageStore';
     import { get } from 'svelte/store';
-    import type { ItemInterface, userRequest, PlayerState } from '../../../common/store/synchronize.type';
+    import type { ItemInterface, userRequest, MyPlayerState } from '../../../common/store/synchronize.type';
     import { itemList } from '../common/itemObject';
     import { showMessageBox } from '../../../common/messagebox/customStore';
     import { musicStore, toggleMusic } from '../../../common/store/musicStore';
-    import { nicknameList } from '../game.type';
+    import { nicknameList, Survivor } from '../game.type';
     import { selectPlayerMessageBox } from '../../../common/store/selectPlayerMessageBox';
-    import { exitGame } from '../common/gameActions';
+    import { exitGame, infectPlayer } from '../common/gameActions';
 
   let inventory:HTMLElement
   let action:HTMLElement
@@ -66,7 +66,7 @@ async function moveNextRegion() {
       token,
       user,
       myStatus: {
-        state: (currentStatus.state === 'infected' ? 'alive' : currentStatus.state) as PlayerState,
+        state: currentStatus.state as MyPlayerState, // infected는 이제 사용하지 않음
         items: currentStatus.items,
         region: currentStatus.region,
         next: selectedRegion, // 선택한 지역 번호
@@ -92,17 +92,15 @@ async function giveItem(item: ItemInterface) {
     return;
   }
 
-  // PlayerStatus를 Survivor 형태로 변환
-  const survivors = playersInRegion.map(player => ({
-    playerId: player.playerId,
-    state: (player.state === 'host' || player.state === 'infected') ? 'alive' : player.state, // host와 infected를 alive로 표시
-    sameRegion: true, // 이미 같은 지역 플레이어만 필터링됨
-    nickname: nicknameList[player.playerId] || `플레이어${player.playerId}`,
-    // Survivor 클래스의 메서드들은 필요없으므로 생략
-    checkAndUpdateSurvivor: () => {},
-    disappearSurvivor: () => {},
-    updateData: () => {}
-  }));
+  // PlayerStatus를 Survivor 클래스 인스턴스로 변환
+  const survivors: Survivor[] = playersInRegion.map(player => {
+    const survivor = new Survivor(
+      player.playerId,
+      player.state === 'host' ? 'alive' : player.state, // host만 alive로 표시 (infected 상태는 없음)
+      true // sameRegion
+    );
+    return survivor;
+  });
 
   try {
     // 플레이어 선택 모달 표시
@@ -184,6 +182,7 @@ async function giveItem(item: ItemInterface) {
           <button 
             class={`block w-full py-2 rounded ${$isHost && $canInfect ? THEME.bgAccent : THEME.bgDisabled}`}
             disabled={!$isHost || !$canInfect}
+            on:click={infectPlayer}
           >감염시키기(숙주 전용)</button>
           <button 
             class={`block w-full py-2 rounded ${$isHost && $zombies.length > 0 ? THEME.bgAccent : THEME.bgDisabled}`}

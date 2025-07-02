@@ -74,7 +74,7 @@ updateData(Survivor: SurvivorInterface | undefined ){
 }
 }
 
-type PlayerState = 'alive' | 'host' | `zombie` | `killed` | 'you' // 생존자 상태
+type PlayerState = 'alive' | 'host' | `zombie` | `killed` | 'you' | 'left' // 생존자 상태
 type Act = `runaway` | `hide` | `lure` // 좀비 대처 행동
 
 
