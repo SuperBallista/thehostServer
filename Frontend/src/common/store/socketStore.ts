@@ -2,7 +2,7 @@
 import { get, writable } from 'svelte/store';
 import  io  from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import { showMessageBox } from '../messagebox/customStore';
+import { showMessageBox, closeMessageBox } from '../messagebox/customStore';
 import { authStore } from './authStore';
 import { locationState, currentRoom, pageStore, type State, lobbyPage } from './pageStore';
 import type { userDataResponse } from './synchronize.type';
@@ -95,6 +95,8 @@ function updateData(payload: userDataResponse) {
     if (payload.locationState === 'lobby') pageStore.set('lobby');
     else if (payload.locationState === 'room') pageStore.set('room');
     else if (payload.locationState === 'game') pageStore.set('game');
+
+    closeMessageBox();
   }
 
   // 사용자 정보 업데이트
