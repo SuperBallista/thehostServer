@@ -40,6 +40,7 @@ turn: number;
 hostId: number;
 record: Record[];
 action: Action[];
+endGame?: 'infected' | 'killed' | 'cure';
 }
 
 export interface GameDto{

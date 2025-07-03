@@ -20,7 +20,8 @@ import {
   // 현재 구역의 메시지 필터링
   $: nowRegionInfo = $regionMessages
     .filter(msg => msg.region === $myStatus?.region)
-    .map(msg => msg.isErased ? '지워진 낙서' : msg.message);
+    .map(msg => msg.isErased ? '지워진 낙서' : msg.message)
+    .filter(msg => msg !== ''); // 빈 메시지 제거
 
   // 디폴트 메시지가 없으면 빈 배열 대신 안내 문구
   $: if (nowRegionInfo.length === 0) {
@@ -34,16 +35,8 @@ import {
     {#if $myStatus}
       <span class={`text-lg font-bold ${$myStatus.state === 'host' ? THEME.textWarning : THEME.textAccent}`}>
         {nicknameList[$myStatus.playerId]} - 
-        {#if $myStatus.state === 'you'}
-          생존자
-        {:else if $myStatus.state === 'host'}
+        {#if $myStatus.state === 'host'}
           숙주
-        {:else if $myStatus.state === 'zombie'}
-          좀비
-        {:else if $myStatus.state === 'infected'}
-          감염자
-        {:else if $myStatus.state === 'killed'}
-          사망
         {:else}
           생존자
         {/if}

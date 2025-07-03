@@ -265,6 +265,16 @@ export class GameService {
     for (const player of players) {
       await this.gameDataService.savePlayerData(roomId, player.playerId, player.recordData());
     }
+
+    // 구역 데이터 초기화 (모든 구역에 대해 빈 채팅 로그와 메시지 리스트 생성)
+    const maxRegions = Math.max(...players.map(p => p.regionId)) + 1;
+    for (let regionId = 0; regionId < maxRegions; regionId++) {
+      const regionData = {
+        chatLog: [],
+        regionMessageList: []
+      };
+      await this.gameDataService.saveRegionData(roomId, regionId, regionData);
+    }
   }
 
   /**
@@ -460,5 +470,391 @@ export class GameService {
         img: 'info'
       }
     });
+  }
+
+  /**
+   * 아이템 사용 처리
+   */
+  async handleUseItem(userId: number, useItem: { item: ItemInterface; targetPlayer?: number; content?: string; targetMessage?: number }, gameId: string): Promise<userDataResponse> {
+    console.log('handleUseItem 시작:', { userId, useItem, gameId });
+    
+    // 플레이어 데이터 가져오기
+    const playerData = await this.playerManagerService.getPlayerDataByUserId(gameId, userId);
+    if (!playerData) {
+      throw new Error('플레이어 데이터를 찾을 수 없습니다');
+    }
+
+    // 죽은 플레이어는 아이템을 사용할 수 없음
+    if (playerData.state === 'killed') {
+      throw new Error('죽은 플레이어는 아이템을 사용할 수 없습니다');
+    }
+
+    // 아이템 소유 확인
+    const itemIndex = playerData.items.indexOf(useItem.item);
+    if (itemIndex === -1) {
+      throw new Error('해당 아이템을 가지고 있지 않습니다');
+    }
+
+    // 아이템별 처리
+    switch (useItem.item) {
+      case 'spray':
+        return await this.handleSprayUse(gameId, playerData, useItem.content);
+      case 'eraser':
+        return await this.handleEraserUse(gameId, playerData, useItem.targetMessage);
+      case 'virusChecker':
+        return await this.handleVirusCheckerUse(gameId, playerData);
+      case 'medicine':
+        return await this.handleMedicineUse(gameId, playerData);
+      case 'vaccine':
+        return await this.handleVaccineUse(gameId, playerData);
+      case 'shotgun':
+        return await this.handleShotgunUse(gameId, playerData, useItem.targetPlayer);
+      case 'wireless':
+        return await this.handleWirelessUse(gameId, playerData, useItem.targetPlayer, useItem.content);
+      case 'microphone':
+        return await this.handleMicrophoneUse(gameId, playerData, useItem.content);
+      case 'vaccineMaterialA':
+      case 'vaccineMaterialB':
+      case 'vaccineMaterialC':
+        return await this.handleVaccineMaterialUse(gameId, playerData, useItem.item);
+      default:
+        throw new Error('알 수 없는 아이템입니다');
+    }
+  }
+
+  /**
+   * 낙서스프레이 사용 처리
+   */
+  private async handleSprayUse(gameId: string, playerData: any, content?: string): Promise<userDataResponse> {
+    if (!content || content.trim() === '') {
+      throw new Error('낙서 내용을 입력해주세요');
+    }
+
+    // 현재 구역의 낙서 목록 가져오기
+    const regionData = await this.gameDataService.getRegionData(gameId, playerData.regionId);
+    if (!regionData) {
+      throw new Error('구역 데이터를 찾을 수 없습니다');
+    }
+
+    // 낙서 추가
+    regionData.regionMessageList.push(content.trim());
+    await this.gameDataService.saveRegionData(gameId, playerData.regionId, regionData);
+
+    // 아이템 소모
+    const itemIndex = playerData.items.indexOf('spray');
+    playerData.items.splice(itemIndex, 1);
+    await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+
+    // 익명성을 위해 시스템 메시지 제거 - 작성자에게만 개인 알림
+    // 구역 정보 업데이트를 모든 플레이어에게 전송 (낙서 내용은 익명으로 표시)
+    await this.redisPubSubService.publishToRegion(gameId, playerData.regionId, {
+      region: regionData
+    });
+
+    return this.gameStateService.createPlayerGameUpdate(gameId, playerData.userId, {
+      myStatus: {
+        state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
+        items: playerData.items,
+        region: playerData.regionId,
+        next: playerData.next,
+        act: playerData.act
+      },
+      alarm: {
+        message: '낙서를 성공적으로 남겼습니다.',
+        img: 'info'
+      }
+    });
+  }
+
+  /**
+   * 지우개 사용 처리
+   */
+  private async handleEraserUse(gameId: string, playerData: any, targetMessage?: number): Promise<userDataResponse> {
+    if (targetMessage === undefined) {
+      throw new Error('지울 메시지를 선택해주세요');
+    }
+
+    // 현재 구역의 낙서 목록 가져오기
+    const regionData = await this.gameDataService.getRegionData(gameId, playerData.regionId);
+    if (!regionData) {
+      throw new Error('구역 데이터를 찾을 수 없습니다');
+    }
+
+    // 메시지 인덱스 확인
+    if (targetMessage < 0 || targetMessage >= regionData.regionMessageList.length) {
+      throw new Error('존재하지 않는 메시지입니다');
+    }
+
+    // 메시지 삭제 (null로 설정하여 삭제 흔적 남김)
+    regionData.regionMessageList[targetMessage] = null;
+    await this.gameDataService.saveRegionData(gameId, playerData.regionId, regionData);
+
+    // 아이템 소모
+    const itemIndex = playerData.items.indexOf('eraser');
+    playerData.items.splice(itemIndex, 1);
+    await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+
+    // 익명성을 위해 시스템 메시지 제거 - 작성자에게만 개인 알림
+    // 구역 정보 업데이트를 모든 플레이어에게 전송 (낙서 삭제는 익명으로 표시)
+    await this.redisPubSubService.publishToRegion(gameId, playerData.regionId, {
+      region: regionData
+    });
+
+    return this.gameStateService.createPlayerGameUpdate(gameId, playerData.userId, {
+      myStatus: {
+        state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
+        items: playerData.items,
+        region: playerData.regionId,
+        next: playerData.next,
+        act: playerData.act
+      },
+      alarm: {
+        message: '낙서를 성공적으로 지웠습니다.',
+        img: 'info'
+      }
+    });
+  }
+
+  /**
+   * 진단키트 사용 처리
+   */
+  private async handleVirusCheckerUse(gameId: string, playerData: any): Promise<userDataResponse> {
+    // 아이템 소모
+    const itemIndex = playerData.items.indexOf('virusChecker');
+    playerData.items.splice(itemIndex, 1);
+    await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+
+    // 감염 여부 확인
+    const isInfected = playerData.infected !== null && playerData.infected > 0;
+    const message = isInfected 
+      ? `감염되어 있습니다. ${playerData.infected}턴 후에 좀비로 변이됩니다.`
+      : '감염되지 않았습니다.';
+
+    return this.gameStateService.createPlayerGameUpdate(gameId, playerData.userId, {
+      myStatus: {
+        state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
+        items: playerData.items,
+        region: playerData.regionId,
+        next: playerData.next,
+        act: playerData.act
+      },
+      alarm: {
+        message,
+        img: isInfected ? 'warning' : 'info'
+      }
+    });
+  }
+
+  /**
+   * 응급치료제 사용 처리
+   */
+  private async handleMedicineUse(gameId: string, playerData: any): Promise<userDataResponse> {
+    // 감염 상태 확인
+    if (playerData.infected === null || playerData.infected <= 0) {
+      throw new Error('감염되지 않은 상태입니다');
+    }
+
+    // 아이템 소모
+    const itemIndex = playerData.items.indexOf('medicine');
+    playerData.items.splice(itemIndex, 1);
+    
+    // 감염 치료
+    playerData.infected = null;
+    await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+
+    return this.gameStateService.createPlayerGameUpdate(gameId, playerData.userId, {
+      myStatus: {
+        state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
+        items: playerData.items,
+        region: playerData.regionId,
+        next: playerData.next,
+        act: playerData.act
+      },
+      alarm: {
+        message: '감염이 치료되었습니다.',
+        img: 'success'
+      }
+    });
+  }
+
+  /**
+   * 백신 사용 처리
+   */
+  private async handleVaccineUse(gameId: string, playerData: any): Promise<userDataResponse> {
+    // 숙주인지 확인
+    if (playerData.state !== 'host') {
+      throw new Error('숙주에게만 백신을 사용할 수 있습니다');
+    }
+
+    // 아이템 소모
+    const itemIndex = playerData.items.indexOf('vaccine');
+    playerData.items.splice(itemIndex, 1);
+    await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+
+    // 게임 종료 처리 (생존자 승리)
+    await this.gameDataService.setGameEnd(gameId, 'cure');
+
+    // 모든 플레이어에게 게임 종료 알림
+    await this.redisPubSubService.publishToGame(gameId, {
+      endGame: 'cure',
+      alarm: {
+        message: '백신 투여 성공! 생존자들이 승리했습니다!',
+        img: 'success'
+      }
+    });
+
+    return {
+      endGame: 'cure',
+      alarm: {
+        message: '백신 투여 성공! 생존자들이 승리했습니다!',
+        img: 'success'
+      }
+    };
+  }
+
+  /**
+   * 산탄총 사용 처리
+   */
+  private async handleShotgunUse(gameId: string, playerData: any, targetPlayer?: number): Promise<userDataResponse> {
+    if (targetPlayer === undefined) {
+      throw new Error('대상을 선택해주세요');
+    }
+
+    // 대상 플레이어 데이터 가져오기
+    const targetData = await this.playerManagerService.getPlayerData(gameId, targetPlayer);
+    if (!targetData) {
+      throw new Error('대상을 찾을 수 없습니다');
+    }
+
+    // 좀비인지 확인
+    if (targetData.state !== 'zombie') {
+      throw new Error('좀비에게만 사용할 수 있습니다');
+    }
+
+    // 같은 지역인지 확인
+    if (playerData.regionId !== targetData.regionId) {
+      throw new Error('같은 지역에 있는 좀비에게만 사용할 수 있습니다');
+    }
+
+    // 아이템 소모
+    const itemIndex = playerData.items.indexOf('shotgun');
+    playerData.items.splice(itemIndex, 1);
+    await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+
+    // 좀비 제거
+    targetData.state = 'killed';
+    await this.gameDataService.savePlayerData(gameId, targetData.playerId, targetData);
+
+    // 시스템 메시지 전송
+    const playerNickname = ANIMAL_NICKNAMES[playerData.playerId] || `플레이어${playerData.playerId}`;
+    const targetNickname = ANIMAL_NICKNAMES[targetData.playerId] || `플레이어${targetData.playerId}`;
+    const systemMessage = `${playerNickname}이(가) ${targetNickname}을(를) 사살했습니다.`;
+    await this.chatService.sendSystemMessage(gameId, systemMessage, playerData.regionId);
+
+    return this.gameStateService.createPlayerGameUpdate(gameId, playerData.userId, {
+      myStatus: {
+        state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
+        items: playerData.items,
+        region: playerData.regionId,
+        next: playerData.next,
+        act: playerData.act
+      },
+      alarm: {
+        message: `${targetNickname}을(를) 성공적으로 사살했습니다.`,
+        img: 'success'
+      }
+    });
+  }
+
+  /**
+   * 무전기 사용 처리
+   */
+  private async handleWirelessUse(gameId: string, playerData: any, targetPlayer?: number, content?: string): Promise<userDataResponse> {
+    if (targetPlayer === undefined || !content || content.trim() === '') {
+      throw new Error('대상과 메시지를 입력해주세요');
+    }
+
+    // 대상 플레이어 데이터 가져오기
+    const targetData = await this.playerManagerService.getPlayerData(gameId, targetPlayer);
+    if (!targetData) {
+      throw new Error('대상을 찾을 수 없습니다');
+    }
+
+    // 아이템 소모
+    const itemIndex = playerData.items.indexOf('wireless');
+    playerData.items.splice(itemIndex, 1);
+    await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+
+    // 무전 메시지 전송 (대상에게만)
+    if (targetData.userId > 0) {
+      const playerNickname = ANIMAL_NICKNAMES[playerData.playerId] || `플레이어${playerData.playerId}`;
+      await this.redisPubSubService.publishPlayerStatus(gameId, targetData.playerId, {
+        alarm: {
+          message: `${playerNickname}의 무전: ${content.trim()}`,
+          img: 'info'
+        }
+      }, targetData.playerId);
+    }
+
+    return this.gameStateService.createPlayerGameUpdate(gameId, playerData.userId, {
+      myStatus: {
+        state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
+        items: playerData.items,
+        region: playerData.regionId,
+        next: playerData.next,
+        act: playerData.act
+      },
+      alarm: {
+        message: '무전 메시지를 전송했습니다.',
+        img: 'info'
+      }
+    });
+  }
+
+  /**
+   * 마이크 사용 처리
+   */
+  private async handleMicrophoneUse(gameId: string, playerData: any, content?: string): Promise<userDataResponse> {
+    if (!content || content.trim() === '') {
+      throw new Error('방송할 메시지를 입력해주세요');
+    }
+
+    // 아이템 소모
+    const itemIndex = playerData.items.indexOf('microphone');
+    playerData.items.splice(itemIndex, 1);
+    await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+
+    // 전체 방송 메시지 전송
+    const playerNickname = ANIMAL_NICKNAMES[playerData.playerId] || `플레이어${playerData.playerId}`;
+    const broadcastMessage = `📢 ${playerNickname}의 방송: ${content.trim()}`;
+    
+    await this.redisPubSubService.publishToGame(gameId, {
+      alarm: {
+        message: broadcastMessage,
+        img: 'info'
+      }
+    });
+
+    return this.gameStateService.createPlayerGameUpdate(gameId, playerData.userId, {
+      myStatus: {
+        state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
+        items: playerData.items,
+        region: playerData.regionId,
+        next: playerData.next,
+        act: playerData.act
+      },
+      alarm: {
+        message: '전체 방송을 완료했습니다.',
+        img: 'info'
+      }
+    });
+  }
+
+  /**
+   * 백신 재료 사용 처리
+   */
+  private async handleVaccineMaterialUse(gameId: string, playerData: any, materialType: ItemInterface): Promise<userDataResponse> {
+    // 백신 재료는 조합용이므로 사용 불가
+    throw new Error('백신 재료는 조합해서 사용해야 합니다');
   }
 }

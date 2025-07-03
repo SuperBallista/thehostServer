@@ -1,8 +1,11 @@
 import { selectPlayerMessageBox } from "../../../common/store/selectPlayerMessageBox";
 import { showMessageBox } from "../../../common/messagebox/customStore";
 import type { ItemInterface } from "../../../common/store/synchronize.type";
-
-
+import { get } from 'svelte/store';
+import { socketStore } from '../../../common/store/socketStore';
+import { authStore } from '../../../common/store/authStore';
+import { currentRoom } from '../../../common/store/pageStore';
+import type { userRequest } from '../../../common/store/synchronize.type';
 
 type UseMethod = () => Promise<boolean>;
 
@@ -52,22 +55,19 @@ export const itemList = {
     info: '낙서스프레이로 남긴 메세지를 읽지 못하게 흔적만 남기고 내용을 지워버립니다',
     method: useEraser,
   },
-    shotgun: {
+  shotgun: {
     name: '좀비사살용산탄총',
     info: '좀비를 즉사시킬 수 있는 산탄총입니다',
     method: useShotgun,
   },
-
   microphone: {
     name: '마이크',
     info: '섬 전체에 한번 메세지를 전송할 수 있는 무선 마이크입니다',
     method: useMicrophone,
   }
-
 };
 
-
-export class  Item {
+export class Item {
   code: string;          // 아이템 코드 (ex: 'spray001')
   name: string;          // 아이템 명칭 (ex: '낙서 스프레이')
   tooltip: string;       // 아이템 설명 (ex: '다른 플레이어도 볼 수 있는 낙서를 남깁니다')
@@ -87,7 +87,7 @@ export class  Item {
         showMessageBox('alert','아이템 건네주기',`${userResponse.nickname}에게 ${this.name}을(를) 건네주었습니다`)
   }}
 
-async use(): Promise<void> {
+  async use(): Promise<void> {
     if (typeof this.useMethod === 'function') {
      const success = await this.useMethod();
      if (success) {
@@ -99,46 +99,149 @@ async use(): Promise<void> {
   }
 }
 
+// 서버에 아이템 사용 요청을 보내는 공통 함수
+async function sendUseItemRequest(item: ItemInterface, targetPlayer?: number, content?: string, targetMessage?: number): Promise<boolean> {
+  const socket = get(socketStore);
+  const authData = get(authStore);
+  const room = get(currentRoom);
+  
+  if (!socket || !authData.token || !authData.user || !room?.id) {
+    console.error('소켓 또는 인증 정보가 없습니다');
+    return false;
+  }
 
-async function useSpray() {
-    const message = (await showMessageBox('input','아이템 사용', '낙서 스프레이로 남길 메세지를 작성해주세요', undefined, [{key: 'content', label: '', type: 'text', placeholder: '여기에 이 구역에 남길 메세지를 입력'}], 'img/items/spray.jpg')).values?.content
-    if (message){
-    return true
-} else return false
-}
+  const requestData: userRequest = {
+    token: authData.token,
+    user: authData.user,
+    useItem: {
+      item,
+      targetPlayer,
+      content,
+      targetMessage
+    },
+    roomId: room.id
+  };
 
-async function useVirusChecker() {
-
-    return true    
-}
-
-async function useVaccine() {
-
-    return true    
-}
-
- async function useMedicine() {
-    return true
- }
-
-async function useMakeVaccine(): Promise<boolean> {
-
+  socket.emit('request', requestData);
+  console.log('아이템 사용 요청 전송:', requestData);
   return true;
 }
-  
 
-async function useWireless() {
-  return true
+async function useSpray(): Promise<boolean> {
+  const message = (await showMessageBox(
+    'input',
+    '낙서스프레이 사용',
+    '구역에 남길 낙서 메시지를 작성해주세요',
+    undefined,
+    [
+      {
+        key: 'content',
+        label: '',
+        type: 'text',
+        placeholder: '여기에 이 구역에 남길 메시지를 입력하세요'
+      }
+    ],
+    '/img/items/spray.jpg'
+  )).values?.content;
+
+  if (message && message.trim()) {
+    return await sendUseItemRequest('spray', undefined, message.trim());
+  }
+  return false;
 }
 
-async function useMicrophone() {
-  return true
+async function useVirusChecker(): Promise<boolean> {
+  return await sendUseItemRequest('virusChecker');
 }
 
-async function useEraser() {
-return false;
+async function useVaccine(): Promise<boolean> {
+  return await sendUseItemRequest('vaccine');
 }
 
-async function useShotgun() {
-return false;
+async function useMedicine(): Promise<boolean> {
+  return await sendUseItemRequest('medicine');
+}
+
+async function useMakeVaccine(): Promise<boolean> {
+  // 백신 재료는 조합용이므로 사용 불가
+  await showMessageBox('alert', '알림', '백신 재료는 조합해서 사용해야 합니다.');
+  return false;
+}
+
+async function useWireless(): Promise<boolean> {
+  // 같은 지역에 있는 생존자들 중에서 선택
+  const playersInRegion = await selectPlayerMessageBox(
+    '무전기 사용',
+    '무전을 보낼 생존자를 선택하세요.',
+    [],
+    '/img/items/wireless.jpg'
+  );
+
+  if (!playersInRegion) return false;
+
+  const message = (await showMessageBox(
+    'input',
+    '무전 메시지',
+    '무전으로 보낼 메시지를 입력하세요',
+    undefined,
+    [
+      {
+        key: 'content',
+        label: '',
+        type: 'text',
+        placeholder: '무전 메시지를 입력하세요'
+      }
+    ],
+    '/img/items/wireless.jpg'
+  )).values?.content;
+
+  if (message && message.trim()) {
+    return await sendUseItemRequest('wireless', playersInRegion.playerId, message.trim());
+  }
+  return false;
+}
+
+async function useEraser(): Promise<boolean> {
+  // 구역의 낙서 목록을 보여주고 선택하도록 함
+  // 실제로는 구역 정보를 가져와서 낙서 목록을 표시해야 함
+  await showMessageBox('alert', '알림', '지우개 기능은 준비 중입니다.');
+  return false;
+}
+
+async function useShotgun(): Promise<boolean> {
+  // 같은 지역에 있는 좀비들 중에서 선택
+  const playersInRegion = await selectPlayerMessageBox(
+    '산탄총 사용',
+    '사살할 좀비를 선택하세요.',
+    [],
+    '/img/items/shotgun.jpg'
+  );
+
+  if (playersInRegion) {
+    return await sendUseItemRequest('shotgun', playersInRegion.playerId);
+  }
+  return false;
+}
+
+async function useMicrophone(): Promise<boolean> {
+  const message = (await showMessageBox(
+    'input',
+    '마이크 사용',
+    '전체 방송할 메시지를 입력하세요',
+    undefined,
+    [
+      {
+        key: 'content',
+        label: '',
+        type: 'text',
+        placeholder: '방송할 메시지를 입력하세요'
+      }
+    ],
+    '/img/items/microphone.jpg'
+  )).values?.content;
+
+  if (message && message.trim()) {
+    return await sendUseItemRequest('microphone', undefined, message.trim());
+  }
+  return false;
 }

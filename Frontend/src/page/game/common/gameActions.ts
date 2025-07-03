@@ -2,10 +2,12 @@ import { get } from 'svelte/store';
 import { socketStore } from '../../../common/store/socketStore';
 import { authStore } from '../../../common/store/authStore';
 import { showMessageBox } from '../../../common/messagebox/customStore';
-import type { userRequest, Zombie } from '../../../common/store/synchronize.type';
+import type { userRequest, ItemInterface } from '../../../common/store/synchronize.type';
 import { playersInMyRegion, canInfect, zombies } from '../../../common/store/gameStateStore';
 import { selectPlayerMessageBox } from '../../../common/store/selectPlayerMessageBox';
 import { nicknameList, Survivor } from '../game.type';
+import { currentRoom } from '../../../common/store/pageStore';
+import { itemList } from './itemObject';
 
 /**
  * 게임 나가기 처리
@@ -35,6 +37,75 @@ export async function exitGame() {
   
   socket.emit('request', requestData);
   console.log('게임 나가기 요청 전송');
+}
+
+/**
+ * 아이템 전달하기
+ */
+export async function giveItem(item: ItemInterface) {
+  // 같은 지역에 있는 생존자들만 필터링
+  const playersInRegion = get(playersInMyRegion);
+  
+  if (!playersInRegion || playersInRegion.length === 0) {
+    await showMessageBox(
+      'error',
+      '알림',
+      '같은 지역에 다른 생존자가 없습니다.'
+    );
+    return;
+  }
+
+  // PlayerStatus를 Survivor 클래스 인스턴스로 변환
+  const survivors: Survivor[] = playersInRegion.map(player => {
+    const survivor = new Survivor(
+      player.playerId,
+      player.state === 'host' ? 'alive' : player.state, // host만 alive로 표시 (infected 상태는 없음)
+      true // sameRegion
+    );
+    return survivor;
+  });
+
+  try {
+    // 플레이어 선택 모달 표시
+    const selectedPlayer = await selectPlayerMessageBox(
+      '아이템 전달',
+      `${itemList[item].name}을(를) 전달할 생존자를 선택하세요.`,
+      survivors,
+      `/img/items/${item}.jpg`
+    );
+
+    if (selectedPlayer) {
+      // 서버로 아이템 전달 요청
+      const socket = get(socketStore);
+      const token = get(authStore).token;
+      const user = get(authStore).user;
+      const room = get(currentRoom);
+
+      if (!socket || !token || !user || !room?.id) return;
+
+      console.log('아이템 전달:', { 
+        item, 
+        targetPlayer: selectedPlayer.playerId,
+        targetNickname: selectedPlayer.nickname 
+      });
+      
+      const requestData: userRequest = {
+        token,
+        user,
+        giveItem: {
+          item: item,
+          receiver: selectedPlayer.playerId
+        },
+        roomId: room.id
+      };
+
+      socket.emit('request', requestData);
+      console.log('서버로 아이템 전달 요청:', requestData);
+    }
+  } catch (error) {
+    // 사용자가 취소한 경우
+    console.log('아이템 전달 취소');
+  }
 }
 
 /**
@@ -118,3 +189,4 @@ export async function infectPlayer() {
     console.log('감염 대상 선택 취소');
   }
 }
+

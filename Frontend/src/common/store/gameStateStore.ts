@@ -29,7 +29,7 @@ export const regionNames = writable<string[]>([
   '해안', '폐건물', '정글', '동굴', '산 정상', '개울'
 ]);
 
-// 플레이어 상태
+// 다른 플레이어들의 상태
 export interface PlayerStatus {
   playerId: number;
   state: OtherPlayerState; // 다른 플레이어들의 상태 (모든 상태 가능)
@@ -40,21 +40,34 @@ export interface PlayerStatus {
   infectedTurn?: number;
 }
 
+// 내 상태 (MyPlayerState만 가능)
+export interface MyPlayerStatus {
+  playerId: number;
+  state: MyPlayerState; // 내 상태는 alive 또는 host만 가능
+  region: number;
+  nextRegion: number;
+  act: 'runaway' | 'hide' | 'lure';
+  items: ItemInterface[];
+}
+
 // myStatus를 playerStore의 값들을 합쳐서 파생 스토어로 제공
 export const myStatus = derived(
   [playerId, playerState, playerRegion, playerNextRegion, playerAct, playerItems],
   ([$playerId, $state, $region, $nextRegion, $act, $items]) => {
     if ($playerId === undefined) return null;
     
+    // MyPlayerState 타입으로 안전하게 변환
+    const safeState: MyPlayerState = $state === 'host' ? 'host' : 'alive';
+    
     return {
       playerId: $playerId,
       nickname: '', // 서버에서 받아야 함
-      state: $state,
+      state: safeState,
       region: $region,
       nextRegion: $nextRegion,
       act: $act,
       items: $items
-    } as PlayerStatus;
+    } as MyPlayerStatus;
   }
 );
 
@@ -299,9 +312,25 @@ export function syncWithServer(serverData: any) {
       console.log('채팅 메시지 수신:', serverData.region.chatLog);
       chatMessages.update(messages => [...messages, ...serverData.region.chatLog]);
     }
-    // 지역 메시지는 전체 교체
+    // 지역 메시지는 현재 구역의 메시지만 업데이트
     if (serverData.region.regionMessageList !== undefined) {
-      regionMessages.set(serverData.region.regionMessageList || []);
+      const currentRegion = get(myStatus)?.region || 0;
+      const currentRegionMessages = serverData.region.regionMessageList.map((msg: string | null, index: number) => ({
+        message: msg || '',
+        region: currentRegion,
+        isErased: msg === null
+      }));
+      
+      // 현재 구역의 기존 메시지 제거 후 새로운 메시지 추가
+      regionMessages.update(messages => {
+        const otherRegionMessages = messages.filter(msg => msg.region !== currentRegion);
+        return [...otherRegionMessages, ...currentRegionMessages];
+      });
+      
+      console.log('구역 메시지 업데이트:', {
+        region: currentRegion,
+        messages: currentRegionMessages
+      });
     }
   }
   if (serverData.alarm) {

@@ -12,7 +12,7 @@
     import { musicStore, toggleMusic } from '../../../common/store/musicStore';
     import { nicknameList, Survivor } from '../game.type';
     import { selectPlayerMessageBox } from '../../../common/store/selectPlayerMessageBox';
-    import { exitGame, infectPlayer } from '../common/gameActions';
+    import { exitGame, infectPlayer, giveItem } from '../common/gameActions';
 
   let inventory:HTMLElement
   let action:HTMLElement
@@ -66,7 +66,7 @@ async function moveNextRegion() {
       token,
       user,
       myStatus: {
-        state: currentStatus.state as MyPlayerState, // infected는 이제 사용하지 않음
+        state: currentStatus.state,
         items: currentStatus.items,
         region: currentStatus.region,
         next: selectedRegion, // 선택한 지역 번호
@@ -79,73 +79,7 @@ async function moveNextRegion() {
   }
 }
 
-async function giveItem(item: ItemInterface) {
-  // 같은 지역에 있는 생존자들만 필터링
-  const playersInRegion = get(playersInMyRegion);
-  
-  if (!playersInRegion || playersInRegion.length === 0) {
-    await showMessageBox(
-      'error',
-      '알림',
-      '같은 지역에 다른 생존자가 없습니다.'
-    );
-    return;
-  }
 
-  // PlayerStatus를 Survivor 클래스 인스턴스로 변환
-  const survivors: Survivor[] = playersInRegion.map(player => {
-    const survivor = new Survivor(
-      player.playerId,
-      player.state === 'host' ? 'alive' : player.state, // host만 alive로 표시 (infected 상태는 없음)
-      true // sameRegion
-    );
-    return survivor;
-  });
-
-  try {
-    // 플레이어 선택 모달 표시
-    const selectedPlayer = await selectPlayerMessageBox(
-      '아이템 전달',
-      `${itemList[item].name}을(를) 전달할 생존자를 선택하세요.`,
-      survivors,
-      `/img/items/${item}.jpg`
-    );
-
-    if (selectedPlayer) {
-      // 서버로 아이템 전달 요청
-      const socket = get(socketStore);
-      const token = get(authStore).token;
-      const user = get(authStore).user;
-      const currentStatus = get(myStatus);
-
-      if (!socket || !token || !user || !currentStatus) return;
-
-      console.log('아이템 전달:', { 
-        item, 
-        targetPlayer: selectedPlayer.playerId,
-        targetNickname: selectedPlayer.nickname 
-      });
-
-      const room = get(currentRoom);
-      
-      const requestData: userRequest = {
-        token,
-        user,
-        giveItem: {
-          item: item,
-          receiver: selectedPlayer.playerId
-        },
-        roomId: room?.id || ''
-      };
-
-      socket.emit('request', requestData);
-      console.log('서버로 아이템 전달 요청:', requestData);
-    }
-  } catch (error) {
-    // 사용자가 취소한 경우
-    console.log('아이템 전달 취소');
-  }
-}
 
 </script>
 
@@ -161,7 +95,7 @@ async function giveItem(item: ItemInterface) {
               <div class="text-white font-medium">{itemList[item].name}</div>
               <div class="flex gap-1">
                 <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`} on:click={() => showItemInfo(item)}>안내</button>
-                <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgAccent}`}>사용</button>
+                <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgAccent}`} on:click={() => itemList[item].method()}>사용</button>
                 <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`} on:click={() => giveItem(item)}>주기</button>
               </div>
             </div>

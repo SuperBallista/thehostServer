@@ -28,6 +28,9 @@ export class GameStateService {
     const uniqueRegions = new Set(allPlayers.map(p => p.regionId));
     const useRegionsNumber = Math.max(...Array.from(uniqueRegions)) + 1;
     
+    // 현재 구역의 데이터 가져오기
+    const regionData = await this.gameDataService.getRegionData(roomId, myPlayerData.regionId);
+    
     // 초기 시스템 메시지 생성
     const regionName = REGION_NAMES[myPlayerData.regionId] || '알 수 없는 지역';
     let systemMessage = `${regionName}으로 진입하였습니다.`;
@@ -38,6 +41,13 @@ export class GameStateService {
       const itemName = ITEM_NAMES[lastItem] || '알 수 없는 아이템';
       systemMessage += ` 이곳에서 ${itemName}을 획득하였습니다.`;
     }
+    
+    // 시스템 메시지를 채팅 로그에 추가
+    const initialChatLog = [{
+      system: true,
+      message: systemMessage,
+      timeStamp: new Date()
+    }];
     
     const response: userDataResponse = {
       locationState: 'game',
@@ -54,12 +64,8 @@ export class GameStateService {
       useRegionsNumber: useRegionsNumber,
       survivorList: this.createSurvivorList(allPlayers, myPlayerData),
       region: {
-        chatLog: [{
-          system: true,
-          message: systemMessage,
-          timeStamp: new Date()
-        }],
-        regionMessageList: []
+        chatLog: [...initialChatLog, ...(regionData.chatLog || [])],
+        regionMessageList: regionData.regionMessageList || []
       }
     };
 

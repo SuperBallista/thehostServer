@@ -4,6 +4,7 @@
     import type { ItemInterface } from '../../../common/store/synchronize.type';
     import { itemList } from '../common/itemObject';
     import { showMessageBox } from '../../../common/messagebox/customStore';
+    import { giveItem } from '../common/gameActions';
 
     export let isOpen = false;
 
@@ -19,6 +20,16 @@
         undefined,
         `/img/items/${item}.jpg`
       );
+    }
+
+    async function handleUseItem(item: ItemInterface) {
+      // itemObject.ts의 메서드 사용
+      await itemList[item].method();
+    }
+
+    async function handleGiveItem(item: ItemInterface) {
+      // 공통 giveItem 함수 사용
+      await giveItem(item);
     }
 </script>
 
@@ -52,8 +63,18 @@
                 >
                   안내
                 </button>
-                <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgAccent}`}>사용</button>
-                <button class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`}>주기</button>
+                <button 
+                  class={`px-2 py-1 text-white rounded text-sm ${THEME.bgAccent}`}
+                  on:click={() => handleUseItem(item)}
+                >
+                  사용
+                </button>
+                <button 
+                  class={`px-2 py-1 text-white rounded text-sm ${THEME.bgSecondary}`}
+                  on:click={() => handleGiveItem(item)}
+                >
+                  주기
+                </button>
               </div>
             </div>
           {/each}

@@ -350,17 +350,46 @@ export class RedisPubSubService implements OnModuleInit {
     await this.publishInternal(chatMessage);
   }
 
+  /**
+   * 플레이어 상태 업데이트 발행
+   */
   async publishPlayerStatus(gameId: string, playerId: number, status: any, targetPlayerId?: number): Promise<void> {
     const message = InternalMessageBuilder.playerStatus(gameId, playerId, status, targetPlayerId);
     await this.publishInternal(message);
   }
 
   /**
-   * 기존 호환성 유지를 위한 레거시 메서드
+   * 특정 구역의 모든 플레이어에게 메시지 발행
+   */
+  async publishToRegion(gameId: string, regionId: number, data: any): Promise<void> {
+    if (!this.io) {
+      console.warn('Socket.IO 서버가 초기화되지 않음');
+      return;
+    }
+    
+    const roomName = `game:${gameId}:region:${regionId}`;
+    this.io.to(roomName).emit('update', data);
+    console.log(`📢 구역 메시지 발행: ${roomName}`);
+  }
+
+  /**
+   * 게임의 모든 플레이어에게 메시지 발행
+   */
+  async publishToGame(gameId: string, data: any): Promise<void> {
+    if (!this.io) {
+      console.warn('Socket.IO 서버가 초기화되지 않음');
+      return;
+    }
+    
+    const roomName = `game:${gameId}`;
+    this.io.to(roomName).emit('update', data);
+    console.log(`📢 게임 메시지 발행: ${roomName}`);
+  }
+
+  /**
+   * 일반 Redis 발행
    */
   async publish(channel: string, payload: any): Promise<void> {
-    console.warn('⚠️ Legacy publish method used. Consider using publishInternal instead.');
-    const data = typeof payload === 'string' ? payload : JSON.stringify(payload);
-    await this.publisher.publish(channel, data);
+    await this.publisher.publish(channel, JSON.stringify(payload));
   }
 }

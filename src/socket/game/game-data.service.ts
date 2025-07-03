@@ -92,7 +92,7 @@ export class GameDataService {
       await Promise.all(zombieKeys.map(key => this.redisService.del(key)));
     }
     
-    // 지역 데이터 삭제
+    // 지역 데이터 삭제 (Redis ERD에 맞게 키 패턴 수정)
     const regionKeys = await this.redisService.client.keys(`game:${gameId}:region:*`);
     if (regionKeys.length > 0) {
       await Promise.all(regionKeys.map(key => this.redisService.del(key)));
@@ -124,25 +124,47 @@ export class GameDataService {
   }
 
   /**
-   * 게임 데이터 정리
+   * 게임 데이터 정리 (게임 종료 시)
    */
   async cleanupGameData(gameId: string): Promise<void> {
-    // 게임 관련 모든 데이터 삭제
-    const patterns = [
-      `game:${gameId}`,
-      `game:${gameId}:*`,
-      `room:data:${gameId}`
-      // room:list:* 제거 - 다른 방의 리스트까지 삭제하면 안됨
-    ];
+    await this.deleteGameData(gameId);
+  }
 
-    for (const pattern of patterns) {
-      const keys = await this.redisService.scanKeys(pattern);
-      if (keys.length > 0) {
-        // Redis del 명령어 사용
-        const pipeline = this.redisService.pipeline();
-        keys.forEach(key => pipeline.del(key));
-        await pipeline.exec();
-      }
+  /**
+   * 구역 데이터 가져오기
+   */
+  async getRegionData(gameId: string, regionId: number): Promise<any> {
+    // Redis ERD에 맞게 키 수정: game:gameId:region:turn:regionId
+    const gameData = await this.redisService.getAndParse(`game:${gameId}`);
+    const turn = gameData?.turn || 1;
+    const regionData = await this.redisService.getAndParse(`game:${gameId}:region:${turn}:${regionId}`);
+    
+    if (!regionData) {
+      // 구역 데이터가 없으면 기본 구조 생성
+      return {
+        chatLog: [],
+        regionMessageList: []
+      };
     }
+    return regionData;
+  }
+
+  /**
+   * 구역 데이터 저장
+   */
+  async saveRegionData(gameId: string, regionId: number, regionData: any): Promise<void> {
+    // Redis ERD에 맞게 키 수정: game:gameId:region:turn:regionId
+    const gameData = await this.redisService.getAndParse(`game:${gameId}`);
+    const turn = gameData?.turn || 1;
+    await this.redisService.stringifyAndSet(`game:${gameId}:region:${turn}:${regionId}`, regionData);
+  }
+
+  /**
+   * 게임 종료 설정
+   */
+  async setGameEnd(gameId: string, endType: 'infected' | 'killed' | 'cure'): Promise<void> {
+    const gameData = await this.getGameData(gameId);
+    gameData.endGame = endType;
+    await this.saveGameData(gameId, gameData);
   }
 }

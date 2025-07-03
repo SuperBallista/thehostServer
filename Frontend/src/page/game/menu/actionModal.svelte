@@ -5,7 +5,7 @@
     import { socketStore } from '../../../common/store/socketStore';
     import { authStore } from '../../../common/store/authStore';
     import { get } from 'svelte/store';
-    import type { userRequest } from '../../../common/store/synchronize.type';
+    import type { userRequest, MyPlayerState } from '../../../common/store/synchronize.type';
     
     // 디버깅용 로그
     $: console.log('ActionModal 상태:', {

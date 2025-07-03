@@ -135,6 +135,6 @@ export type OtherPlayerState = 'alive' | 'host' | 'zombie' | 'killed' | 'left' |
 // 전체 플레이어 상태 (기존 호환성 유지)
 export type PlayerState = 'alive' | 'host' | `zombie` | `killed` | 'left' | 'you' // 생존자 상태
 type Act = `runaway` | `hide` | `lure` // 좀비 대처 행동
-export type ItemInterface = `spray` | `virusChecker` | `vaccine` | `medicine` | `vaccineMaterialA` | `vaccineMaterialB` | `vaccineMaterialC` | `wireless` | `eraser` | 'shotgun' | `microphone`
+export type ItemInterface = `spray` | `virusChecker` | `vaccine` | `medicine` | `vaccineMaterialA` | `vaccineMaterialB` | `vaccineMaterialC` | `wireless` | `eraser` | `shotgun` | `microphone`
 
 

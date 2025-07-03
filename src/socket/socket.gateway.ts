@@ -150,6 +150,12 @@ afterInit(server: Server) {
         response = await this.gameService.handleGiveItem(data.user.id, data.giveItem, data.roomId)
       }
 
+      // 아이템 사용 처리
+      if (data.useItem && data.user.id && data.roomId) {
+        console.log('아이템 사용 요청:', { userId: data.user.id, useItem: data.useItem, roomId: data.roomId });
+        response = await this.gameService.handleUseItem(data.user.id, data.useItem, data.roomId)
+      }
+
       // ✅ 응답 전송
       client.emit('update', response);
       
