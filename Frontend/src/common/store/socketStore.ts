@@ -15,10 +15,10 @@ const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const wsHost = window.location.host;
 const wsUrl = `${wsProtocol}://${wsHost}`;
 
-let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-let reconnectAttempts = 0;
 let isInitializing = false;
 let isInitialized = false;
+let connectionHeartbeat = 0; // 연결 상태 하트비트 (초 단위)
+let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
 export const socketStore = writable<Socket | null>(null);
 export const roomId = writable<string | null>(null);
@@ -66,6 +66,7 @@ export function initSocket(): Promise<void> {
 
     setupCoreHandlers(socket, resolve, reject);
     setupDynamicSubscriptions(socket);
+    startHeartbeat();
 
     socketStore.set(socket);
     isInitialized = true;
@@ -89,30 +90,21 @@ function setupCoreHandlers(socket: Socket, resolve: () => void, reject: (e: Erro
 
   socket.on('connect', () => {
     console.log('✅ Socket.IO 연결됨');
-    reconnectAttempts = 0;
+    connectionHeartbeat = 30; // 연결 시 하트비트 30초로 초기화
     resolve();
   });
 
-  socket.on('disconnect', () => {
-    console.warn('❌ Socket.IO 연결 종료됨');
-    socketStore.set(null);
+  socket.on('disconnect', (reason: string) => {
+    console.warn('❌ Socket.IO 연결 종료됨:', reason);
     isInitialized = false;
+    connectionHeartbeat = 0;
     showMessageBox('loading', '연결 끊어짐', '재연결을 시도합니다');
-
-    if (reconnectAttempts < 10) {
-      const delay = Math.min(5000, 1000 + reconnectAttempts * 1000);
-      reconnectTimeout = setTimeout(() => {
-        reconnectAttempts++;
-        initSocket().catch(console.error);
-      }, delay);
-    } else {
-      showMessageBox('error', '연결 실패', '서버와 연결할 수 없습니다.');
-    }
   });
 
   socket.on('connect_error', (err: Error) => {
     console.error('❗ Socket.IO 연결 오류:', err.message);
     isInitialized = false;
+    connectionHeartbeat = 0;
     reject(err);
   });
 }
@@ -121,9 +113,49 @@ function setupDynamicSubscriptions(socket: Socket) {
   // 기존 리스너 제거
   socket.off('update');
 
+  // 새로운 리스너 등록
   socket.on('update', (responseData: userDataResponse) => {
-    updateData(responseData)
+    console.log('📨 update 이벤트 수신:', responseData);
+    connectionHeartbeat = 30; // update 수신 시 하트비트 30초로 리셋
+    updateData(responseData);
   });
+}
+
+function startHeartbeat() {
+  // 기존 하트비트 정리
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+  }
+
+  // 1초마다 하트비트 감소
+  heartbeatInterval = setInterval(() => {
+    if (connectionHeartbeat > 0) {
+      connectionHeartbeat--;
+      
+      // 하트비트가 5초 이하일 때 빈 update 요청으로 연결 상태 확인
+      if (connectionHeartbeat <= 5 && connectionHeartbeat > 0) {
+        console.log(`🔍 하트비트 ${connectionHeartbeat}초 - 연결 상태 확인 요청`);
+        const currentSocket = get(socketStore);
+        if (currentSocket?.connected) {
+          // 빈 request를 보내서 update 응답을 받음
+          currentSocket.emit('request', {
+            token: get(authStore).token,
+            user: get(authStore).user,
+            // 빈 요청으로 연결 상태만 확인
+          });
+        }
+      }
+      
+      // 하트비트가 0이 되면 연결 문제로 간주
+      if (connectionHeartbeat === 0) {
+        console.warn('⚠️ 하트비트 타임아웃 - 연결 문제 감지');
+        const currentSocket = get(socketStore);
+        if (currentSocket) {
+          currentSocket.disconnect();
+        }
+      }
+    }
+  }, 1000);
 }
 
 function updateData(payload: userDataResponse) {
@@ -205,12 +237,43 @@ export function cleanupSocket(): void {
     socketStore.set(null);
   }
   
-  if (reconnectTimeout) {
-    clearTimeout(reconnectTimeout);
-    reconnectTimeout = null;
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
   }
   
   isInitialized = false;
   isInitializing = false;
-  reconnectAttempts = 0;
+  connectionHeartbeat = 0;
+}
+
+// 소켓 상태 확인 함수 (디버깅용)
+export function getSocketStatus(): {
+  isInitialized: boolean;
+  isInitializing: boolean;
+  hasSocket: boolean;
+  isConnected: boolean;
+  connectionHeartbeat: number;
+} {
+  const currentSocket = get(socketStore);
+  return {
+    isInitialized,
+    isInitializing,
+    hasSocket: !!currentSocket,
+    isConnected: currentSocket?.connected || false,
+    connectionHeartbeat
+  };
+}
+
+// 소켓 이벤트 리스너 상태 확인 (디버깅용)
+export function checkSocketListeners(): void {
+  const currentSocket = get(socketStore);
+  if (currentSocket) {
+    console.log('🔍 소켓 리스너 상태 확인:');
+    console.log('- 연결 상태:', currentSocket.connected);
+    console.log('- 소켓 ID:', currentSocket.id);
+    console.log('- 하트비트:', connectionHeartbeat);
+  } else {
+    console.log('�� 소켓이 없습니다');
+  }
 }

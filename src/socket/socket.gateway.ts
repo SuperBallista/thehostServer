@@ -88,72 +88,83 @@ afterInit(server: Server) {
     let response: userDataResponse = {}
 
     try {
-      if (data.createRoom) {
-        response = await this.lobbyService.createRoom(client, data.createRoom)
-      }
-      
-      if (data.joinRoom) {
-        response = await this.lobbyService.joinRoom(client, data.joinRoom)
-      }
-      
-      if (data.exitRoom && data.user.id) {
-        // 현재 위치 확인
-        const locationState = await this.connectionService.getLocationData(data.user.id);
-        console.log(`[exitRoom] userId: ${data.user.id}, 현재 위치: ${locationState.state}, roomId: ${locationState.roomId}`);
-        
-        if (locationState.state === 'game') {
-          // 게임 중이면 gameService의 exitGame 호출
-          console.log(`[exitRoom] 게임 나가기 처리 시작 - userId: ${data.user.id}`);
-          response = await this.gameService.exitGame(data.user.id, client);
-        } else if (locationState.state === 'room') {
-          // 대기실이면 기존 lobbyService의 exitToLobby 호출
-          console.log(`[exitRoom] 방 나가기 처리 시작 - userId: ${data.user.id}`);
-          response = await this.lobbyService.exitToLobby(client);
-        } else {
-          // 이미 로비에 있는 경우
-          console.log(`[exitRoom] 이미 로비에 있음 - userId: ${data.user.id}`);
-          response = { locationState: 'lobby' };
+      // 하트비트 확인용 빈 request 처리
+      if (!data.createRoom && !data.joinRoom && !data.exitRoom && !data.room && 
+          !data.page && !data.gameStart && !data.hostAct && !data.myStatus && 
+          !data.chatMessage && !data.giveItem && !data.useItem) {
+        // 빈 request는 단순히 연결 상태만 확인
+        response = { 
+          // 빈 응답으로 하트비트만 리셋
+        };
+      } else {
+        // 기존 로직 처리
+        if (data.createRoom) {
+          response = await this.lobbyService.createRoom(client, data.createRoom)
         }
-      }
+        
+        if (data.joinRoom) {
+          response = await this.lobbyService.joinRoom(client, data.joinRoom)
+        }
+        
+        if (data.exitRoom && data.user.id) {
+          // 현재 위치 확인
+          const locationState = await this.connectionService.getLocationData(data.user.id);
+          console.log(`[exitRoom] userId: ${data.user.id}, 현재 위치: ${locationState.state}, roomId: ${locationState.roomId}`);
+          
+          if (locationState.state === 'game') {
+            // 게임 중이면 gameService의 exitGame 호출
+            console.log(`[exitRoom] 게임 나가기 처리 시작 - userId: ${data.user.id}`);
+            response = await this.gameService.exitGame(data.user.id, client);
+          } else if (locationState.state === 'room') {
+            // 대기실이면 기존 lobbyService의 exitToLobby 호출
+            console.log(`[exitRoom] 방 나가기 처리 시작 - userId: ${data.user.id}`);
+            response = await this.lobbyService.exitToLobby(client);
+          } else {
+            // 이미 로비에 있는 경우
+            console.log(`[exitRoom] 이미 로비에 있음 - userId: ${data.user.id}`);
+            response = { locationState: 'lobby' };
+          }
+        }
 
-      if (data.room) {
-        response = await this.lobbyService.changeRoomOption(data.room)
-      }
-      
-      if (data.page) {
-        const roomList = await this.lobbyService.getRooms(data.page)
-        response = roomList
-      }
-      
-      if (data.gameStart && data.user.id) {
-        response = await this.gameService.gameStart(data.user.id)
-      }
+        if (data.room) {
+          response = await this.lobbyService.changeRoomOption(data.room)
+        }
+        
+        if (data.page) {
+          const roomList = await this.lobbyService.getRooms(data.page)
+          response = roomList
+        }
+        
+        if (data.gameStart && data.user.id) {
+          response = await this.gameService.gameStart(data.user.id)
+        }
 
-      // 호스트 액션 처리
-      if (data.hostAct && data.user.id) {
-        response = await this.gameService.handleHostAction(data.user.id, data.hostAct)
-      }
+        // 호스트 액션 처리
+        if (data.hostAct && data.user.id) {
+          response = await this.gameService.handleHostAction(data.user.id, data.hostAct)
+        }
 
-      // 플레이어 상태 업데이트 (이동 장소 설정 포함)
-      if (data.myStatus && data.user.id) {
-        response = await this.gameService.updatePlayerStatus(data.user.id, data.myStatus)
-      }
+        // 플레이어 상태 업데이트 (이동 장소 설정 포함)
+        if (data.myStatus && data.user.id) {
+          response = await this.gameService.updatePlayerStatus(data.user.id, data.myStatus)
+        }
 
-      // 채팅 메시지 처리
-      if (data.chatMessage && data.user.id) {
-        response = await this.gameService.handleChatMessage(data.user.id, data.chatMessage)
-      }
+        // 채팅 메시지 처리
+        if (data.chatMessage && data.user.id) {
+          response = await this.gameService.handleChatMessage(data.user.id, data.chatMessage)
+        }
 
-      // 아이템 전달 처리
-      if (data.giveItem && data.user.id && data.roomId) {
-        console.log('아이템 전달 요청:', { userId: data.user.id, giveItem: data.giveItem, roomId: data.roomId });
-        response = await this.gameService.handleGiveItem(data.user.id, data.giveItem, data.roomId)
-      }
+        // 아이템 전달 처리
+        if (data.giveItem && data.user.id && data.roomId) {
+          console.log('아이템 전달 요청:', { userId: data.user.id, giveItem: data.giveItem, roomId: data.roomId });
+          response = await this.gameService.handleGiveItem(data.user.id, data.giveItem, data.roomId)
+        }
 
-      // 아이템 사용 처리
-      if (data.useItem && data.user.id && data.roomId) {
-        console.log('아이템 사용 요청:', { userId: data.user.id, useItem: data.useItem, roomId: data.roomId });
-        response = await this.gameService.handleUseItem(data.user.id, data.useItem, data.roomId)
+        // 아이템 사용 처리
+        if (data.useItem && data.user.id && data.roomId) {
+          console.log('아이템 사용 요청:', { userId: data.user.id, useItem: data.useItem, roomId: data.roomId });
+          response = await this.gameService.handleUseItem(data.user.id, data.useItem, data.roomId)
+        }
       }
 
       // ✅ 응답 전송
