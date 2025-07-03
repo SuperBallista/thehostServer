@@ -17,17 +17,49 @@ const wsUrl = `${wsProtocol}://${wsHost}`;
 
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempts = 0;
+let isInitializing = false;
+let isInitialized = false;
 
 export const socketStore = writable<Socket | null>(null);
-
 export const roomId = writable<string | null>(null);
 
 export function initSocket(): Promise<void> {
+  // 이미 초기화 중이면 기다림
+  if (isInitializing) {
+    return new Promise((resolve, reject) => {
+      const checkInterval = setInterval(() => {
+        if (!isInitializing) {
+          clearInterval(checkInterval);
+          if (isInitialized) {
+            resolve();
+          } else {
+            reject(new Error('소켓 초기화 실패'));
+          }
+        }
+      }, 100);
+    });
+  }
+
+  // 이미 초기화되어 있고 연결된 소켓이 있으면 그대로 반환
+  const currentSocket = get(socketStore);
+  if (currentSocket?.connected) {
+    return Promise.resolve();
+  }
+
+  isInitializing = true;
+
   return new Promise((resolve, reject) => {
     const token = get(authStore).token;
 
     if (!token) {
+      isInitializing = false;
       return reject(new Error('토큰 없음: 소켓 연결 불가'));
+    }
+
+    // 기존 소켓이 있으면 정리
+    if (currentSocket) {
+      currentSocket.removeAllListeners();
+      currentSocket.disconnect();
     }
 
     const socket = createSocket(token);
@@ -36,6 +68,8 @@ export function initSocket(): Promise<void> {
     setupDynamicSubscriptions(socket);
 
     socketStore.set(socket);
+    isInitialized = true;
+    isInitializing = false;
   });
 }
 
@@ -46,7 +80,13 @@ function createSocket(token: string): Socket {
     reconnection: false,
   });
 }
+
 function setupCoreHandlers(socket: Socket, resolve: () => void, reject: (e: Error) => void) {
+  // 기존 리스너 제거
+  socket.off('connect');
+  socket.off('disconnect');
+  socket.off('connect_error');
+
   socket.on('connect', () => {
     console.log('✅ Socket.IO 연결됨');
     reconnectAttempts = 0;
@@ -56,6 +96,7 @@ function setupCoreHandlers(socket: Socket, resolve: () => void, reject: (e: Erro
   socket.on('disconnect', () => {
     console.warn('❌ Socket.IO 연결 종료됨');
     socketStore.set(null);
+    isInitialized = false;
     showMessageBox('loading', '연결 끊어짐', '재연결을 시도합니다');
 
     if (reconnectAttempts < 10) {
@@ -71,13 +112,14 @@ function setupCoreHandlers(socket: Socket, resolve: () => void, reject: (e: Erro
 
   socket.on('connect_error', (err: Error) => {
     console.error('❗ Socket.IO 연결 오류:', err.message);
+    isInitialized = false;
     reject(err);
   });
 }
 
-
-
 function setupDynamicSubscriptions(socket: Socket) {
+  // 기존 리스너 제거
+  socket.off('update');
 
   socket.on('update', (responseData: userDataResponse) => {
     updateData(responseData)
@@ -152,4 +194,23 @@ function updateData(payload: userDataResponse) {
   if (payload.alarm) {
     showMessageBox(payload.alarm.img as any, '알림', payload.alarm.message);
   }
+}
+
+// 소켓 정리 함수
+export function cleanupSocket(): void {
+  const currentSocket = get(socketStore);
+  if (currentSocket) {
+    currentSocket.removeAllListeners();
+    currentSocket.disconnect();
+    socketStore.set(null);
+  }
+  
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+  
+  isInitialized = false;
+  isInitializing = false;
+  reconnectAttempts = 0;
 }

@@ -28,7 +28,7 @@ export async function awaitSocketReady(timeoutMs = 5000): Promise<Socket> {
           clearInterval(check);
           unsub();
           reject(new Error('⛔ 소켓이 초기화되지 않았습니다.'));
-          initSocket()
+          // 중복 초기화 방지를 위해 initSocket 호출하지 않음
         }
       }, 50);
     });
