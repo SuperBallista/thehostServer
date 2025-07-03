@@ -774,10 +774,15 @@ export class GameService {
       throw new Error('대상과 메시지를 입력해주세요');
     }
 
-    // 대상 플레이어 데이터 가져오기
+    // 대상 플레이어 데이터 가져오기 (게임에 참여했던 플레이어라면 허용)
     const targetData = await this.playerManagerService.getPlayerData(gameId, targetPlayer);
     if (!targetData) {
       throw new Error('대상을 찾을 수 없습니다');
+    }
+
+    // 자기 자신에게는 무전을 보낼 수 없음
+    if (playerData.playerId === targetPlayer) {
+      throw new Error('자기 자신에게는 무전을 보낼 수 없습니다');
     }
 
     // 아이템 소모
@@ -785,16 +790,29 @@ export class GameService {
     playerData.items.splice(itemIndex, 1);
     await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
 
-    // 무전 메시지 전송 (대상에게만)
-    if (targetData.userId > 0) {
-      const playerNickname = ANIMAL_NICKNAMES[playerData.playerId] || `플레이어${playerData.playerId}`;
-      await this.redisPubSubService.publishPlayerStatus(gameId, targetData.playerId, {
-        alarm: {
-          message: `${playerNickname}의 무전: ${content.trim()}`,
-          img: 'info'
-        }
-      }, targetData.playerId);
+    const messageContent = content.trim();
+    const playerNickname = ANIMAL_NICKNAMES[playerData.playerId] || `플레이어${playerData.playerId}`;
+    const targetNickname = ANIMAL_NICKNAMES[targetPlayer] || `플레이어${targetPlayer}`;
+
+    // 발신자에게 전송한 메시지 표시 (채팅 로그에 표시)
+    await this.chatService.sendSystemMessage(
+      gameId, 
+      `(귓속말) ${targetNickname}에게: ${messageContent}`, 
+      playerData.regionId
+    );
+
+    // 수신자에게 무전 메시지 전송 (살아있는 플레이어에게만)
+    // targetData.userId > 0: 실제 플레이어 (봇이 아님)
+    // targetData.state가 'alive' 또는 'host'인 경우에만 메시지 전송
+    // 감염 상태는 infected 속성으로 별도 관리되므로 state에서는 제외
+    if (targetData.userId > 0 && ['alive', 'host'].includes(targetData.state)) {
+      await this.chatService.sendSystemMessage(
+        gameId, 
+        `(귓속말) ${playerNickname}: ${messageContent}`, 
+        targetData.regionId
+      );
     }
+    // 죽었거나 좀비가 된 플레이어는 방에서 나가므로 이벤트 리스너가 꺼져있어 메시지가 전송되지 않음
 
     return this.gameStateService.createPlayerGameUpdate(gameId, playerData.userId, {
       myStatus: {
@@ -805,7 +823,7 @@ export class GameService {
         act: playerData.act
       },
       alarm: {
-        message: '무전 메시지를 전송했습니다.',
+        message: `${targetNickname}에게 무전 메시지를 전송했습니다.`,
         img: 'info'
       }
     });

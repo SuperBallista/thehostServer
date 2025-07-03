@@ -10,7 +10,9 @@
   $: regionChats = $chatMessages as ChatMessage[];
 
   afterUpdate(() => {
-    targetEl?.scrollTo({ top: targetEl.scrollHeight, behavior: 'smooth' });
+    if (targetEl) {
+      targetEl.scrollTop = targetEl.scrollHeight;
+    }
   });
 </script>
 

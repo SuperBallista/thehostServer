@@ -1,4 +1,3 @@
-
 export interface userRequest{
 token: string
 user: AuthUser

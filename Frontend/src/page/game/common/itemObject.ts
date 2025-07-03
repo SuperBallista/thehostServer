@@ -6,6 +6,9 @@ import { socketStore } from '../../../common/store/socketStore';
 import { authStore } from '../../../common/store/authStore';
 import { currentRoom } from '../../../common/store/pageStore';
 import type { userRequest } from '../../../common/store/synchronize.type';
+import { otherPlayers, myStatus } from '../../../common/store/gameStateStore';
+import { nicknameList } from '../game.type';
+import { Survivor } from '../game.type';
 
 type UseMethod = () => Promise<boolean>;
 
@@ -169,15 +172,36 @@ async function useMakeVaccine(): Promise<boolean> {
 }
 
 async function useWireless(): Promise<boolean> {
-  // 같은 지역에 있는 생존자들 중에서 선택
-  const playersInRegion = await selectPlayerMessageBox(
+  // 다른 지역에 있는 생존자들 중에서 선택 (무전기는 다른 지역에 있는 플레이어에게 보냄)
+  const allSurvivors = get(otherPlayers);
+  const myRegion = get(myStatus)?.region || 0;
+  
+  // 다른 지역에 있는 생존자들만 필터링
+  const playersInOtherRegions = Array.from(allSurvivors.values())
+    .filter(player => player.region !== myRegion && player.state === 'alive')
+    .map(player => new Survivor(
+      player.playerId,
+      player.state,
+      false // sameRegion = false (다른 지역에 있음)
+    ));
+
+  if (playersInOtherRegions.length === 0) {
+    await showMessageBox(
+      'error',
+      '무전기 사용 불가',
+      '다른 지역에 있는 생존자가 없습니다.'
+    );
+    return false;
+  }
+
+  const selectedPlayer = await selectPlayerMessageBox(
     '무전기 사용',
     '무전을 보낼 생존자를 선택하세요.',
-    [],
+    playersInOtherRegions,
     '/img/items/wireless.jpg'
   );
 
-  if (!playersInRegion) return false;
+  if (!selectedPlayer) return false;
 
   const message = (await showMessageBox(
     'input',
@@ -196,7 +220,7 @@ async function useWireless(): Promise<boolean> {
   )).values?.content;
 
   if (message && message.trim()) {
-    return await sendUseItemRequest('wireless', playersInRegion.playerId, message.trim());
+    return await sendUseItemRequest('wireless', selectedPlayer.playerId, message.trim());
   }
   return false;
 }
