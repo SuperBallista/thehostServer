@@ -30,6 +30,7 @@ interface UseItem{
   targetPlayer?: number
   content?: string
   targetMessage?: number
+  playerId?: number
 }
 
 

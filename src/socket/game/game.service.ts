@@ -475,12 +475,31 @@ export class GameService {
   /**
    * 아이템 사용 처리
    */
-  async handleUseItem(userId: number, useItem: { item: ItemInterface; targetPlayer?: number; content?: string; targetMessage?: number }, gameId: string): Promise<userDataResponse> {
+  async handleUseItem(userId: number, useItem: { item: ItemInterface; targetPlayer?: number; content?: string; targetMessage?: number; playerId?: number }, gameId: string): Promise<userDataResponse> {
     console.log('handleUseItem 시작:', { userId, useItem, gameId });
     
     // 플레이어 데이터 가져오기
-    const playerData = await this.playerManagerService.getPlayerDataByUserId(gameId, userId);
+    let playerData;
+    
+    // playerId가 전달된 경우 직접 조회 (더 빠름)
+    if (useItem.playerId !== undefined) {
+      playerData = await this.playerManagerService.getPlayerData(gameId, useItem.playerId);
+      // 보안 검증: playerId와 userId가 일치하는지 확인
+      if (playerData && playerData.userId !== userId) {
+        throw new Error('권한이 없습니다');
+      }
+    } else {
+      // playerId가 없으면 userId로 조회 (느림)
+      playerData = await this.playerManagerService.getPlayerDataByUserId(gameId, userId);
+    }
+    
     if (!playerData) {
+      console.error('플레이어 데이터를 찾을 수 없습니다:', { gameId, userId, playerId: useItem.playerId });
+      
+      // 디버깅을 위해 모든 플레이어 확인
+      const allPlayers = await this.playerManagerService.getAllPlayersInGame(gameId);
+      console.log('게임 내 모든 플레이어:', allPlayers.map(p => ({ playerId: p.playerId, userId: p.userId })));
+      
       throw new Error('플레이어 데이터를 찾을 수 없습니다');
     }
 
@@ -625,9 +644,10 @@ export class GameService {
     await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
 
     // 감염 여부 확인
-    const isInfected = playerData.infected !== null && playerData.infected > 0;
+    // infected가 null이면 비감염, 숫자면 감염 (잠복기)
+    const isInfected = playerData.infected !== null;
     const message = isInfected 
-      ? `감염되어 있습니다. ${playerData.infected}턴 후에 좀비로 변이됩니다.`
+      ? '바이러스에 감염되어 있습니다.'
       : '감염되지 않았습니다.';
 
     return this.gameStateService.createPlayerGameUpdate(gameId, playerData.userId, {
@@ -846,12 +866,12 @@ export class GameService {
     const playerNickname = ANIMAL_NICKNAMES[playerData.playerId] || `플레이어${playerData.playerId}`;
     const broadcastMessage = `📢 ${playerNickname}의 방송: ${content.trim()}`;
     
-    await this.redisPubSubService.publishToGame(gameId, {
-      alarm: {
-        message: broadcastMessage,
-        img: 'info'
-      }
-    });
+    // 채팅 시스템을 통해 모든 지역에 메시지 전송
+    await this.chatService.broadcastToAllRegions(
+      gameId,
+      playerData.playerId,
+      broadcastMessage
+    );
 
     return this.gameStateService.createPlayerGameUpdate(gameId, playerData.userId, {
       myStatus: {

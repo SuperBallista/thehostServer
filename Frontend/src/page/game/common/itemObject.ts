@@ -7,6 +7,7 @@ import { authStore } from '../../../common/store/authStore';
 import { currentRoom } from '../../../common/store/pageStore';
 import type { userRequest } from '../../../common/store/synchronize.type';
 import { otherPlayers, myStatus } from '../../../common/store/gameStateStore';
+import { playerId } from '../../../common/store/playerStore';
 import { nicknameList } from '../game.type';
 import { Survivor } from '../game.type';
 
@@ -107,6 +108,7 @@ async function sendUseItemRequest(item: ItemInterface, targetPlayer?: number, co
   const socket = get(socketStore);
   const authData = get(authStore);
   const room = get(currentRoom);
+  const currentPlayerId = get(playerId);
   
   if (!socket || !authData.token || !authData.user || !room?.id) {
     console.error('소켓 또는 인증 정보가 없습니다');
@@ -120,7 +122,8 @@ async function sendUseItemRequest(item: ItemInterface, targetPlayer?: number, co
       item,
       targetPlayer,
       content,
-      targetMessage
+      targetMessage,
+      playerId: currentPlayerId
     },
     roomId: room.id
   };
@@ -154,7 +157,20 @@ async function useSpray(): Promise<boolean> {
 }
 
 async function useVirusChecker(): Promise<boolean> {
-  return await sendUseItemRequest('virusChecker');
+  // 사용 확인 메시지
+  const result = await showMessageBox(
+    'confirm',
+    '진단키트 사용',
+    '진단키트를 사용하여 감염 여부를 확인하시겠습니까?\n\n결과는 본인에게만 표시됩니다.',
+    undefined,
+    undefined,
+    '/img/items/virusChecker.jpg'
+  );
+
+  if (result) {
+    return await sendUseItemRequest('virusChecker');
+  }
+  return false;
 }
 
 async function useVaccine(): Promise<boolean> {
