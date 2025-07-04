@@ -175,7 +175,58 @@ async function useVirusChecker(): Promise<boolean> {
 }
 
 async function useVaccine(): Promise<boolean> {
-  return await sendUseItemRequest('vaccine');
+  // 모든 플레이어 정보와 내 현재 위치 가져오기
+  const allPlayers = get(otherPlayers);
+  const myRegion = get(playerRegion);
+  
+  // 같은 구역에 있는 다른 생존자들만 필터링 (자신 제외)
+  const playersInRegion = Array.from(allPlayers.values())
+    .filter(player => 
+      player.region === myRegion && 
+      (player.state === 'alive' || player.state === 'host')
+    )
+    .map(player => new Survivor(
+      player.playerId,
+      player.state,
+      true // sameRegion = true
+    ));
+
+  if (playersInRegion.length === 0) {
+    await showMessageBox(
+      'error',
+      '백신 사용 불가',
+      '이 구역에 다른 생존자가 없습니다.'
+    );
+    return false;
+  }
+
+  // 플레이어 선택
+  const selectedPlayer = await selectPlayerMessageBox(
+    '백신 사용',
+    '백신을 투여할 대상을 선택하세요.\n숙주에게 투여하면 게임에서 승리합니다!',
+    playersInRegion,
+    '/img/items/vaccine.jpg'
+  );
+
+  if (!selectedPlayer) {
+    return false;
+  }
+
+  // 백신 투여 확인
+  const confirmResponse = await showMessageBox(
+    'confirm',
+    '백신 투여 확인',
+    `${selectedPlayer.nickname}에게 백신을 투여하시겠습니까?\n\n※ 숙주가 맞다면 게임에서 승리합니다!\n※ 숙주가 아니라면 백신만 소모됩니다.`,
+    undefined,
+    undefined,
+    '/img/items/vaccine.jpg'
+  );
+
+  if (!confirmResponse.success) {
+    return false;
+  }
+
+  return await sendUseItemRequest('vaccine', selectedPlayer.playerId);
 }
 
 async function useMedicine(): Promise<boolean> {
@@ -360,18 +411,58 @@ async function useEraser(): Promise<boolean> {
 }
 
 async function useShotgun(): Promise<boolean> {
-  // 같은 지역에 있는 좀비들 중에서 선택
-  const playersInRegion = await selectPlayerMessageBox(
+  // 모든 플레이어 정보와 내 현재 위치 가져오기
+  const allPlayers = get(otherPlayers);
+  const myRegion = get(playerRegion);
+  
+  // 같은 지역에 있는 좀비들만 필터링
+  const zombiesInRegion = Array.from(allPlayers.values())
+    .filter(player => 
+      player.region === myRegion && 
+      player.state === 'zombie'
+    )
+    .map(player => new Survivor(
+      player.playerId,
+      player.state,
+      true // sameRegion = true
+    ));
+
+  if (zombiesInRegion.length === 0) {
+    await showMessageBox(
+      'error',
+      '산탄총 사용 불가',
+      '이 구역에 좀비가 없습니다.'
+    );
+    return false;
+  }
+
+  // 좀비 선택
+  const selectedZombie = await selectPlayerMessageBox(
     '산탄총 사용',
     '사살할 좀비를 선택하세요.',
-    [],
+    zombiesInRegion,
     '/img/items/shotgun.jpg'
   );
 
-  if (playersInRegion) {
-    return await sendUseItemRequest('shotgun', playersInRegion.playerId);
+  if (!selectedZombie) {
+    return false;
   }
-  return false;
+
+  // 사살 확인
+  const confirmResponse = await showMessageBox(
+    'confirm',
+    '좀비 사살 확인',
+    `${selectedZombie.nickname}를 사살하시겠습니까?\n\n※ 산탄총은 1회용입니다.`,
+    undefined,
+    undefined,
+    '/img/items/shotgun.jpg'
+  );
+
+  if (!confirmResponse.success) {
+    return false;
+  }
+
+  return await sendUseItemRequest('shotgun', selectedZombie.playerId);
 }
 
 async function useMicrophone(): Promise<boolean> {

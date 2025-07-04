@@ -20,6 +20,9 @@
   } from '../../common/store/gameStateStore';
   import { socketStore } from '../../common/store/socketStore';
   import { initMusic, cleanupMusic } from '../../common/store/musicStore'; // 🔥 toggleMusic 제거
+  import { authStore } from '../../common/store/authStore';
+  import { currentRoom } from '../../common/store/pageStore';
+  import type { userRequest } from '../../common/store/synchronize.type';
     
   let showSurvivorModal = false;
   let hasShownRoleMessage = false;
@@ -74,6 +77,29 @@
     resetGameState();
   });
 
+  // 로비로 돌아가기 함수
+  async function returnToLobby() {
+    const socket = $socketStore;
+    const auth = $authStore;
+    const room = $currentRoom;
+    
+    if (!socket || !auth.token || !auth.user) {
+      console.error('소켓 또는 인증 정보가 없습니다');
+      return;
+    }
+
+    // exitRoom 요청 전송 (게임에서 나가기)
+    const requestData: userRequest = {
+      token: auth.token,
+      user: auth.user,
+      exitRoom: true,
+      roomId: room?.id
+    };
+
+    socket.emit('request', requestData);
+    console.log('게임 종료 후 로비로 이동 요청');
+  }
+
 </script>
 {#if $pageStore === 'game'}
 <PlayerSelector/>
@@ -104,7 +130,7 @@
           💀 좀비 승리! 모든 생존자가 사망했습니다.
         {/if}
       </p>
-      <button class="mt-4 px-4 py-2 bg-blue-500 text-white rounded" on:click={() => pageStore.set('lobby')}>
+      <button class="mt-4 px-4 py-2 bg-blue-500 text-white rounded" on:click={returnToLobby}>
         로비로 돌아가기
       </button>
     </div>
