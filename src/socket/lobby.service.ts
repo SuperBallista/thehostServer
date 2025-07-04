@@ -7,7 +7,7 @@ import { WsException } from '@nestjs/websockets';
 import { UserDto } from 'src/user/dto/user.dto';
 import { UserService } from 'src/user/user.service';
 import { Room, userDataResponse } from './payload.types';
-import { moveToRoom } from './utils/socketRoomManager';
+import { moveToRoom, moveToLobby } from './utils/socketRoomManager';
 import { Socket } from 'socket.io';
 import { LocationState } from './data.types';
 import { InternalUpdateType } from 'src/redis/pubsub.types';
@@ -177,11 +177,15 @@ async exitToLobby(client: Socket): Promise<userDataResponse> {
     let roomData: Room = await this.redisService.getAndParse(`room:data:${roomId}`);
     if (!roomData) {
       await this.updateUserLocationToLobby(userId);
+      moveToLobby(client); // 소켓을 로비로 이동
       return { exitRoom: true, locationState: 'lobby' };
     }
 
     roomData = this.removeUserFromRoom(roomData, userId);
     await this.updateUserLocationToLobby(userId);
+    
+    // 소켓을 방에서 나가고 로비로 이동
+    moveToLobby(client);
 
     const isHost = userId === Number(roomData.hostUserId);
 

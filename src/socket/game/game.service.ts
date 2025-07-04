@@ -351,6 +351,8 @@ export class GameService {
     if (client) {
       await client.leave(`game:${gameId}`);
       await client.leave(`game:${gameId}:region:${playerData.regionId}`);
+      // 로비로 이동
+      await client.join('lobby');
     }
 
     // 위치 상태를 로비로 변경

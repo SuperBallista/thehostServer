@@ -18,7 +18,12 @@ import { GameService } from './game/game.service';
 
 
 
-@WebSocketGateway({ cors: true })
+@WebSocketGateway({ 
+  cors: true,
+  // Socket.IO 서버 옵션
+  pingInterval: 25000,  // 25초마다 ping (기본값)
+  pingTimeout: 60000,   // 60초 동안 pong 없으면 연결 끊김
+})
 export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;

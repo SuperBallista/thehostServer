@@ -17,8 +17,6 @@ const wsUrl = `${wsProtocol}://${wsHost}`;
 
 let isInitializing = false;
 let isInitialized = false;
-let connectionHeartbeat = 0; // 연결 상태 하트비트 (초 단위)
-let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
 export const socketStore = writable<Socket | null>(null);
 export const roomId = writable<string | null>(null);
@@ -66,7 +64,6 @@ export function initSocket(): Promise<void> {
 
     setupCoreHandlers(socket, resolve, reject);
     setupDynamicSubscriptions(socket);
-    startHeartbeat();
 
     socketStore.set(socket);
     isInitialized = true;
@@ -78,7 +75,11 @@ function createSocket(token: string): Socket {
   return io(wsUrl, {
     auth: { token },
     transports: ['websocket'],
-    reconnection: false,
+    reconnection: true,  // 자동 재연결 활성화
+    reconnectionAttempts: 10,  // 최대 10회 재연결 시도
+    reconnectionDelay: 1000,  // 첫 재연결 시도까지 1초 대기
+    reconnectionDelayMax: 5000,  // 재연결 시도 간격 최대 5초
+    timeout: 20000,  // 연결 타임아웃 20초
   });
 }
 
@@ -87,25 +88,59 @@ function setupCoreHandlers(socket: Socket, resolve: () => void, reject: (e: Erro
   socket.off('connect');
   socket.off('disconnect');
   socket.off('connect_error');
+  socket.off('reconnect');
+  socket.off('reconnect_attempt');
+  socket.off('reconnect_error');
+  socket.off('reconnect_failed');
 
   socket.on('connect', () => {
     console.log('✅ Socket.IO 연결됨');
-    connectionHeartbeat = 30; // 연결 시 하트비트 30초로 초기화
+    isInitialized = true;
+    closeMessageBox(); // 재연결 성공 시 로딩 메시지 닫기
+    
+    // 재연결 후 이벤트 리스너 재설정
+    setupDynamicSubscriptions(socket);
     resolve();
   });
 
   socket.on('disconnect', (reason: string) => {
     console.warn('❌ Socket.IO 연결 종료됨:', reason);
     isInitialized = false;
-    connectionHeartbeat = 0;
-    showMessageBox('loading', '연결 끊어짐', '재연결을 시도합니다');
+    
+    // 의도적인 연결 종료가 아닌 경우만 재연결 시도
+    if (reason !== 'io client disconnect') {
+      showMessageBox('loading', '연결 끊어짐', '재연결을 시도합니다...');
+    }
   });
 
   socket.on('connect_error', (err: Error) => {
     console.error('❗ Socket.IO 연결 오류:', err.message);
     isInitialized = false;
-    connectionHeartbeat = 0;
-    reject(err);
+    // 초기 연결 시에만 reject
+    if (!socket.connected && isInitializing) {
+      reject(err);
+    }
+  });
+
+  // 재연결 관련 이벤트
+  socket.on('reconnect', (attemptNumber: number) => {
+    console.log(`✅ 재연결 성공! (시도 횟수: ${attemptNumber})`);
+    isInitialized = true;
+    closeMessageBox();
+  });
+
+  socket.on('reconnect_attempt', (attemptNumber: number) => {
+    console.log(`🔄 재연결 시도 중... (${attemptNumber}번째)`);
+    showMessageBox('loading', '재연결 시도', `서버에 재연결을 시도합니다... (${attemptNumber}/10)`);
+  });
+
+  socket.on('reconnect_error', (err: Error) => {
+    console.error('❌ 재연결 오류:', err.message);
+  });
+
+  socket.on('reconnect_failed', () => {
+    console.error('❌ 재연결 실패!');
+    showMessageBox('error', '연결 실패', '서버와의 연결을 복구할 수 없습니다. 페이지를 새로고침해주세요.');
   });
 }
 
@@ -116,47 +151,10 @@ function setupDynamicSubscriptions(socket: Socket) {
   // 새로운 리스너 등록
   socket.on('update', (responseData: userDataResponse) => {
     console.log('📨 update 이벤트 수신:', responseData);
-    connectionHeartbeat = 30; // update 수신 시 하트비트 30초로 리셋
     updateData(responseData);
   });
 }
 
-function startHeartbeat() {
-  // 기존 하트비트 정리
-  if (heartbeatInterval) {
-    clearInterval(heartbeatInterval);
-  }
-
-  // 1초마다 하트비트 감소
-  heartbeatInterval = setInterval(() => {
-    if (connectionHeartbeat > 0) {
-      connectionHeartbeat--;
-      
-      // 하트비트가 5초 이하일 때 빈 update 요청으로 연결 상태 확인
-      if (connectionHeartbeat <= 5 && connectionHeartbeat > 0) {
-        console.log(`🔍 하트비트 ${connectionHeartbeat}초 - 연결 상태 확인 요청`);
-        const currentSocket = get(socketStore);
-        if (currentSocket?.connected) {
-          // 빈 request를 보내서 update 응답을 받음
-          currentSocket.emit('request', {
-            token: get(authStore).token,
-            user: get(authStore).user,
-            // 빈 요청으로 연결 상태만 확인
-          });
-        }
-      }
-      
-      // 하트비트가 0이 되면 연결 문제로 간주
-      if (connectionHeartbeat === 0) {
-        console.warn('⚠️ 하트비트 타임아웃 - 연결 문제 감지');
-        const currentSocket = get(socketStore);
-        if (currentSocket) {
-          currentSocket.disconnect();
-        }
-      }
-    }
-  }, 1000);
-}
 
 function updateData(payload: userDataResponse) {
   console.log('updateData received:', payload);
@@ -237,14 +235,8 @@ export function cleanupSocket(): void {
     socketStore.set(null);
   }
   
-  if (heartbeatInterval) {
-    clearInterval(heartbeatInterval);
-    heartbeatInterval = null;
-  }
-  
   isInitialized = false;
   isInitializing = false;
-  connectionHeartbeat = 0;
 }
 
 // 소켓 상태 확인 함수 (디버깅용)
@@ -253,15 +245,13 @@ export function getSocketStatus(): {
   isInitializing: boolean;
   hasSocket: boolean;
   isConnected: boolean;
-  connectionHeartbeat: number;
 } {
   const currentSocket = get(socketStore);
   return {
     isInitialized,
     isInitializing,
     hasSocket: !!currentSocket,
-    isConnected: currentSocket?.connected || false,
-    connectionHeartbeat
+    isConnected: currentSocket?.connected || false
   };
 }
 
