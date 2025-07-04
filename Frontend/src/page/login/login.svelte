@@ -4,6 +4,7 @@
   import { authStore, restoreAuthFromSessionAndCookie, setAuthSuccess } from '../../common/store/authStore';
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
+  import { initSocket } from '../../common/store/socketStore';
 
   function goToGoogleLogin() {
     window.location.href = '/api/auth/google/login';
@@ -18,7 +19,13 @@
   if (token && nickname!=='null' && id!==0) {
     console.log('기존 유저, 로비 이동');
     setAuthSuccess({nickname, id}, token);
-    pageStore.set('lobby');
+    // 소켓 초기화를 먼저 시작하고 로비로 이동
+    initSocket().then(() => {
+      pageStore.set('lobby');
+    }).catch((error) => {
+      console.error('소켓 초기화 실패:', error);
+      pageStore.set('lobby'); // 실패해도 로비로 이동
+    });
     window.history.replaceState(null, '', window.location.pathname);
     return false;
   }
@@ -49,7 +56,13 @@ onMount(async () => {
 
       if (auth.user?.nickname) {
         console.log('기존 유저, 로비 이동');
-        pageStore.set('lobby');
+        // 소켓 초기화를 먼저 시작하고 로비로 이동
+        initSocket().then(() => {
+          pageStore.set('lobby');
+        }).catch((error) => {
+          console.error('소켓 초기화 실패:', error);
+          pageStore.set('lobby'); // 실패해도 로비로 이동
+        });
         window.history.replaceState(null, '', window.location.pathname);
       }
     }
