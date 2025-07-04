@@ -2,7 +2,7 @@
     import { THEME } from "../../../common/constant/theme";
     import { myStatus } from '../../../common/store/gameStateStore';
     import type { ItemInterface } from '../../../common/store/synchronize.type';
-    import { itemList } from '../common/itemObject';
+    import { itemList } from '../common/itemObjectRefactored';
     import { showMessageBox } from '../../../common/messagebox/customStore';
     import { giveItem } from '../common/gameActions';
 

@@ -16,6 +16,8 @@ import { GameDataService } from './game/game-data.service';
 import { GameStateService } from './game/game-state.service';
 import { ChatService } from './game/chat.service';
 import { HostActionService } from './game/host-action.service';
+import { ItemHandlerService } from './game/item-handler.service';
+import { CombatHandlerService } from './game/combat-handler.service';
 
 @Module({
   imports: [RedisModule, JwtModule, UserModule],
@@ -38,6 +40,8 @@ import { HostActionService } from './game/host-action.service';
     GameStateService,
     ChatService,
     HostActionService,
+    ItemHandlerService,
+    CombatHandlerService,
   ],
 })
 export class SocketModule {}

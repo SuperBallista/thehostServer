@@ -78,15 +78,17 @@ src/
 │   ├── data.types.ts       # 데이터 타입 정의
 │   ├── payload.types.ts    # 페이로드 타입 정의 (ChatMessage 포함)
 │   ├── game/               # 게임 관련 서비스
-│   │   ├── game.service.ts         # 게임 메인 오케스트레이터 (378줄)
+│   │   ├── game.service.ts         # 게임 메인 오케스트레이터 (476줄, 리팩토링 완료)
 │   │   ├── game.types.ts           # 게임 타입 정의
 │   │   ├── gameTurn.service.ts     # 턴별 아이템 지급 서비스
 │   │   ├── zombie.service.ts       # 좀비 관리 서비스
 │   │   ├── player-manager.service.ts    # 플레이어 데이터 관리 (127줄)
-│   │   ├── game-data.service.ts         # Redis 데이터 접근 계층 (119줄)
+│   │   ├── game-data.service.ts         # Redis 데이터 접근 계층 (170줄)
 │   │   ├── game-state.service.ts        # 게임 상태 응답 생성 (166줄)
 │   │   ├── chat.service.ts              # 채팅 메시지 처리 (98줄)
 │   │   ├── host-action.service.ts       # 호스트 액션 처리 (120줄)
+│   │   ├── item-handler.service.ts      # 아이템 사용 처리 (383줄, 신규)
+│   │   ├── combat-handler.service.ts    # 전투 관련 처리 (154줄, 신규)
 │   │   └── itemProbabilities.json       # 아이템 확률 설정
 │   ├── utils/              # 소켓 유틸리티
 │   │   ├── socketRoomManager.ts
@@ -160,8 +162,14 @@ Frontend/src/
 │       ├── game.type.ts    # 게임 타입 정의
 │       ├── game.type.d.ts  # 게임 타입 선언
 │       ├── common/         # 게임 공통 요소
-│       │   ├── itemObject.ts  # 아이템 객체 정의
+│       │   ├── itemObject.ts  # 아이템 객체 정의 (기존)
+│       │   ├── itemObjectRefactored.ts  # 아이템 객체 (Strategy 패턴)
 │       │   ├── itemObject.d.ts  # 아이템 타입 선언
+│       │   ├── items/          # 아이템 Strategy 패턴 구현 (신규)
+│       │   │   ├── ItemStrategy.ts
+│       │   │   ├── ItemService.ts
+│       │   │   ├── strategies/  # 각 아이템별 구현
+│       │   │   └── MIGRATION_GUIDE.md
 │       │   └── GameStartMessageBox.svelte  # 게임 시작 역할 안내 메시지박스
 │       ├── chat/           # 채팅 관련
 │       │   ├── chatInput.svelte
@@ -199,7 +207,10 @@ Frontend/src/
 │   ├── store/              # 상태 관리 (Svelte stores)
 │   │   ├── authStore.ts
 │   │   ├── gameStore.d.ts
-│   │   ├── gameStateStore.ts      # 게임 상태 통합 관리
+│   │   ├── gameStateStore.ts      # 게임 상태 통합 관리 (262줄, 리팩토링 완료)
+│   │   ├── chatStore.ts           # 채팅 관련 상태 (69줄, 신규)
+│   │   ├── hostStore.ts           # 숙주 관련 상태 (37줄, 신규)
+│   │   ├── itemHistoryStore.ts    # 아이템 사용 기록 (23줄, 신규)
 │   │   ├── lobbyStore.ts
 │   │   ├── pageStore.ts
 │   │   ├── playerStore.ts         # 플레이어 상태 관리

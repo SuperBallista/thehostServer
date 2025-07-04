@@ -6,7 +6,6 @@ import type {
   MyPlayerState,
   OtherPlayerState
 } from './synchronize.type';
-import type { ChatMessage } from '../../page/game/game.type';
 import { 
   playerId, 
   playerState, 
@@ -15,6 +14,28 @@ import {
   playerAct, 
   playerItems 
 } from './playerStore';
+import { 
+  chatMessages, 
+  regionMessages, 
+  wirelessConnections,
+  addChatMessage,
+  addRegionMessage,
+  eraseRegionMessage,
+  resetChatState
+} from './chatStore';
+import {
+  isHost,
+  zombies,
+  canInfect,
+  infectTarget,
+  updateZombieInfo,
+  resetHostState
+} from './hostStore';
+import {
+  itemUseHistory,
+  addItemUseRecord,
+  resetItemHistory
+} from './itemHistoryStore';
 
 // 게임 기본 정보
 export const gameId = writable<string>('');
@@ -90,56 +111,14 @@ export const playersInMyRegion = derived(
   }
 );
 
-// 채팅 & 메시지
-export const chatMessages = writable<ChatMessage[]>([]);
-// 구역 메시지 인터페이스
-interface RegionMessage {
-  message: string;
-  region: number;
-  isErased?: boolean;
-}
+// Re-export from specialized stores for backward compatibility
+export { chatMessages, regionMessages, wirelessConnections, type WirelessConnection, type MicrophoneMessage } from './chatStore';
 
-export const regionMessages = writable<RegionMessage[]>([]);
+// Re-export from hostStore for backward compatibility
+export { isHost, zombies, canInfect, infectTarget, type ZombieInfo } from './hostStore';
 
-// 무전기 연결
-export interface WirelessConnection {
-  fromPlayerId: number;
-  toPlayerId: number;
-  active: boolean;
-}
-
-// 마이크 메세지
-export interface MicrophoneMessage {
-  message: string;
-  timeStamp: Date
-}
-
-export const wirelessConnections = writable<WirelessConnection[]>([]);
-
-// 좀비 관련 (숙주 전용)
-export interface ZombieInfo {
-  playerId: number;
-  targetId: number | null;
-  region: number;
-  nextRegion: number;
-  turnsUntilMove: number;
-}
-
-export const isHost = writable<boolean>(false);
-export const zombies = writable<ZombieInfo[]>([]);
-export const canInfect = writable<boolean>(true);
-export const infectTarget = writable<number | null>(null);
-
-// 아이템 사용 기록
-export interface ItemUseRecord {
-  playerId: number;
-  item: ItemInterface;
-  targetPlayerId?: number;
-  turn: number;
-  result?: string;
-}
-
-export const itemUseHistory = writable<ItemUseRecord[]>([]);
+// Re-export from itemHistoryStore for backward compatibility
+export { itemUseHistory, type ItemUseRecord } from './itemHistoryStore';
 
 // showMessageBox import
 import { showMessageBox } from '../messagebox/customStore';
@@ -197,39 +176,9 @@ export function updateOtherPlayers(survivors: SurvivorInterface[]) {
   otherPlayers.set(updatedPlayers);
 }
 
-export function addChatMessage(message: any) {
-  const newMessage = {
-    ...message,
-    id: `${Date.now()}-${Math.random()}`,
-    timestamp: new Date()
-  };
-  chatMessages.update(messages => [...messages, newMessage]);
-}
-
-export function addRegionMessage(message: string, region: number) {
-  regionMessages.update(messages => [...messages, { message, region, isErased: false }]);
-}
-
-export function eraseRegionMessage(messageIndex: number) {
-  regionMessages.update(messages => {
-    const newMessages = [...messages];
-    if (newMessages[messageIndex]) {
-      newMessages[messageIndex] = { ...newMessages[messageIndex], isErased: true };
-    }
-    return newMessages;
-  });
-}
-
-export function updateZombieInfo(zombieList: any[]) {
-  const zombieInfos: ZombieInfo[] = zombieList.map(zombie => ({
-    playerId: zombie.playerId,
-    targetId: zombie.targetId,
-    region: zombie.region,
-    nextRegion: zombie.next,
-    turnsUntilMove: zombie.leftTurn
-  }));
-  zombies.set(zombieInfos);
-}
+// Re-export functions from specialized stores for backward compatibility
+export { addChatMessage, addRegionMessage, eraseRegionMessage } from './chatStore';
+export { updateZombieInfo } from './hostStore';
 
 // 게임 알림 표시 함수
 export function showGameNotification(
@@ -263,14 +212,9 @@ export function resetGameState() {
   playerId.set(0);
   // myStatus는 derived store이므로 set할 수 없음
   otherPlayers.set(new Map());
-  chatMessages.set([]);
-  regionMessages.set([]);
-  wirelessConnections.set([]);
-  isHost.set(false);
-  zombies.set([]);
-  canInfect.set(true);
-  infectTarget.set(null);
-  itemUseHistory.set([]);
+  resetChatState();
+  resetHostState();
+  resetItemHistory();
 }
 
 // 서버와 동기화를 위한 함수

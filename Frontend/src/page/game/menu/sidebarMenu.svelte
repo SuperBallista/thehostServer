@@ -7,7 +7,7 @@
     import { currentRoom } from '../../../common/store/pageStore';
     import { get } from 'svelte/store';
     import type { ItemInterface, userRequest, MyPlayerState } from '../../../common/store/synchronize.type';
-    import { itemList } from '../common/itemObject';
+    import { itemList } from '../common/itemObjectRefactored';
     import { showMessageBox } from '../../../common/messagebox/customStore';
     import { musicStore, toggleMusic } from '../../../common/store/musicStore';
     import { nicknameList, Survivor } from '../game.type';
