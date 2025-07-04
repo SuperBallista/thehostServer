@@ -15,25 +15,25 @@
         <h2 class="text-xl font-bold mb-2">{config.title}</h2>
         <p class="mb-4 text-sm">{config.message}</p>
   
-        <ul class="space-y-2 mb-4">
-          {#if config.image}
+        {#if config.image}
           <img class="message-image" src={config.image} alt="image"/>
-          {/if}
-
-          {#each config.players as player}
-            <li>
+        {/if}
+        
+        <div class="max-h-96 overflow-y-auto mb-4">
+          <div class="grid grid-cols-2 gap-2">
+            {#each config.players as player}
               <button
                 on:click={() => {
                   config.resolve(player);
                   selectPlayerStore.set(null);
                 }}
-                class={`w-full py-2 px-4 rounded-xl shadow ${THEME.bgTertiary} hover:${THEME.bgAccent} transition-colors`}
+                class={`py-2 px-4 rounded-xl shadow ${THEME.bgTertiary} hover:${THEME.bgAccent} transition-colors text-center`}
               >
                 {player.nickname}
               </button>
-            </li>
-          {/each}
-        </ul>
+            {/each}
+          </div>
+        </div>
   
         <button
           on:click={() => {
