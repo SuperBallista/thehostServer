@@ -6,6 +6,7 @@
   import { THEME } from '../../common/constant/theme';
   import GameMenu from './gameMenu.svelte';
   import PlayerSelector from './selectModal/playerSelector.svelte';
+  import GraffitiSelector from './selectModal/graffitiSelector.svelte';
   import SelectOptionBox from './selectModal/selectOptionBox.svelte';
   import { pageStore } from '../../common/store/pageStore';
   import { onMount, onDestroy } from 'svelte';
@@ -76,6 +77,7 @@
 </script>
 {#if $pageStore === 'game'}
 <PlayerSelector/>
+<GraffitiSelector/>
 <SelectOptionBox/>
 
 <!-- 🔥 게임 시작 메시지박스 -->

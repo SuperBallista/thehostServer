@@ -671,19 +671,18 @@ export class GameService {
    * 응급치료제 사용 처리
    */
   private async handleMedicineUse(gameId: string, playerData: any): Promise<userDataResponse> {
-    // 감염 상태 확인
-    if (playerData.infected === null || playerData.infected <= 0) {
-      throw new Error('감염되지 않은 상태입니다');
-    }
-
-    // 아이템 소모
+    // 아이템 소모 (감염 여부와 상관없이 소모)
     const itemIndex = playerData.items.indexOf('medicine');
     playerData.items.splice(itemIndex, 1);
     
-    // 감염 치료
-    playerData.infected = null;
+    // 감염되어 있었다면 치료 (조용히 처리)
+    if (playerData.infected !== null && playerData.infected > 0) {
+      playerData.infected = null;
+    }
+    
     await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
 
+    // 감염 여부와 상관없이 동일한 메시지 반환
     return this.gameStateService.createPlayerGameUpdate(gameId, playerData.userId, {
       myStatus: {
         state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
@@ -693,8 +692,8 @@ export class GameService {
         act: playerData.act
       },
       alarm: {
-        message: '감염이 치료되었습니다.',
-        img: 'success'
+        message: '응급치료제를 사용했습니다.',
+        img: 'info'
       }
     });
   }
@@ -894,7 +893,63 @@ export class GameService {
    * 백신 재료 사용 처리
    */
   private async handleVaccineMaterialUse(gameId: string, playerData: any, materialType: ItemInterface): Promise<userDataResponse> {
-    // 백신 재료는 조합용이므로 사용 불가
-    throw new Error('백신 재료는 조합해서 사용해야 합니다');
+    // 필요한 백신 재료들
+    const requiredMaterials = ['vaccineMaterialA', 'vaccineMaterialB', 'vaccineMaterialC'];
+    
+    // 플레이어가 모든 재료를 가지고 있는지 확인
+    const hasAllMaterials = requiredMaterials.every(material => 
+      playerData.items.includes(material)
+    );
+    
+    if (!hasAllMaterials) {
+      // 부족한 재료 찾기
+      const missingMaterials = requiredMaterials.filter(material => 
+        !playerData.items.includes(material)
+      );
+      
+      const materialNames = {
+        'vaccineMaterialA': '항바이러스혈청',
+        'vaccineMaterialB': '촉매정제물질',
+        'vaccineMaterialC': '신경억제단백질'
+      };
+      
+      const missingNames = missingMaterials.map(m => materialNames[m]).join(', ');
+      throw new Error(`백신 제작에 필요한 재료가 부족합니다. (부족: ${missingNames})`);
+    }
+    
+    // 모든 재료 제거
+    requiredMaterials.forEach(material => {
+      const index = playerData.items.indexOf(material);
+      if (index > -1) {
+        playerData.items.splice(index, 1);
+      }
+    });
+    
+    // 백신 추가
+    playerData.items.push('vaccine');
+    
+    // 저장
+    await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+    
+    // 시스템 메시지로 백신 제작 알림
+    await this.chatService.sendSystemMessage(
+      gameId,
+      `${ANIMAL_NICKNAMES[playerData.playerId]}님이 백신을 제작했습니다!`,
+      playerData.regionId
+    );
+    
+    return this.gameStateService.createPlayerGameUpdate(gameId, playerData.userId, {
+      myStatus: {
+        state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
+        items: playerData.items,
+        region: playerData.regionId,
+        next: playerData.next,
+        act: playerData.act
+      },
+      alarm: {
+        message: '백신 제작에 성공했습니다! 이제 숙주에게 백신을 사용할 수 있습니다.',
+        img: 'success'
+      }
+    });
   }
 }

@@ -104,7 +104,15 @@ export class GamePlayer{
         this.infected = null; // 추가
         
         this.state = host ? 'host' : 'alive';
-        this.items = [];
+        
+        // TODO: 테스트용 - 모든 아이템 지급 (나중에 제거해야 함)
+        this.items = [
+            'spray', 'spray', 'spray', 'vaccine', 'shotgun', 'eraser', 'medicine', 'eraser', 'eraser',
+            'microphone', 'vaccineMaterialA', 'vaccineMaterialB', 
+            'vaccineMaterialC', 'virusChecker', 'wireless'
+        ];
+        // 원래 코드: this.items = [];
+        
         this.next = Math.floor(Math.random() * regionNumber);
         this.act = 'lure';
     }

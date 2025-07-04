@@ -1,4 +1,5 @@
 import { selectPlayerMessageBox } from "../../../common/store/selectPlayerMessageBox";
+import { selectGraffitiMessageBox } from "../../../common/store/selectGraffitiMessageBox";
 import { showMessageBox } from "../../../common/messagebox/customStore";
 import type { ItemInterface } from "../../../common/store/synchronize.type";
 import { get } from 'svelte/store';
@@ -6,8 +7,8 @@ import { socketStore } from '../../../common/store/socketStore';
 import { authStore } from '../../../common/store/authStore';
 import { currentRoom } from '../../../common/store/pageStore';
 import type { userRequest } from '../../../common/store/synchronize.type';
-import { otherPlayers, myStatus } from '../../../common/store/gameStateStore';
-import { playerId } from '../../../common/store/playerStore';
+import { otherPlayers, myStatus, regionMessages } from '../../../common/store/gameStateStore';
+import { playerId, playerRegion, playerItems } from '../../../common/store/playerStore';
 import { nicknameList } from '../game.type';
 import { Survivor } from '../game.type';
 
@@ -182,9 +183,67 @@ async function useMedicine(): Promise<boolean> {
 }
 
 async function useMakeVaccine(): Promise<boolean> {
-  // 백신 재료는 조합용이므로 사용 불가
-  await showMessageBox('alert', '알림', '백신 재료는 조합해서 사용해야 합니다.');
-  return false;
+  // 현재 보유한 아이템 확인
+  const currentItems = get(playerItems);
+  
+  // 필요한 재료들
+  const requiredMaterials: ItemInterface[] = ['vaccineMaterialA', 'vaccineMaterialB', 'vaccineMaterialC'];
+  const materialNames: Record<string, string> = {
+    'vaccineMaterialA': '항바이러스혈청',
+    'vaccineMaterialB': '촉매정제물질',
+    'vaccineMaterialC': '신경억제단백질'
+  };
+  
+  // 보유한 재료 확인
+  const hasMaterials = requiredMaterials.map(material => ({
+    item: material,
+    name: materialNames[material],
+    has: currentItems.includes(material)
+  }));
+  
+  // 모든 재료를 가지고 있는지 확인
+  const hasAllMaterials = hasMaterials.every(m => m.has);
+  
+  if (!hasAllMaterials) {
+    // 부족한 재료 목록 만들기
+    const missingMaterials = hasMaterials
+      .filter(m => !m.has)
+      .map(m => m.name)
+      .join(', ');
+    
+    await showMessageBox(
+      'error',
+      '백신 제작 불가',
+      `백신을 만들기 위한 재료가 부족합니다.\n\n현재 보유한 재료:\n${hasMaterials
+        .filter(m => m.has)
+        .map(m => `✓ ${m.name}`)
+        .join('\n') || '없음'}\n\n부족한 재료:\n${hasMaterials
+        .filter(m => !m.has)
+        .map(m => `✗ ${m.name}`)
+        .join('\n')}`,
+      undefined,
+      undefined,
+      '/img/items/vaccine.jpg'
+    );
+    return false;
+  }
+  
+  // 모든 재료가 있으면 제작 확인
+  const confirm = await showMessageBox(
+    'confirm',
+    '백신 제작',
+    '모든 재료가 준비되었습니다.\n백신을 제작하시겠습니까?\n\n사용될 재료:\n• 항바이러스혈청\n• 촉매정제물질\n• 신경억제단백질',
+    undefined,
+    undefined,
+    '/img/items/vaccine.jpg'
+  );
+  
+  if (!confirm.success) {
+    return false;
+  }
+  
+  // 백신 제작 요청 (특별한 아이템 코드 사용)
+  return await sendUseItemRequest('vaccineMaterialA'); // 서버에서 3개 모두 확인하고 처리
 }
 
 async function useWireless(): Promise<boolean> {
@@ -242,10 +301,62 @@ async function useWireless(): Promise<boolean> {
 }
 
 async function useEraser(): Promise<boolean> {
-  // 구역의 낙서 목록을 보여주고 선택하도록 함
-  // 실제로는 구역 정보를 가져와서 낙서 목록을 표시해야 함
-  await showMessageBox('alert', '알림', '지우개 기능은 준비 중입니다.');
-  return false;
+  // 현재 지역의 메시지 목록 가져오기
+  const messages = get(regionMessages);
+  const currentRegion = get(playerRegion);
+  
+  // 현재 지역의 메시지만 필터링하고 원본 인덱스 유지
+  const regionFilteredMessages = messages
+    .filter(msg => msg.region === currentRegion);
+  
+  // 지우지 않은 메시지들과 그들의 regionMessageList 인덱스 매핑
+  const availableMessages: { message: string; index: number }[] = [];
+  
+  regionFilteredMessages.forEach((msg, idx) => {
+    if (msg.message && !msg.isErased) {
+      availableMessages.push({
+        message: msg.message,
+        index: idx // regionMessageList에서의 인덱스
+      });
+    }
+  });
+
+  if (availableMessages.length === 0) {
+    await showMessageBox(
+      'error',
+      '지우개 사용 불가',
+      '이 구역에 지울 수 있는 낙서가 없습니다.'
+    );
+    return false;
+  }
+
+  // 커스텀 낙서 선택 컴포넌트 사용
+  const selectedGraffiti = await selectGraffitiMessageBox(
+    '낙서 지우기',
+    '지울 낙서를 선택하세요.',
+    availableMessages,
+    '/img/items/eraser.jpg'
+  );
+
+  if (!selectedGraffiti) {
+    return false;
+  }
+
+  // 선택한 메시지 확인
+  const confirmResponse = await showMessageBox(
+    'confirm',
+    '낙서 삭제 확인',
+    `다음 낙서를 지우시겠습니까?\n\n"${selectedGraffiti.message}"\n\n※ 지운 흔적이 남게 됩니다.`,
+    undefined,
+    undefined,
+    '/img/items/eraser.jpg'
+  );
+
+  if (!confirmResponse.success) {
+    return false;
+  }
+
+  return await sendUseItemRequest('eraser', undefined, undefined, selectedGraffiti.index);
 }
 
 async function useShotgun(): Promise<boolean> {
