@@ -12,6 +12,7 @@ export const playerRegion = writable<number>(0);
 export const playerNextRegion = writable<number>(0);
 export const playerAct = writable<'runaway' | 'hide' | 'lure'>('lure');
 export const playerItems = writable<ItemInterface[]>([]);
+export const playerCanEscape = writable<boolean>(true); // 도주 가능 여부
 
 // === 파생 스토어 ===
 // myStatus는 gameStateStore.ts에서 관리
@@ -27,6 +28,7 @@ export function updatePlayerStatus(data: GamePlayerStatusInterface) {
   if (data.items !== undefined) {
     playerItems.set(data.items);
   }
+  if (data.canEscape !== undefined) playerCanEscape.set(data.canEscape);
 }
 
 // 다음 이동 구역 설정
@@ -59,4 +61,5 @@ export function resetPlayerStore() {
   playerNextRegion.set(0);
   playerAct.set('lure');
   playerItems.set([]);
+  playerCanEscape.set(true);
 }

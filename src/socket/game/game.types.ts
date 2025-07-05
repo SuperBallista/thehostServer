@@ -85,6 +85,7 @@ export interface GamePlayerInRedis {
     regionId: number;
     next: number;
     act: Act;
+    canEscape: boolean; // 도주 가능 여부 (true: 가능, false: 이미 도주 선택함)
 }
 
 export class GamePlayer{
@@ -96,6 +97,7 @@ export class GamePlayer{
     regionId: number;
     next: number;
     act: Act;
+    canEscape: boolean;
 
     constructor(playerId: number, userId: number, regionId: number, host: boolean, regionNumber: number) {
         this.playerId = playerId;
@@ -109,6 +111,7 @@ export class GamePlayer{
         
         this.next = Math.floor(Math.random() * regionNumber);
         this.act = 'lure';
+        this.canEscape = true; // 초기값: 도주 가능
     }
 
     recordData(){
@@ -120,7 +123,8 @@ export class GamePlayer{
             items: this.items,
             regionId: this.regionId,
             next: this.next,
-            act: this.act
+            act: this.act,
+            canEscape: this.canEscape
         }
         return playerData
     }

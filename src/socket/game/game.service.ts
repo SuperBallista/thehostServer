@@ -16,6 +16,7 @@ import { HostActionService } from './host-action.service';
 import { ConnectionService } from '../connection.service';
 import { ItemHandlerService } from './item-handler.service';
 import { CombatHandlerService } from './combat-handler.service';
+import { ZombieService } from './zombie.service';
 import { Socket } from 'socket.io';
 
 @Injectable()
@@ -31,6 +32,7 @@ export class GameService {
     private readonly connectionService: ConnectionService,
     private readonly itemHandlerService: ItemHandlerService,
     private readonly combatHandlerService: CombatHandlerService,
+    private readonly zombieService: ZombieService,
   ) {}
 
   /**
@@ -144,6 +146,44 @@ export class GameService {
       throw new WsException('플레이어 데이터를 찾을 수 없습니다');
     }
 
+    // act 필드가 있으면 좀비 대처 행동 업데이트
+    if (status.act !== undefined && status.act !== playerData.act) {
+      console.log('좀비 대처 행동 업데이트:', {
+        currentAct: playerData.act,
+        newAct: status.act,
+        canEscape: playerData.canEscape
+      });
+      
+      // 도주 선택 시 canEscape를 false로 설정
+      if (status.act === 'runaway') {
+        if (!playerData.canEscape) {
+          throw new WsException('이미 도주를 선택하여 다시 도주할 수 없습니다');
+        }
+        playerData.canEscape = false;
+      }
+      
+      playerData.act = status.act;
+      await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+      
+      // 시스템 메시지 전송
+      let actionMessage = '';
+      switch (status.act) {
+        case 'hide':
+          actionMessage = '이번 턴에 좀비로부터 숨기로 결정했습니다.';
+          break;
+        case 'lure':
+          actionMessage = '이번 턴에 좀비를 유인하기로 결정했습니다.';
+          break;
+        case 'runaway':
+          actionMessage = '이번 턴에 좀비로부터 도주하기로 결정했습니다. (연속 도주 불가)';
+          break;
+      }
+      
+      if (actionMessage) {
+        await this.chatService.sendSystemMessage(gameId, actionMessage, playerData.regionId);
+      }
+    }
+
     // next 필드가 있으면 다음 이동 장소 업데이트
     if (status.next !== undefined && status.next !== playerData.next) {
       console.log('이동 장소 업데이트:', {
@@ -250,9 +290,28 @@ export class GameService {
       regionNumber = 5;
     }
 
-    const gamePlayers = players.map((player, index) => 
-      new GamePlayer(index, player.id, index % regionNumber, index === hostPlayer, regionNumber)
-    );
+    // 원본 코드 (프로덕션용)
+    // const gamePlayers = players.map((player, index) => 
+    //   new GamePlayer(index, player.id, index % regionNumber, index === hostPlayer, regionNumber)
+    // );
+
+    // 🧪 테스트 코드 시작 (프로덕션에서는 위 원본 코드 주석 해제하고 아래 테스트 코드 주석 처리)
+    const gamePlayers = players.map((player, index) => {
+      const gamePlayer = new GamePlayer(index, player.id, index % regionNumber, index === hostPlayer, regionNumber);
+      
+      // 봇 플레이어(id < 0)이고 호스트가 아닌 경우, 30% 확률로 좀비로 시작
+      if (player.id < 0 && index !== hostPlayer && Math.random() < 0.3) {
+        gamePlayer.state = 'zombie';
+        console.log(`🧟 테스트: 봇 플레이어 ${player.nickname}(ID: ${player.id})를 좀비로 시작`);
+      }
+      
+      return gamePlayer;
+    });
+
+    // 좀비 수 확인 로그
+    const zombieCount = gamePlayers.filter(p => p.state === 'zombie').length;
+    console.log(`🧪 테스트 모드: 총 ${zombieCount}명의 봇이 좀비로 시작합니다.`);
+    // 🧪 테스트 코드 끝
 
     return gamePlayers;
   }
@@ -268,6 +327,12 @@ export class GameService {
     // 플레이어 데이터 저장
     for (const player of players) {
       await this.gameDataService.savePlayerData(roomId, player.playerId, player.recordData());
+      
+      // 🧪 테스트: 좀비 상태인 플레이어는 ZombieService에도 등록
+      if (player.state === 'zombie') {
+        await this.zombieService.createZombie(roomId, player.playerId, player.regionId);
+        console.log(`🧟 테스트: 좀비 ${player.playerId}를 ZombieService에 등록`);
+      }
     }
 
     // 구역 데이터 초기화 (모든 구역에 대해 빈 채팅 로그와 메시지 리스트 생성)

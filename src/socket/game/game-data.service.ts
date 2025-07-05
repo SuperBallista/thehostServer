@@ -47,6 +47,14 @@ export class GameDataService {
   }
 
   /**
+   * 호스트 유저 ID 가져오기
+   */
+  async getHostUserId(gameId: string): Promise<number> {
+    const gameData = await this.getGameData(gameId);
+    return gameData.hostId;
+  }
+
+  /**
    * 호스트 데이터 저장
    */
   async saveHostData(gameId: string, hostData: Host): Promise<void> {

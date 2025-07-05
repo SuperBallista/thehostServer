@@ -1,7 +1,7 @@
 <script lang="ts">
     import { THEME } from "../../../common/constant/theme";
     import { showSelectOptionBox } from "../../../common/store/selectOptionStore";
-    import { myStatus, isHost, canInfect, zombies, regionNames, playersInMyRegion } from '../../../common/store/gameStateStore';
+    import { myStatus, isHost, canInfect, zombies, regionNames, playersInMyRegion, hasZombieInMyRegion } from '../../../common/store/gameStateStore';
     import { socketStore } from '../../../common/store/socketStore';
     import { authStore } from '../../../common/store/authStore';
     import { currentRoom } from '../../../common/store/pageStore';
@@ -12,7 +12,7 @@
     import { musicStore, toggleMusic } from '../../../common/store/musicStore';
     import { nicknameList, Survivor } from '../game.type';
     import { selectPlayerMessageBox } from '../../../common/store/selectPlayerMessageBox';
-    import { exitGame, infectPlayer, giveItem } from '../common/gameActions';
+    import { exitGame, infectPlayer, giveItem, copeWithZombie, controlZombie } from '../common/gameActions';
 
   let inventory:HTMLElement
   let action:HTMLElement
@@ -69,7 +69,7 @@ async function moveNextRegion() {
         state: currentStatus.state,
         items: currentStatus.items,
         region: currentStatus.region,
-        next: selectedRegion, // 선택한 지역 번호
+        nextRegion: selectedRegion, // 선택한 지역 번호
         act: currentStatus.act
       }
     };
@@ -112,7 +112,11 @@ async function moveNextRegion() {
     <button bind:this={action} class="w-full text-left px-4 py-2 font-semibold" on:click={() => toggle('action')}>🧭 행동</button>
       <div class="pl-6 mt-1 space-y-1 text-sm flex flex-col">
         <button on:click={() => moveNextRegion()} class={`block w-full py-2 rounded ${THEME.bgAccent}`}>다음 턴 이동 장소 설정</button>
-          <button class={`block w-full py-2 rounded ${THEME.bgDisabled}`}>좀비 대처 행동</button>
+          <button 
+            class={`block w-full py-2 rounded ${$hasZombieInMyRegion ? THEME.bgAccent : THEME.bgDisabled}`}
+            disabled={!$hasZombieInMyRegion}
+            on:click={copeWithZombie}
+          >좀비 대처 행동</button>
           <button 
             class={`block w-full py-2 rounded ${$isHost && $canInfect ? THEME.bgAccent : THEME.bgDisabled}`}
             disabled={!$isHost || !$canInfect}
@@ -121,11 +125,8 @@ async function moveNextRegion() {
           <button 
             class={`block w-full py-2 rounded ${$isHost && $zombies.length > 0 ? THEME.bgAccent : THEME.bgDisabled}`}
             disabled={!$isHost || $zombies.length === 0}
-          >좀비의 공격 대상 정하기(숙주 전용)</button>
-          <button 
-            class={`block w-full py-2 rounded ${$isHost && $zombies.length > 0 ? THEME.bgAccent : THEME.bgDisabled}`}
-            disabled={!$isHost || $zombies.length === 0}
-          >좀비의 이동 구역 정하기(숙주 전용)</button>
+            on:click={controlZombie}
+          >좀비 제어하기(숙주 전용)</button>
       </div>
   <!-- ⏭️ 넘기기 -->
   <div bind:this={skip} class="mt-4">

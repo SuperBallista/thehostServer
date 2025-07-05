@@ -68,7 +68,7 @@ export class ItemHandlerService {
           state: (receiverData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
           items: receiverData.items,
           region: receiverData.regionId,
-          next: receiverData.next,
+          nextRegion: receiverData.next,
           act: receiverData.act
         },
         alarm: {
@@ -83,7 +83,7 @@ export class ItemHandlerService {
         state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
         items: playerData.items,
         region: playerData.regionId,
-        next: playerData.next,
+        nextRegion: playerData.next,
         act: playerData.act
       },
       alarm: {
@@ -124,7 +124,7 @@ export class ItemHandlerService {
         state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
         items: playerData.items,
         region: playerData.regionId,
-        next: playerData.next,
+        nextRegion: playerData.next,
         act: playerData.act
       },
       alarm: {
@@ -172,7 +172,7 @@ export class ItemHandlerService {
         state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
         items: playerData.items,
         region: playerData.regionId,
-        next: playerData.next,
+        nextRegion: playerData.next,
         act: playerData.act
       },
       alarm: {
@@ -202,7 +202,7 @@ export class ItemHandlerService {
         state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
         items: playerData.items,
         region: playerData.regionId,
-        next: playerData.next,
+        nextRegion: playerData.next,
         act: playerData.act
       },
       alarm: {
@@ -233,7 +233,7 @@ export class ItemHandlerService {
         state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
         items: playerData.items,
         region: playerData.regionId,
-        next: playerData.next,
+        nextRegion: playerData.next,
         act: playerData.act
       },
       alarm: {
@@ -279,7 +279,7 @@ export class ItemHandlerService {
         state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
         items: playerData.items,
         region: playerData.regionId,
-        next: playerData.next,
+        nextRegion: playerData.next,
         act: playerData.act
       },
       alarm: {
@@ -311,7 +311,7 @@ export class ItemHandlerService {
         state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
         items: playerData.items,
         region: playerData.regionId,
-        next: playerData.next,
+        nextRegion: playerData.next,
         act: playerData.act
       },
       alarm: {
@@ -372,7 +372,7 @@ export class ItemHandlerService {
         state: (playerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
         items: playerData.items,
         region: playerData.regionId,
-        next: playerData.next,
+        nextRegion: playerData.next,
         act: playerData.act
       },
       alarm: {

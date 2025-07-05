@@ -209,7 +209,7 @@ function updateData(payload: userDataResponse) {
   // 게임 관련 모든 업데이트는 syncWithServer로 통합 처리
   const hasGameData = payload.myStatus || payload.survivorList || payload.gameTurn || 
                      payload.region || payload.hostAct || payload.count || 
-                     payload.useRegionsNumber || payload.endGame;
+                     payload.useRegionsNumber || payload.endGame || payload.chatMessage;
   
   if (hasGameData) {
     syncWithServer(payload);

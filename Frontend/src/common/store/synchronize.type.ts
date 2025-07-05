@@ -86,8 +86,9 @@ export interface GamePlayerStatusInterface{ // 내 정보
  state: MyPlayerState; // 자신의 상태는 alive 또는 host만 가능
  items: ItemInterface[];
  region: number;
- next: number;
- act: Act
+ nextRegion: number;
+ act: Act;
+ canEscape?: boolean; // 도주 가능 여부 (true: 가능, false: 이미 도주 선택함)
 }
 
 export interface SurvivorInterface{ // 생존자 정보
@@ -111,8 +112,8 @@ interface Region{
 
 interface Zombie{
     playerId: number
-    targetId: number
-    next: number
+    targetId: number | undefined
+    nextRegion: number
     leftTurn: number
     region: number
 }

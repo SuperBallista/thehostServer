@@ -56,8 +56,9 @@ export class GameStateService {
         state: (myPlayerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
         items: myPlayerData.items as any,
         region: myPlayerData.regionId,
-        next: myPlayerData.next,
-        act: myPlayerData.act as any
+        nextRegion: myPlayerData.next,
+        act: myPlayerData.act as any,
+        canEscape: myPlayerData.canEscape
       },
       gameTurn: gameData.turn,
       count: this.getTurnDuration(gameData.turn),

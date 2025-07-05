@@ -12,7 +12,8 @@ import {
   playerRegion, 
   playerNextRegion, 
   playerAct, 
-  playerItems 
+  playerItems,
+  playerCanEscape 
 } from './playerStore';
 import { 
   chatMessages, 
@@ -69,12 +70,13 @@ export interface MyPlayerStatus {
   nextRegion: number;
   act: 'runaway' | 'hide' | 'lure';
   items: ItemInterface[];
+  canEscape?: boolean; // 도주 가능 여부
 }
 
 // myStatus를 playerStore의 값들을 합쳐서 파생 스토어로 제공
 export const myStatus = derived(
-  [playerId, playerState, playerRegion, playerNextRegion, playerAct, playerItems],
-  ([$playerId, $state, $region, $nextRegion, $act, $items]) => {
+  [playerId, playerState, playerRegion, playerNextRegion, playerAct, playerItems, playerCanEscape],
+  ([$playerId, $state, $region, $nextRegion, $act, $items, $canEscape]) => {
     if ($playerId === undefined) return null;
     
     // MyPlayerState 타입으로 안전하게 변환
@@ -87,7 +89,8 @@ export const myStatus = derived(
       region: $region,
       nextRegion: $nextRegion,
       act: $act,
-      items: $items
+      items: $items,
+      canEscape: $canEscape
     } as MyPlayerStatus;
   }
 );
@@ -108,6 +111,14 @@ export const playersInMyRegion = derived(
       }
     });
     return players;
+  }
+);
+
+// 같은 구역에 좀비가 있는지 확인 (파생 스토어)
+export const hasZombieInMyRegion = derived(
+  playersInMyRegion,
+  $playersInMyRegion => {
+    return $playersInMyRegion.some(player => player.state === 'zombie');
   }
 );
 
@@ -144,9 +155,10 @@ export function updateMyStatus(status: GamePlayerStatusInterface) {
     }
   }
   if (status.region !== undefined) playerRegion.set(status.region);
-  if (status.next !== undefined) playerNextRegion.set(status.next);
+  if (status.nextRegion !== undefined) playerNextRegion.set(status.nextRegion);
   if (status.act !== undefined) playerAct.set(status.act);
   if (status.items !== undefined) playerItems.set(status.items);
+  if (status.canEscape !== undefined) playerCanEscape.set(status.canEscape);
 }
 
 export function updateOtherPlayers(survivors: SurvivorInterface[]) {
@@ -277,6 +289,13 @@ export function syncWithServer(serverData: any) {
       });
     }
   }
+  
+  // 무전기 메시지 처리 (direct chatMessage)
+  if (serverData.chatMessage) {
+    console.log('무전기 메시지 수신:', serverData.chatMessage);
+    chatMessages.update(messages => [...messages, serverData.chatMessage]);
+  }
+  
   if (serverData.alarm) {
     showGameNotification(
       serverData.alarm.message,

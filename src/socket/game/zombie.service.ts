@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { RedisService } from 'src/redis/redis.service';
 import { WsException } from '@nestjs/websockets';
+import { PlayerManagerService } from './player-manager.service';
 
 // Redis에 저장되는 실제 좀비 상태
 export interface ZombieState {
@@ -22,15 +23,17 @@ export interface ZombieCommand {
 export interface HostZombieInfo {
   playerId: number;
   targetId: number | null;
-  next: number;
+  nextRegion: number;
   leftTurn: number;
   region: number;
+  survivorsInRegion?: number[]; // 해당 좀비와 같은 구역에 있는 생존자 ID 목록
 }
 
 @Injectable()
 export class ZombieService {
   constructor(
     private readonly redisService: RedisService,
+    private readonly playerManagerService: PlayerManagerService,
   ) {}
 
   // 1. 좀비 생성 (플레이어가 감염되었을 때)
@@ -62,15 +65,30 @@ export class ZombieService {
       throw new WsException('좀비를 찾을 수 없습니다');
     }
 
+    console.log(`[ZombieService] 좀비 명령 설정 - gameId: ${gameId}, zombieId: ${command.playerId}`);
+    console.log(`  이전 상태:`, {
+      targetId: zombieState.targetId,
+      nextRegion: zombieState.nextRegion,
+      region: zombieState.region,
+      leftTurn: zombieState.leftTurn
+    });
+
     // 명령에 따라 상태 업데이트
     if (command.targetId !== undefined) {
       zombieState.targetId = command.targetId;
+      console.log(`  공격 대상 변경: ${command.targetId === null ? '없음' : command.targetId}`);
     }
     if (command.nextRegion !== undefined) {
       zombieState.nextRegion = command.nextRegion;
+      console.log(`  다음 이동 지역 변경: ${command.nextRegion}`);
     }
 
     await this.redisService.stringifyAndSet(zombieKey, zombieState);
+    
+    console.log(`  새로운 상태:`, {
+      targetId: zombieState.targetId,
+      nextRegion: zombieState.nextRegion
+    });
   }
 
   // 3. 턴 진행시 좀비 상태 업데이트
@@ -131,17 +149,40 @@ export class ZombieService {
     return zombies;
   }
 
-  // 6. 호스트에게 보낼 좀비 정보 변환
+  // 6. 호스트에게 보낼 좀비 정보 변환 (각 좀비 구역의 생존자 정보 포함)
   async getZombiesForHost(gameId: string): Promise<HostZombieInfo[]> {
     const zombies = await this.getAllZombies(gameId);
     
-    return zombies.map(zombie => ({
-      playerId: zombie.playerId,
-      targetId: zombie.targetId,
-      next: zombie.nextRegion,
-      leftTurn: zombie.leftTurn,
-      region: zombie.region
+    console.log(`[ZombieService] getZombiesForHost - gameId: ${gameId}, 좀비 수: ${zombies.length}`);
+    
+    // 모든 플레이어 정보 가져오기
+    const allPlayers = await this.playerManagerService.getAllPlayersInGame(gameId);
+    
+    const hostZombieInfos = await Promise.all(zombies.map(async zombie => {
+      // 해당 좀비와 같은 구역에 있는 생존자 찾기
+      const survivorsInRegion = allPlayers
+        .filter(player => 
+          player.regionId === zombie.region && 
+          (player.state === 'alive' || player.state === 'host') &&
+          player.playerId !== zombie.playerId
+        )
+        .map(player => player.playerId);
+      
+      console.log(`[ZombieService] 좀비 ${zombie.playerId}와 같은 구역(${zombie.region})의 생존자:`, survivorsInRegion);
+      
+      return {
+        playerId: zombie.playerId,
+        targetId: zombie.targetId,
+        nextRegion: zombie.nextRegion,
+        leftTurn: zombie.leftTurn,
+        region: zombie.region,
+        survivorsInRegion: survivorsInRegion
+      };
     }));
+    
+    console.log('[ZombieService] 호스트에게 전송할 좀비 정보:', hostZombieInfos);
+    
+    return hostZombieInfos;
   }
 
   // 7. 좀비 제거 (치료되었을 때)

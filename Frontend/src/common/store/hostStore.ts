@@ -4,10 +4,11 @@ import type { ItemInterface } from './synchronize.type';
 // 좀비 정보 인터페이스
 export interface ZombieInfo {
   playerId: number;
-  targetId: number | null;
+  targetId: number | undefined;
   region: number;
   nextRegion: number;
   turnsUntilMove: number;
+  survivorsInRegion?: number[]; // 좀비와 같은 구역에 있는 생존자 ID 목록
 }
 
 // 호스트 관련 스토어
@@ -18,13 +19,24 @@ export const infectTarget = writable<number | null>(null);
 
 // 좀비 정보 업데이트
 export function updateZombieInfo(zombieList: any[]) {
+  console.log('[hostStore] updateZombieInfo 호출됨:', zombieList);
+  
+  if (!zombieList || !Array.isArray(zombieList)) {
+    console.warn('[hostStore] zombieList가 유효하지 않음:', zombieList);
+    zombies.set([]);
+    return;
+  }
+  
   const zombieInfos: ZombieInfo[] = zombieList.map(zombie => ({
     playerId: zombie.playerId,
     targetId: zombie.targetId,
     region: zombie.region,
-    nextRegion: zombie.next,
-    turnsUntilMove: zombie.leftTurn
+    nextRegion: zombie.nextRegion,
+    turnsUntilMove: zombie.leftTurn,
+    survivorsInRegion: zombie.survivorsInRegion || []
   }));
+  
+  console.log('[hostStore] 좀비 정보 업데이트:', zombieInfos);
   zombies.set(zombieInfos);
 }
 
