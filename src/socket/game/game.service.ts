@@ -340,10 +340,10 @@ export class GameService {
       const gamePlayer = new GamePlayer(index, player.id, index % regionNumber, index === hostPlayer, regionNumber);
       
       // 봇 플레이어(id < 0)이고 호스트가 아닌 경우, 30% 확률로 좀비로 시작
-      if (player.id < 0 && index !== hostPlayer && Math.random() < 0.3) {
-        gamePlayer.state = 'zombie';
-        console.log(`🧟 테스트: 봇 플레이어 ${player.nickname}(ID: ${player.id})를 좀비로 시작`);
-      }
+      // if (player.id < 0 && index !== hostPlayer && Math.random() < 0.3) {
+      //   gamePlayer.state = 'zombie';
+      //   console.log(`🧟 테스트: 봇 플레이어 ${player.nickname}(ID: ${player.id})를 좀비로 시작`);
+      // }
       
       return gamePlayer;
     });
