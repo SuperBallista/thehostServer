@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { Host, ANIMAL_NICKNAMES } from './game.types';
-import { userDataResponse } from '../payload.types';
+import { userDataResponse, HostAct } from '../payload.types';
 import { PlayerManagerService } from './player-manager.service';
 import { GameDataService } from './game-data.service';
-import { ZombieService } from './zombie.service';
+import { ZombieService, ZombieCommand } from './zombie.service';
 import { GameStateService } from './game-state.service';
 import { ChatService } from './chat.service';
 
@@ -21,7 +21,7 @@ export class HostActionService {
   /**
    * 호스트 액션 처리 (감염, 좀비 명령)
    */
-  async handleHostAction(userId: number, hostAct: any): Promise<userDataResponse> {
+  async handleHostAction(userId: number, hostAct: HostAct): Promise<userDataResponse> {
     // 현재 위치 상태 확인
     const locationState = await this.playerManagerService.getPlayerLocationState(userId);
     if (locationState.state !== 'game' || !locationState.roomId) {
@@ -84,7 +84,7 @@ export class HostActionService {
   /**
    * 좀비 명령 처리
    */
-  private async processZombieCommands(gameId: string, zombieCommands: any[]): Promise<void> {
+  private async processZombieCommands(gameId: string, zombieCommands: ZombieCommand[]): Promise<void> {
     console.log(`[HostAction] 좀비 명령 처리 시작 - gameId: ${gameId}, 명령 수: ${zombieCommands.length}`);
     
     for (const zombieCommand of zombieCommands) {
@@ -122,7 +122,7 @@ export class HostActionService {
         }
 
         // 이동 지역 설정 메시지 (이동 명령일 때만)
-        if (isMoveCommand) {
+        if (isMoveCommand && zombieCommand.nextRegion !== undefined) {
           const regionNames = ['해안', '폐건물', '정글', '동굴', '산 정상', '개울'];
           const nextRegionName = regionNames[zombieCommand.nextRegion] || '알 수 없는 지역';
           const turnsUntilMove = zombieState.leftTurn;

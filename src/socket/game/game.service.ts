@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { RedisPubSubService } from '../../redis/redisPubSub.service';
 import { Game, GamePlayer, GamePlayerInRedis, REGION_NAMES, ITEM_NAMES, ANIMAL_NICKNAMES } from './game.types';
-import { Room, ItemInterface, MyPlayerState } from '../payload.types';
+import { Room, ItemInterface, MyPlayerState, ChatMessage, HostAct, GamePlayerStatusInterface, SurvivorInterface } from '../payload.types';
 import { getOrderRandom } from '../utils/randomManager';
 import { userDataResponse } from '../payload.types';
 import { userShortInfo } from '../data.types';
@@ -115,22 +115,29 @@ export class GameService {
   /**
    * 채팅 메시지 처리 위임
    */
-  async handleChatMessage(userId: number, chatMessage: any): Promise<userDataResponse> {
+  async handleChatMessage(userId: number, chatMessage: ChatMessage): Promise<userDataResponse> {
     return this.chatService.handleChatMessage(userId, chatMessage);
   }
 
   /**
    * 호스트 액션 처리 위임
    */
-  async handleHostAction(userId: number, hostAct: any): Promise<userDataResponse> {
+  async handleHostAction(userId: number, hostAct: HostAct): Promise<userDataResponse> {
     return this.hostActionService.handleHostAction(userId, hostAct);
   }
 
   /**
    * 플레이어 상태 업데이트 (이동 장소 설정 등)
    */
-  async updatePlayerStatus(userId: number, status: any): Promise<userDataResponse> {
-    console.log('updatePlayerStatus 호출:', { userId, status });
+  async updatePlayerStatus(userId: number, status: GamePlayerStatusInterface): Promise<userDataResponse> {
+    console.log('updatePlayerStatus 호출:', { 
+      userId, 
+      status,
+      hasAct: status.act !== undefined,
+      actValue: status.act,
+      hasNext: status.next !== undefined,
+      nextValue: status.next
+    });
     
     // 현재 위치 상태 확인
     const locationState = await this.playerManagerService.getPlayerLocationState(userId);
@@ -145,69 +152,102 @@ export class GameService {
     if (!playerData) {
       throw new WsException('플레이어 데이터를 찾을 수 없습니다');
     }
+    
+    // 좀비 대처 행동이 변경되었는지 추적
+    let actChanged = false;
 
     // act 필드가 있으면 좀비 대처 행동 업데이트
-    if (status.act !== undefined && status.act !== playerData.act) {
-      console.log('좀비 대처 행동 업데이트:', {
-        currentAct: playerData.act,
-        newAct: status.act,
-        canEscape: playerData.canEscape
+    if (status.act !== undefined) {
+      console.log('좀비 대처 행동 체크:', {
+        statusAct: status.act,
+        playerAct: playerData.act,
+        isEqual: status.act === playerData.act,
+        willUpdate: status.act !== playerData.act
       });
       
-      // 도주 선택 시 canEscape를 false로 설정
-      if (status.act === 'runaway') {
-        if (!playerData.canEscape) {
-          throw new WsException('이미 도주를 선택하여 다시 도주할 수 없습니다');
+      if (status.act !== playerData.act) {
+        console.log('좀비 대처 행동 업데이트 진행');
+        actChanged = true; // 변경됨을 표시
+        
+        // 도주 선택 시 canEscape를 false로 설정
+        if (status.act === 'runaway') {
+          if (!playerData.canEscape) {
+            throw new WsException('이미 도주를 선택하여 다시 도주할 수 없습니다');
+          }
+          playerData.canEscape = false;
         }
-        playerData.canEscape = false;
-      }
-      
-      playerData.act = status.act;
-      await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
-      
-      // 시스템 메시지 전송
-      let actionMessage = '';
-      switch (status.act) {
-        case 'hide':
-          actionMessage = '이번 턴에 좀비로부터 숨기로 결정했습니다.';
-          break;
-        case 'lure':
-          actionMessage = '이번 턴에 좀비를 유인하기로 결정했습니다.';
-          break;
-        case 'runaway':
-          actionMessage = '이번 턴에 좀비로부터 도주하기로 결정했습니다. (연속 도주 불가)';
-          break;
-      }
-      
-      if (actionMessage) {
-        await this.chatService.sendSystemMessage(gameId, actionMessage, playerData.regionId);
+        
+        playerData.act = status.act;
+        await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+        
+        // 좀비 대처 행동은 본인에게만 보이므로 여기서는 시스템 메시지를 보내지 않음
       }
     }
 
     // next 필드가 있으면 다음 이동 장소 업데이트
-    if (status.next !== undefined && status.next !== playerData.next) {
-      console.log('이동 장소 업데이트:', {
-        currentNext: playerData.next,
-        newNext: status.next,
-        type: typeof status.next,
-        regionNames: REGION_NAMES
+    if (status.next !== undefined) {
+      console.log('이동 장소 체크:', {
+        statusNext: status.next,
+        playerNext: playerData.next,
+        isEqual: status.next === playerData.next,
+        willUpdate: status.next !== playerData.next,
+        typeOfStatusNext: typeof status.next,
+        typeOfPlayerNext: typeof playerData.next
       });
       
-      // Redis에 다음 이동 장소 저장
-      playerData.next = Number(status.next); // 숫자로 변환
-      await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+      // 숫자로 변환하여 비교
+      const newNext = Number(status.next);
+      const currentNext = Number(playerData.next);
       
-      // 시스템 메시지 전송
-      const nextRegion = Number(status.next);
-      const regionName = REGION_NAMES[nextRegion] || '알 수 없는 지역';
-      const systemMessage = `다음 턴에 ${regionName}으로 이동합니다.`;
-      console.log('시스템 메시지:', { nextRegion, regionName, systemMessage });
-      
-      await this.chatService.sendSystemMessage(gameId, systemMessage, playerData.regionId);
+      if (newNext !== currentNext) {
+        console.log('이동 장소 업데이트 진행');
+        
+        // Redis에 다음 이동 장소 저장
+        playerData.next = newNext;
+        await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
+        
+        // 시스템 메시지 전송
+        const nextRegion = Number(status.next);
+        const regionName = REGION_NAMES[nextRegion] || '알 수 없는 지역';
+        const systemMessage = `다음 턴에 ${regionName}으로 이동합니다.`;
+        console.log('시스템 메시지:', { nextRegion, regionName, systemMessage });
+        
+        await this.chatService.sendSystemMessage(gameId, systemMessage, playerData.regionId);
+      }
     }
 
     // 업데이트된 상태 반환
-    return this.gameStateService.createPlayerGameUpdate(gameId, userId, {});
+    const response = await this.gameStateService.createPlayerGameUpdate(gameId, userId, {});
+    
+    // 좀비 대처 행동 메시지는 본인에게만 보여야 함
+    if (actChanged && status.act !== undefined) {
+      let personalMessage = '';
+      switch (status.act) {
+        case 'hide':
+          personalMessage = '이번 턴에 좀비로부터 숨기로 결정했습니다.';
+          break;
+        case 'lure':
+          personalMessage = '이번 턴에 좀비를 유인하기로 결정했습니다.';
+          break;
+        case 'runaway':
+          personalMessage = '이번 턴에 좀비로부터 도주하기로 결정했습니다. (연속 도주 불가)';
+          break;
+      }
+      
+      if (personalMessage) {
+        // 본인에게만 보이는 메시지로 응답에 포함
+        response.region = {
+          chatLog: [{
+            system: true,
+            message: personalMessage,
+            timeStamp: new Date()
+          }],
+          regionMessageList: []
+        };
+      }
+    }
+    
+    return response;
   }
 
   /**
@@ -389,7 +429,7 @@ export class GameService {
     console.log(`전체 플레이어 수: ${allPlayers.length}`);
     
     // 생존자 리스트 업데이트를 위한 데이터 준비
-    const survivorListUpdates: { [userId: number]: any } = {};
+    const survivorListUpdates: { [userId: number]: { survivorList: SurvivorInterface[] } } = {};
     
     for (const player of allPlayers) {
       if (player.userId > 0 && player.state !== 'left') {
@@ -469,6 +509,23 @@ export class GameService {
 
     // ItemHandlerService에 위임
     return await this.itemHandlerService.handleGiveItem(gameId, playerData, giveItem);
+  }
+
+  /**
+   * 턴 남은 시간 가져오기
+   */
+  async getRemainingTurnTime(userId: number): Promise<userDataResponse> {
+    const locationState = await this.playerManagerService.getPlayerLocationState(userId);
+    if (locationState.state !== 'game' || !locationState.roomId) {
+      throw new WsException('게임 중이 아닙니다');
+    }
+    
+    const gameId = locationState.roomId;
+    const remainingTime = await this.gameTurnService.getRemainingTurnTime(gameId);
+    
+    return {
+      count: remainingTime
+    };
   }
 
   /**

@@ -51,8 +51,8 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
     return this.connection;
   }
 
-  async query(sql: string, params?: any[]): Promise<any> {
+  async query<T = mysql.RowDataPacket[]>(sql: string, params?: (string | number | boolean | null)[]): Promise<T> {
     const [rows] = await this.connection.query(sql, params);
-    return rows;
+    return rows as T;
   }
 }

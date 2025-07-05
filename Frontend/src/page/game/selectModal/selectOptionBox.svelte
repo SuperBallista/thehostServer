@@ -1,9 +1,6 @@
 <script lang="ts">
-  import { get } from 'svelte/store';
   import { THEME } from '../../../common/constant/theme';
   import { selectOptionStore } from '../../../common/store/selectOptionStore';
-
-  let config = get(selectOptionStore);
 
   $: visible = !!$selectOptionStore;
   $: config = $selectOptionStore;
@@ -24,7 +21,7 @@
                 config.resolve(option);
                 selectOptionStore.set(null);
               }}
-              class={`w-full py-2 px-4 rounded-xl shadow ${THEME.bgTertiary} hover:${THEME.bgAccent} transition-colors`}
+              class={`w-full py-2 px-4 rounded-xl shadow transition-colors ${THEME.bgTertiary} hover:${THEME.bgAccent}`}
             >
               {option.label}
             </button>

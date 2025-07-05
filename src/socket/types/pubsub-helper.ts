@@ -1,7 +1,19 @@
 // src/socket/types/pubsub-helper.ts
 
-import { InternalMessage, InternalMessageBuilder, InternalUpdateType } from '../../redis/pubsub.types';
+import { 
+  InternalMessage, 
+  InternalMessageBuilder, 
+  InternalUpdateType, 
+  InternalMessageData,
+  RoomListUpdateData,
+  RoomDataUpdateData,
+  RoomDeleteData,
+  GameStartData,
+  UserLocationData,
+  PlayerStatusData
+} from '../../redis/pubsub.types';
 import { RedisPubSubService } from '../../redis/redisPubSub.service';
+import { userDataResponse } from '../payload.types';
 
 /**
  * pub/sub 메시지 발행 헬퍼 클래스
@@ -51,7 +63,7 @@ export class PubSubHelper {
   /**
    * 플레이어 상태 변경 알림
    */
-  async notifyPlayerStatusChanged(gameId: string, playerId: number, status: any): Promise<void> {
+  async notifyPlayerStatusChanged(gameId: string, playerId: number, status: Partial<userDataResponse>): Promise<void> {
     const message = InternalMessageBuilder.playerStatus(gameId, playerId, status);
     await this.pubSubService.publishInternal(message);
   }
@@ -62,35 +74,46 @@ export class PubSubHelper {
  */
 export class MessageValidator {
   
-  static validateInternalMessage(message: any): message is InternalMessage {
+  static validateInternalMessage(message: unknown): message is InternalMessage {
+    if (!message || typeof message !== 'object') {
+      return false;
+    }
+    
+    const msg = message as Record<string, unknown>;
+    
     return (
-      message &&
-      typeof message.type === 'string' &&
-      Object.values(InternalUpdateType).includes(message.type) &&
-      message.data &&
-      typeof message.timestamp === 'number'
+      typeof msg.type === 'string' &&
+      Object.values(InternalUpdateType).includes(msg.type as InternalUpdateType) &&
+      msg.data !== undefined &&
+      typeof msg.timestamp === 'number'
     );
   }
 
-  static validateMessageData(type: InternalUpdateType, data: any): boolean {
+  static validateMessageData(type: InternalUpdateType, data: InternalMessageData): boolean {
     switch (type) {
       case InternalUpdateType.ROOM_LIST:
-        return data.roomId && data.action;
+        const roomListData = data as RoomListUpdateData;
+        return !!roomListData.roomId && !!roomListData.action;
       
       case InternalUpdateType.ROOM_DATA:
-        return data.roomId;
+        const roomData = data as RoomDataUpdateData;
+        return !!roomData.roomId;
       
       case InternalUpdateType.ROOM_DELETE:
-        return data.roomId && Array.isArray(data.kickedUserIds);
+        const roomDeleteData = data as RoomDeleteData;
+        return !!roomDeleteData.roomId && Array.isArray(roomDeleteData.kickedUserIds);
       
       case InternalUpdateType.GAME_START:
-        return data.roomId && data.gameId && Array.isArray(data.playerIds);
+        const gameStartData = data as GameStartData;
+        return !!gameStartData.roomId && !!gameStartData.gameId && Array.isArray(gameStartData.playerIds);
       
       case InternalUpdateType.USER_LOCATION:
-        return data.userId && data.locationState;
+        const userLocationData = data as UserLocationData;
+        return !!userLocationData.userId && !!userLocationData.locationState;
       
       case InternalUpdateType.PLAYER_STATUS:
-        return data.gameId && data.playerId && data.status;
+        const playerStatusData = data as PlayerStatusData;
+        return !!playerStatusData.gameId && !!playerStatusData.playerId && !!playerStatusData.status;
       
       default:
         return false;

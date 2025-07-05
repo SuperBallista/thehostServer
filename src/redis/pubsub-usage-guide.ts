@@ -24,7 +24,7 @@ internal                  -> 모든 메시지 통합
 ```typescript
 {
   type: InternalUpdateType,  // ENUM으로 타입 관리
-  data: any,                 // 실제 데이터
+  data: InternalMessageData, // 실제 데이터
   targetRoomId?: string,     // 타겟 방 ID
   targetUserId?: number,     // 타겟 유저 ID  
   timestamp: number          // 타임스탬프

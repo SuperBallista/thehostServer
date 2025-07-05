@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { RedisService } from 'src/redis/redis.service';
-import { GameInRedis, Host } from './game.types';
-import { Room } from '../payload.types';
+import { GameInRedis, Host, GamePlayerInRedis } from './game.types';
+import { Room, Region } from '../payload.types';
 
 @Injectable()
 export class GameDataService {
@@ -72,7 +72,7 @@ export class GameDataService {
   /**
    * 플레이어 데이터 저장
    */
-  async savePlayerData(gameId: string, playerId: number, playerData: any): Promise<void> {
+  async savePlayerData(gameId: string, playerId: number, playerData: GamePlayerInRedis): Promise<void> {
     await this.redisService.stringifyAndSet(
       `game:${gameId}:player:${playerId}`, 
       playerData
@@ -141,7 +141,7 @@ export class GameDataService {
   /**
    * 구역 데이터 가져오기
    */
-  async getRegionData(gameId: string, regionId: number): Promise<any> {
+  async getRegionData(gameId: string, regionId: number): Promise<Region> {
     // Redis ERD에 맞게 키 수정: game:gameId:region:turn:regionId
     const gameData = await this.redisService.getAndParse(`game:${gameId}`);
     const turn = gameData?.turn || 1;
@@ -160,7 +160,7 @@ export class GameDataService {
   /**
    * 구역 데이터 저장
    */
-  async saveRegionData(gameId: string, regionId: number, regionData: any): Promise<void> {
+  async saveRegionData(gameId: string, regionId: number, regionData: Region): Promise<void> {
     // Redis ERD에 맞게 키 수정: game:gameId:region:turn:regionId
     const gameData = await this.redisService.getAndParse(`game:${gameId}`);
     const turn = gameData?.turn || 1;

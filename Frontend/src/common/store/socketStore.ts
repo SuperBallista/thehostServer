@@ -98,8 +98,8 @@ function setupCoreHandlers(socket: Socket, resolve: () => void, reject: (e: Erro
     isInitialized = true;
     closeMessageBox(); // 재연결 성공 시 로딩 메시지 닫기
     
-    // 재연결 후 이벤트 리스너 재설정
-    setupDynamicSubscriptions(socket);
+    // 재연결 후에는 이벤트 리스너를 재설정하지 않음
+    // (이미 initSocket에서 설정되어 있고, socket.off/on으로 관리됨)
     resolve();
   });
 
@@ -146,9 +146,11 @@ function setupCoreHandlers(socket: Socket, resolve: () => void, reject: (e: Erro
 
 function setupDynamicSubscriptions(socket: Socket) {
   // 기존 리스너 제거
+  console.log('🔧 update 리스너 제거');
   socket.off('update');
 
   // 새로운 리스너 등록
+  console.log('🔧 update 리스너 등록');
   socket.on('update', (responseData: userDataResponse) => {
     console.log('📨 update 이벤트 수신:', responseData);
     updateData(responseData);
@@ -222,7 +224,7 @@ function updateData(payload: userDataResponse) {
 
   // 알림 처리
   if (payload.alarm) {
-    showMessageBox(payload.alarm.img as any, '알림', payload.alarm.message);
+    showMessageBox(payload.alarm.img as "error" | "confirm" | "alert" | "loading" | "input" | "success" | "tips" | "turn", '알림', payload.alarm.message);
   }
 }
 

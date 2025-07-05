@@ -4,9 +4,9 @@
     import { isHost, zombies, canInfect, myStatus, regionNames, hasZombieInMyRegion } from '../../../common/store/gameStateStore';
     import { socketStore } from '../../../common/store/socketStore';
     import { authStore } from '../../../common/store/authStore';
-    import { get } from 'svelte/store';
     import type { userRequest, MyPlayerState } from '../../../common/store/synchronize.type';
     import { copeWithZombie, infectPlayer, controlZombie } from '../common/gameActions';
+    import { playerNextRegion } from "../../../common/store/playerStore";
     
     // 디버깅용 로그
     $: console.log('ActionModal 상태:', {
@@ -19,11 +19,12 @@
 
     async function moveNextRegion() {
       // 지역 이름 배열을 사용하여 선택지 생성
-      const regions = $regionNames.map((name, index) => ({
+      const regions = $regionNames.map((name: string, index: number) => ({
         value: index.toString(),
         label: name
       }));
 
+      
       const result = await showSelectOptionBox(
         '이동지역 선택',
         '다음 지역은 어디로 이동하시겠습니까?',
@@ -32,12 +33,10 @@
 
       if (result && result.value) {
         // 선택한 지역을 서버로 전송
-        const socket = get(socketStore);
-        const token = get(authStore).token;
-        const user = get(authStore).user;
-        const currentStatus = get(myStatus);
-
-        if (!socket || !token || !user || !currentStatus) return;
+        const socket = $socketStore;
+        const token = $authStore.token;
+        const user = $authStore.user;
+        if (!socket || !token || !user || !$myStatus) return;
 
         const selectedRegion = parseInt(result.value); // result.value를 사용
         console.log('선택한 지역:', { result, selectedRegion, regionName: $regionNames[selectedRegion] });
@@ -46,16 +45,18 @@
           token,
           user,
           myStatus: {
-            state: currentStatus.state,
-            items: currentStatus.items,
-            region: currentStatus.region,
-            next: selectedRegion, // 선택한 지역 번호
-            act: currentStatus.act
+            next: selectedRegion // 변경된 필드만 전송
           }
         };
 
+        console.log('이동 지역 설정 요청 전송:', {
+          selectedRegion,
+          myStatus: requestData.myStatus,
+          hasAct: requestData.myStatus && 'act' in requestData.myStatus,
+          hasNext: requestData.myStatus && 'next' in requestData.myStatus
+        });
+        
         socket.emit('request', requestData);
-        console.log('서버로 전송:', requestData);
       }
     }
 

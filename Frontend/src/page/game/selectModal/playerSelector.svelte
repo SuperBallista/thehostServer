@@ -1,9 +1,8 @@
 <script lang="ts">
     import { selectPlayerStore } from '../../../common/store/selectPlayerMessageBox';
     import { THEME } from '../../../common/constant/theme';
-    import { get } from 'svelte/store';
   
-    let config = get(selectPlayerStore);
+    let config = $selectPlayerStore;
   
     $: visible = !!$selectPlayerStore;
     $: config = $selectPlayerStore;

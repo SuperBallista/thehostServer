@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { RedisPubSubService } from '../../redis/redisPubSub.service';
-import { ANIMAL_NICKNAMES } from './game.types';
+import { ANIMAL_NICKNAMES, GamePlayerInRedis } from './game.types';
 import { userDataResponse, MyPlayerState } from '../payload.types';
 import { PlayerManagerService } from './player-manager.service';
 import { GameDataService } from './game-data.service';
 import { GameStateService } from './game-state.service';
 import { ChatService } from './chat.service';
+import { ZombieService } from './zombie.service';
 
 @Injectable()
 export class CombatHandlerService {
@@ -16,12 +17,13 @@ export class CombatHandlerService {
     private readonly gameDataService: GameDataService,
     private readonly gameStateService: GameStateService,
     private readonly chatService: ChatService,
+    private readonly zombieService: ZombieService,
   ) {}
 
   /**
    * 백신 사용 처리
    */
-  async handleVaccineUse(gameId: string, playerData: any, targetPlayer?: number): Promise<userDataResponse> {
+  async handleVaccineUse(gameId: string, playerData: GamePlayerInRedis, targetPlayer?: number): Promise<userDataResponse> {
     if (targetPlayer === undefined) {
       throw new Error('백신을 투여할 대상을 선택해주세요');
     }
@@ -119,7 +121,7 @@ export class CombatHandlerService {
   /**
    * 산탄총 사용 처리
    */
-  async handleShotgunUse(gameId: string, playerData: any, targetPlayer?: number): Promise<userDataResponse> {
+  async handleShotgunUse(gameId: string, playerData: GamePlayerInRedis, targetPlayer?: number): Promise<userDataResponse> {
     if (targetPlayer === undefined) {
       throw new Error('대상을 선택해주세요');
     }
@@ -195,7 +197,7 @@ export class CombatHandlerService {
         const survivorList = await this.gameStateService.createSurvivorList(allPlayers, player);
         
         // 플레이어에게 업데이트 전송
-        const updateData: any = {
+        const updateData: Partial<userDataResponse> = {
           survivorList,
           gameTurn: (await this.gameDataService.getGameData(gameId)).turn
         };
@@ -228,10 +230,17 @@ export class CombatHandlerService {
           await this.gameDataService.saveHostData(gameId, hostData);
           
           // 숙주에게만 개별적으로 업데이트 전송
+          const zombieList = await this.zombieService.getZombiesForHost(gameId);
           await this.redisPubSubService.publishToRegion(gameId, hostPlayerData.regionId, {
             hostAct: {
               canInfect: hostData.canInfect,
-              zombieList: hostData.zombieList
+              zombieList: zombieList.map(z => ({
+                playerId: z.playerId,
+                targetId: z.targetId,
+                nextRegion: z.nextRegion,
+                leftTurn: z.leftTurn,
+                region: z.region
+              }))
             },
             alarm: {
               message: `💥 좀비가 된 ${targetNickname}이(가) 산탄총에 사살되었습니다.`,

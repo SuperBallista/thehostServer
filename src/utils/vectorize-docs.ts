@@ -69,8 +69,8 @@ export class DocumentVectorizer {
         'COSINE'
       );
       console.log('Redis vector index created successfully');
-    } catch (error: any) {
-      if (error.message?.includes('Index already exists')) {
+    } catch (error) {
+      if (error instanceof Error && error.message?.includes('Index already exists')) {
         console.log('Redis vector index already exists');
       } else {
         throw error;

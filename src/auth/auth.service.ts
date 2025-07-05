@@ -46,7 +46,7 @@ export class AuthService {
   }
 
 
-    async handleRefreshToken(req: Request): Promise<{ token: string; user: any }> {
+    async handleRefreshToken(req: Request): Promise<{ token: string; user: { id: number; nickname: string } }> {
       const refreshToken = req.cookies['refresh_token'];
       
       if (!refreshToken) {
@@ -71,7 +71,7 @@ export class AuthService {
     }
   
 
-async authCallbackFlow(code) {
+async authCallbackFlow(code: string): Promise<{ url: string; refreshToken: string }> {
   //코드를 구글 서버로 보내서 사용자 ID를 가져옵니다를 가져옵니다/
    const userInfo = await this.authGetGoogleOauthId(code)
    //사용자 ID로 계정이 Redis 또는 DB에 있는지 여부를 조회합니다
@@ -83,11 +83,11 @@ async authCallbackFlow(code) {
       //생성된 정보를 바탕으로 토큰 URL 쿼리를 생성합니다
     const url = await this.makeUriData(accessToken, tempToken, nickname, userId);
     // URL과 리프레시토큰을 리턴합니다
-    return { url, refreshToken }
+    return { url, refreshToken: refreshToken || '' }
   }
 
 
-  private async authGetGoogleOauthId(code) {
+  private async authGetGoogleOauthId(code: string): Promise<GoogleUserInfo> {
     const googleOAuthConfig = {
       clientID: this.configService.get<string>('GOOGLE_CLIENT_ID'),
       clientSecret: this.configService.get<string>('GOOGLE_CLIENT_SECRET'),

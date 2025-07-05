@@ -1,18 +1,26 @@
 // src/redis/redisPubSub.service.ts
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { Server } from 'socket.io';
 import { RedisService } from './redis.service';
 import { WsException } from '@nestjs/websockets';
-import { Room } from 'src/socket/payload.types';
+import { Room, userDataResponse } from 'src/socket/payload.types';
 import { 
   InternalMessage, 
   InternalUpdateType, 
   InternalMessageBuilder,
   MessageProcessResult,
-  PlayerStatusData
+  PlayerStatusData,
+  TurnEndData,
+  RoomDataUpdateData,
+  RoomDeleteData,
+  GameStartData,
+  UserLocationData,
+  TurnUpdateData,
+  ChatMessageData
 } from './pubsub.types';
+import { TurnProcessorService } from 'src/socket/game/turn-processor.service';
 
 @Injectable()
 export class RedisPubSubService implements OnModuleInit {
@@ -24,6 +32,8 @@ export class RedisPubSubService implements OnModuleInit {
   private roomListUpdateCallback: (() => void) | null = null;
   private gameStartCallback: ((roomData: Room) => void) | null = null;
 
+  private turnProcessorService: TurnProcessorService | null = null; // Will be set later to avoid circular dependency
+
   constructor(
     private readonly configService: ConfigService,
     private readonly redisService: RedisService
@@ -33,6 +43,11 @@ export class RedisPubSubService implements OnModuleInit {
 
     this.publisher = new Redis({ host, port });
     this.subscriber = new Redis({ host, port });
+  }
+  
+  // Setter for TurnProcessorService to be called after initialization
+  setTurnProcessorService(turnProcessorService: TurnProcessorService) {
+    this.turnProcessorService = turnProcessorService;
   }
 
   registerRoomListUpdateCallback(cb: () => void) {
@@ -107,6 +122,10 @@ export class RedisPubSubService implements OnModuleInit {
         case InternalUpdateType.CHAT_MESSAGE:
           processed = await this.handleChatMessage(message);
           break;
+          
+        case InternalUpdateType.TURN_END:
+          processed = await this.handleTurnEnd(message);
+          break;
 
         default:
           console.warn(`🚨 처리되지 않은 메시지 타입: ${message.type}`);
@@ -144,7 +163,7 @@ export class RedisPubSubService implements OnModuleInit {
    * 방 데이터 업데이트 처리
    */
   private async handleRoomDataUpdate(message: InternalMessage): Promise<boolean> {
-    const { roomId } = message.data as any;
+    const { roomId } = message.data as RoomDataUpdateData;
     
     try {
       const room = await this.redisService.getAndParse(`room:data:${roomId}`);
@@ -163,7 +182,7 @@ export class RedisPubSubService implements OnModuleInit {
    * 방 삭제 처리
    */
   private async handleRoomDelete(message: InternalMessage): Promise<boolean> {
-    const { roomId, kickedUserIds } = message.data as any;
+    const { roomId, kickedUserIds } = message.data as RoomDeleteData;
 
     // 로비 유저에게 방 목록 업데이트 알림
     if (this.roomListUpdateCallback) {
@@ -178,7 +197,7 @@ export class RedisPubSubService implements OnModuleInit {
    * 게임 시작 처리
    */
   private async handleGameStart(message: InternalMessage): Promise<boolean> {
-    const { roomId, gameId, playerIds } = message.data as any;
+    const { roomId, gameId, playerIds } = message.data as GameStartData;
     
     console.log(`🎮 handleGameStart 호출됨 - roomId: ${roomId}, playerIds: ${playerIds}`);
     
@@ -205,7 +224,7 @@ export class RedisPubSubService implements OnModuleInit {
    * 유저 위치 업데이트 처리
    */
   private async handleUserLocation(message: InternalMessage): Promise<boolean> {
-    const { userId, locationState, roomId } = message.data as any;
+    const { userId, locationState, roomId } = message.data as UserLocationData;
     
     // 특정 유저에게만 위치 업데이트 전송
     if (message.targetUserId) {
@@ -259,22 +278,16 @@ export class RedisPubSubService implements OnModuleInit {
    * 턴 업데이트 처리
    */
   private async handleTurnUpdate(message: InternalMessage): Promise<boolean> {
-    const { gameId, event, itemsDistributed, turn } = message.data as any;
+    const { gameId, event, itemsDistributed, turn } = message.data as TurnUpdateData;
     
     // 클라이언트가 기대하는 userDataResponse 형식으로 전송
-    const updatePayload: any = {};
+    const updatePayload: Partial<userDataResponse> = {};
     
     if (turn !== undefined) {
       updatePayload.gameTurn = turn;
     }
     
-    // 아이템이 배포되었다면 알림 추가
-    if (itemsDistributed && event === 'turnStarted') {
-      updatePayload.alarm = {
-        message: '새로운 아이템을 획득했습니다!',
-        img: 'info'
-      };
-    }
+    // 아이템 배포 알림은 개별적으로 처리되므로 여기서는 제외
     
     this.io?.to(`game:${gameId}`).emit('update', updatePayload);
     
@@ -286,7 +299,7 @@ export class RedisPubSubService implements OnModuleInit {
    * 채팅 메시지 처리
    */
   private async handleChatMessage(message: InternalMessage): Promise<boolean> {
-    const { gameId, playerId, message: chatMessage, region, system } = message.data as any;
+    const { gameId, playerId, message: chatMessage, region, system } = message.data as ChatMessageData;
     
     // ChatMessage 형식으로 변환
     const chatData = {
@@ -353,7 +366,7 @@ export class RedisPubSubService implements OnModuleInit {
   /**
    * 플레이어 상태 업데이트 발행
    */
-  async publishPlayerStatus(gameId: string, playerId: number, status: any, targetPlayerId?: number): Promise<void> {
+  async publishPlayerStatus(gameId: string, playerId: number, status: Partial<userDataResponse>, targetPlayerId?: number): Promise<void> {
     const message = InternalMessageBuilder.playerStatus(gameId, playerId, status, targetPlayerId);
     await this.publishInternal(message);
   }
@@ -361,7 +374,7 @@ export class RedisPubSubService implements OnModuleInit {
   /**
    * 특정 구역의 모든 플레이어에게 메시지 발행
    */
-  async publishToRegion(gameId: string, regionId: number, data: any): Promise<void> {
+  async publishToRegion(gameId: string, regionId: number, data: Partial<userDataResponse>): Promise<void> {
     if (!this.io) {
       console.warn('Socket.IO 서버가 초기화되지 않음');
       return;
@@ -375,7 +388,7 @@ export class RedisPubSubService implements OnModuleInit {
   /**
    * 게임의 모든 플레이어에게 메시지 발행
    */
-  async publishToGame(gameId: string, data: any): Promise<void> {
+  async publishToGame(gameId: string, data: Partial<userDataResponse>): Promise<void> {
     if (!this.io) {
       console.warn('Socket.IO 서버가 초기화되지 않음');
       return;
@@ -387,9 +400,62 @@ export class RedisPubSubService implements OnModuleInit {
   }
 
   /**
+   * 턴 종료 처리
+   */
+  private async handleTurnEnd(message: InternalMessage): Promise<boolean> {
+    const { gameId } = message.data as TurnEndData;
+    
+    console.log(`⏱️ 턴 종료 이벤트 처리: ${gameId}`);
+    
+    // TurnProcessorService가 설정되었는지 확인
+    if (!this.turnProcessorService) {
+      console.error(`❌ TurnProcessorService가 설정되지 않음`);
+      return false;
+    }
+    
+    try {
+      await this.turnProcessorService.processTurnEnd(gameId);
+      console.log(`✅ 턴 종료 처리 완료: ${gameId}`);
+      return true;
+    } catch (error) {
+      console.error(`❌ 턴 종료 처리 실패:`, error);
+    }
+    
+    return false;
+  }
+
+  /**
+   * 플레이어 구역 변경 시 Socket.IO 룸 업데이트
+   */
+  async updatePlayerRegionRoom(gameId: string, userId: number, oldRegion: number, newRegion: number): Promise<void> {
+    if (!this.io) {
+      console.warn('Socket.IO 서버가 초기화되지 않음');
+      return;
+    }
+    
+    const sockets = await this.io.sockets.sockets;
+    if (sockets) {
+      for (const [socketId, socket] of sockets) {
+        if (socket.data?.id === userId) {
+          const oldRoomName = `game:${gameId}:region:${oldRegion}`;
+          const newRoomName = `game:${gameId}:region:${newRegion}`;
+          
+          // 이전 구역 룸에서 나가기
+          await socket.leave(oldRoomName);
+          // 새 구역 룸에 들어가기
+          await socket.join(newRoomName);
+          
+          console.log(`🚪 플레이어 ${userId} 구역 룸 변경: ${oldRoomName} → ${newRoomName}`);
+          break;
+        }
+      }
+    }
+  }
+
+  /**
    * 일반 Redis 발행
    */
-  async publish(channel: string, payload: any): Promise<void> {
+  async publish(channel: string, payload: InternalUpdateType): Promise<void> {
     await this.publisher.publish(channel, JSON.stringify(payload));
   }
 }

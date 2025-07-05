@@ -4,7 +4,6 @@
   import { authStore } from '../../../common/store/authStore';
   import { playerId } from '../../../common/store/playerStore';
   import { nicknameList } from '../game.type';
-  import { get } from 'svelte/store';
   import type { userRequest } from '../../../common/store/synchronize.type';
 
   let message = '';
@@ -12,14 +11,14 @@
   function sendMessage() {
     if (!message.trim()) return;
 
-    const socket = get(socketStore);
-    const token = get(authStore).token;
-    const user = get(authStore).user;
-    const currentPlayerId = get(playerId);
+    const socket = $socketStore;
+    const token = $authStore.token;
+    const user = $authStore.user;
+    const currentPlayerId = $playerId;
 
     if (!socket || !token || !user) return;
 
-    const animalNickname = nicknameList[currentPlayerId];
+    const animalNickname = currentPlayerId !== undefined ? nicknameList[currentPlayerId] : '알 수 없음';
     
     // 서버로 메시지 전송 (프론트에서 닉네임 포함)
     const requestData: userRequest = {

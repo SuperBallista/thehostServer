@@ -18,7 +18,16 @@ export const canInfect = writable<boolean>(true);
 export const infectTarget = writable<number | null>(null);
 
 // 좀비 정보 업데이트
-export function updateZombieInfo(zombieList: any[]) {
+interface ZombieData {
+  playerId: number;
+  targetId: number | undefined;
+  region: number;
+  nextRegion: number;
+  leftTurn: number;
+  survivorsInRegion?: number[];
+}
+
+export function updateZombieInfo(zombieList: ZombieData[]) {
   console.log('[hostStore] updateZombieInfo 호출됨:', zombieList);
   
   if (!zombieList || !Array.isArray(zombieList)) {

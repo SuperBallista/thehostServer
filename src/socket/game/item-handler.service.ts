@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { RedisPubSubService } from '../../redis/redisPubSub.service';
-import { ITEM_NAMES, ANIMAL_NICKNAMES } from './game.types';
+import { ITEM_NAMES, ANIMAL_NICKNAMES, GamePlayerInRedis } from './game.types';
 import { MyPlayerState, ItemInterface } from '../payload.types';
 import { PlayerManagerService } from './player-manager.service';
 import { GameDataService } from './game-data.service';
@@ -21,7 +21,7 @@ export class ItemHandlerService {
   /**
    * 아이템 전달 처리
    */
-  async handleGiveItem(gameId: string, playerData: any, giveItem: { item: ItemInterface; receiver: number }) {
+  async handleGiveItem(gameId: string, playerData: GamePlayerInRedis, giveItem: { item: ItemInterface; receiver: number }) {
     // 아이템 소유 확인
     const itemIndex = playerData.items.indexOf(giveItem.item);
     if (itemIndex === -1) {
@@ -52,14 +52,10 @@ export class ItemHandlerService {
     await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
     await this.gameDataService.savePlayerData(gameId, receiverData.playerId, receiverData);
 
-    // 시스템 메시지 전송
+    // 아이템 이름과 닉네임 준비
     const itemName = ITEM_NAMES[giveItem.item] || giveItem.item;
     const giverNickname = ANIMAL_NICKNAMES[playerData.playerId] || `플레이어${playerData.playerId}`;
     const receiverNickname = ANIMAL_NICKNAMES[receiverData.playerId] || `플레이어${receiverData.playerId}`;
-
-    // 같은 지역의 모든 플레이어에게 공개 메시지 전송
-    const publicMessage = `${giverNickname}이(가) ${receiverNickname}에게 ${itemName}을(를) 전달했습니다.`;
-    await this.chatService.sendSystemMessage(gameId, publicMessage, playerData.regionId);
 
     // 받는 사람이 실제 플레이어인 경우 개인 메시지와 아이템 목록 업데이트 전송
     if (receiverData.userId > 0) {
@@ -96,7 +92,7 @@ export class ItemHandlerService {
   /**
    * 낙서스프레이 사용 처리
    */
-  async handleSprayUse(gameId: string, playerData: any, content?: string) {
+  async handleSprayUse(gameId: string, playerData: GamePlayerInRedis, content?: string) {
     if (!content || content.trim() === '') {
       throw new Error('낙서 내용을 입력해주세요');
     }
@@ -117,7 +113,10 @@ export class ItemHandlerService {
     await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
 
     // 익명성을 위해 시스템 메시지는 보내지 않음
-    // 낙서는 다음 턴부터 확인 가능
+    // 구역 정보 업데이트를 같은 지역의 모든 플레이어에게 전송
+    await this.redisPubSubService.publishToRegion(gameId, playerData.regionId, {
+      region: regionData
+    });
 
     return this.gameStateService.createPlayerGameUpdate(gameId, playerData.userId, {
       myStatus: {
@@ -128,7 +127,7 @@ export class ItemHandlerService {
         act: playerData.act
       },
       alarm: {
-        message: '낙서를 성공적으로 남겼습니다. 다음 턴부터 다른 플레이어가 볼 수 있습니다.',
+        message: '낙서를 성공적으로 남겼습니다.',
         img: 'info'
       }
     });
@@ -137,7 +136,7 @@ export class ItemHandlerService {
   /**
    * 지우개 사용 처리
    */
-  async handleEraserUse(gameId: string, playerData: any, targetMessage?: number) {
+  async handleEraserUse(gameId: string, playerData: GamePlayerInRedis, targetMessage?: number) {
     if (targetMessage === undefined) {
       throw new Error('지울 메시지를 선택해주세요');
     }
@@ -185,7 +184,7 @@ export class ItemHandlerService {
   /**
    * 진단키트 사용 처리
    */
-  async handleVirusCheckerUse(gameId: string, playerData: any) {
+  async handleVirusCheckerUse(gameId: string, playerData: GamePlayerInRedis) {
     // 아이템 소모
     const itemIndex = playerData.items.indexOf('virusChecker');
     playerData.items.splice(itemIndex, 1);
@@ -215,7 +214,7 @@ export class ItemHandlerService {
   /**
    * 응급치료제 사용 처리
    */
-  async handleMedicineUse(gameId: string, playerData: any) {
+  async handleMedicineUse(gameId: string, playerData: GamePlayerInRedis) {
     // 아이템 소모 (감염 여부와 상관없이 소모)
     const itemIndex = playerData.items.indexOf('medicine');
     playerData.items.splice(itemIndex, 1);
@@ -246,7 +245,7 @@ export class ItemHandlerService {
   /**
    * 백신 재료 조합 처리
    */
-  async handleVaccineMaterialUse(gameId: string, playerData: any) {
+  async handleVaccineMaterialUse(gameId: string, playerData: GamePlayerInRedis) {
     // 필요한 재료들
     const requiredMaterials: ItemInterface[] = ['vaccineMaterialA', 'vaccineMaterialB', 'vaccineMaterialC'];
     
@@ -292,7 +291,7 @@ export class ItemHandlerService {
   /**
    * 마이크 사용 처리
    */
-  async handleMicrophoneUse(gameId: string, playerData: any, content?: string) {
+  async handleMicrophoneUse(gameId: string, playerData: GamePlayerInRedis, content?: string) {
     if (!content || content.trim() === '') {
       throw new Error('방송할 메시지를 입력해주세요');
     }
@@ -324,7 +323,7 @@ export class ItemHandlerService {
   /**
    * 무전기 사용 처리
    */
-  async handleWirelessUse(gameId: string, playerData: any, targetPlayer?: number, content?: string) {
+  async handleWirelessUse(gameId: string, playerData: GamePlayerInRedis, targetPlayer?: number, content?: string) {
     if (targetPlayer === undefined || !content || content.trim() === '') {
       throw new Error('대상과 메시지를 입력해주세요');
     }
@@ -359,10 +358,13 @@ export class ItemHandlerService {
     // 수신자에게 무전 메시지 전송 (살아있는 플레이어에게만)
     if (targetData.userId > 0 && ['alive', 'host'].includes(targetData.state)) {
       await this.redisPubSubService.publishPlayerStatus(gameId, targetData.playerId, {
-        chatMessage: {
-          system: false,
-          message: `(무전) ${playerNickname}: ${messageContent}`,
-          timeStamp: new Date()
+        region: {
+          chatLog: [{
+            system: false,
+            message: `(무전) ${playerNickname}: ${messageContent}`,
+            timeStamp: new Date()
+          }],
+          regionMessageList: []
         }
       }, targetData.playerId);
     }

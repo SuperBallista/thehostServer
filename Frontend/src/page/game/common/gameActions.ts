@@ -242,16 +242,18 @@ export async function copeWithZombie() {
       token,
       user,
       myStatus: {
-        state: currentStatus.state,
-        items: currentStatus.items,
-        region: currentStatus.region,
-        nextRegion: currentStatus.nextRegion,
-        act: result.value as 'hide' | 'lure' | 'runaway'
+        act: result.value as 'hide' | 'lure' | 'runaway' // 변경된 필드만 전송
       }
     };
 
+    console.log('좀비 대처 행동 요청 전송:', {
+      selectedAct: result.value,
+      myStatus: requestData.myStatus,
+      hasAct: 'act' in requestData.myStatus,
+      hasNext: 'next' in requestData.myStatus
+    });
+    
     socket.emit('request', requestData);
-    console.log('좀비 대처 행동 전송:', requestData);
   }
 }
 
@@ -480,7 +482,14 @@ export async function setZombieTargets() {
   }
 
   // 각 좀비에 대해 공격 대상 설정
-  const zombieCommands: any[] = [];
+  interface ZombieCommand {
+    playerId: number;
+    targetId: number | null;
+    nextRegion: number;
+    leftTurn: number;
+    region: number;
+  }
+  const zombieCommands: ZombieCommand[] = [];
   
   for (const zombie of currentZombies) {
     // 해당 좀비와 같은 구역에 있는 생존자 찾기
@@ -576,7 +585,14 @@ export async function setZombieMovements() {
   }
 
   // 각 좀비에 대해 이동 구역 설정
-  const zombieCommands: any[] = [];
+  interface ZombieCommand {
+    playerId: number;
+    targetId: number | null;
+    nextRegion: number;
+    leftTurn: number;
+    region: number;
+  }
+  const zombieCommands: ZombieCommand[] = [];
   
   for (const zombie of currentZombies) {
     const zombieNickname = nicknameList[zombie.playerId] || `좀비 #${zombie.playerId}`;

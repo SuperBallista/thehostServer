@@ -1,11 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
-import { GameInRedis, GamePlayerInRedis, REGION_NAMES, ITEM_NAMES } from './game.types';
-import { PlayerState, SurvivorInterface, MyPlayerState } from '../payload.types';
+import { GameInRedis, GamePlayerInRedis, REGION_NAMES, ITEM_NAMES, ItemCode } from './game.types';
+import { PlayerState, SurvivorInterface, MyPlayerState, Act } from '../payload.types';
 import { userDataResponse } from '../payload.types';
 import { PlayerManagerService } from './player-manager.service';
 import { GameDataService } from './game-data.service';
 import { ZombieService } from './zombie.service';
+import { GameTurnService } from './gameTurn.service';
 
 @Injectable()
 export class GameStateService {
@@ -13,6 +14,8 @@ export class GameStateService {
     private readonly playerManagerService: PlayerManagerService,
     private readonly gameDataService: GameDataService,
     private readonly zombieService: ZombieService,
+    @Inject(forwardRef(() => GameTurnService))
+    private readonly gameTurnService: GameTurnService,
   ) {}
 
   /**
@@ -54,14 +57,14 @@ export class GameStateService {
       playerId: myPlayerData.playerId,
       myStatus: {
         state: (myPlayerData.state === 'host' ? 'host' : 'alive') as MyPlayerState,
-        items: myPlayerData.items as any,
+        items: myPlayerData.items as ItemCode[],
         region: myPlayerData.regionId,
         nextRegion: myPlayerData.next,
-        act: myPlayerData.act as any,
+        act: myPlayerData.act as Act,
         canEscape: myPlayerData.canEscape
       },
       gameTurn: gameData.turn,
-      count: this.getTurnDuration(gameData.turn),
+      count: await this.getRemainingTime(roomId, gameData.turn),
       useRegionsNumber: useRegionsNumber,
       survivorList: this.createSurvivorList(allPlayers, myPlayerData),
       region: {
@@ -94,7 +97,7 @@ export class GameStateService {
   async createPlayerGameUpdate(
     gameId: string, 
     userId: number,
-    updateData: any
+    updateData: Partial<userDataResponse>
   ): Promise<userDataResponse> {
     // 플레이어 데이터 가져오기
     const playerData = await this.playerManagerService.getPlayerDataByUserId(gameId, userId);
@@ -157,6 +160,26 @@ export class GameStateService {
    */
   private getTurnDuration(turn: number): number {
     return turn < 5 ? 60 : 90;
+  }
+  
+  /**
+   * 남은 시간 가져오기 (Redis에서)
+   */
+  private async getRemainingTime(gameId: string, currentTurn: number): Promise<number> {
+    try {
+      // gameTurnService가 주입되었는지 확인
+      if (this.gameTurnService && this.gameTurnService.getRemainingTurnTime) {
+        const remainingTime = await this.gameTurnService.getRemainingTurnTime(gameId);
+        if (remainingTime > 0) {
+          return remainingTime;
+        }
+      }
+    } catch (error) {
+      console.error('[GameStateService] 남은 시간 가져오기 실패:', error);
+    }
+    
+    // Redis에서 가져오지 못한 경우 기본값 반환
+    return this.getTurnDuration(currentTurn);
   }
 
   /**

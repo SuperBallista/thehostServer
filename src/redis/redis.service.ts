@@ -34,8 +34,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.redisClient;
   }
 
-  /** ✅ 단일 키 저장 (기본 5분 TTL 적용 예시) */
-  async stringifyAndSet(key: string, value: object, expireSeconds = 300): Promise<'OK'> {
+  /** ✅ 단일 키 저장 (기본 3시간 TTL 적용 - 테스트용) */
+  async stringifyAndSet(key: string, value: object, expireSeconds = 10800): Promise<'OK'> {
     return await this.redisClient.set(key, JSON.stringify(value), 'EX', expireSeconds);
   }
 

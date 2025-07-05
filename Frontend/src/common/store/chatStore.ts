@@ -38,7 +38,7 @@ export const currentRegionMessages = derived(
 );
 
 // 채팅 관련 함수들
-export function addChatMessage(message: any) {
+export function addChatMessage(message: ChatMessage) {
   const newMessage = {
     ...message,
     id: `${Date.now()}-${Math.random()}`,

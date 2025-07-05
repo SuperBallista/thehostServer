@@ -16,7 +16,8 @@
     gameResult,
     syncWithServer,
     resetGameState,
-    myStatus
+    myStatus,
+    turnTimer
   } from '../../common/store/gameStateStore';
   import { socketStore } from '../../common/store/socketStore';
   import { initMusic, cleanupMusic } from '../../common/store/musicStore'; // 🔥 toggleMusic 제거
@@ -38,7 +39,35 @@
     initMusic('/game_bgm.mp3');
 
     // 소켓 이벤트 리스너는 socketStore.ts에서 이미 처리하고 있으므로 중복 등록하지 않음
+    
+    // 게임 참가 시 이미 count를 받으므로 getRemainingTime 요청은 필요없음
+    // 단, 새로고침 후 게임 페이지에 직접 접근한 경우를 위해 타이머 확인
+    if ($turnTimer === 0 && $gamePhase === 'playing') {
+      // 타이머가 0이고 게임 중이면 서버에 요청
+      requestRemainingTime();
+    }
   });
+  
+  // 서버로부터 남은 턴 시간 요청 (새로고침 대응용)
+  async function requestRemainingTime() {
+    const socket = $socketStore;
+    const auth = $authStore;
+    
+    if (!socket || !auth.token || !auth.user) {
+      console.error('소켓 또는 인증 정보가 없습니다');
+      return;
+    }
+
+    // getRemainingTurnTime 요청 전송
+    const requestData: userRequest = {
+      token: auth.token,
+      user: auth.user,
+      getRemainingTurnTime: true
+    };
+
+    socket.emit('request', requestData);
+    console.log('남은 턴 시간 요청 (새로고침 대응)');
+  }
 
   // myStatus가 설정되면 역할 안내 메시지 표시
   $: if ($myStatus && !hasShownRoleMessage) {

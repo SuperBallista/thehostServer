@@ -1,4 +1,5 @@
 // src/redis/pubsub.types.ts
+import { Room, userDataResponse } from '../socket/payload.types';
 
 /**
  * Redis pub/sub 메시지 타입 정의
@@ -11,7 +12,8 @@ export enum InternalUpdateType {
   USER_LOCATION = 'USER_LOCATION',
   PLAYER_STATUS = 'PLAYER_STATUS',
   TURN_UPDATE = 'TURN_UPDATE',
-  CHAT_MESSAGE = 'CHAT_MESSAGE'
+  CHAT_MESSAGE = 'CHAT_MESSAGE',
+  TURN_END = 'TURN_END'
 }
 
 /**
@@ -36,7 +38,8 @@ export type InternalMessageData =
   | UserLocationData
   | PlayerStatusData
   | TurnUpdateData
-  | ChatMessageData;
+  | ChatMessageData
+  | TurnEndData;
 
 // 각 메시지 타입별 데이터 인터페이스
 export interface RoomListUpdateData {
@@ -46,7 +49,7 @@ export interface RoomListUpdateData {
 
 export interface RoomDataUpdateData {
   roomId: string;
-  roomData?: any;
+  roomData?: Room;
 }
 
 export interface RoomDeleteData {
@@ -69,7 +72,7 @@ export interface UserLocationData {
 export interface PlayerStatusData {
   gameId: string;
   playerId: number;
-  status: any;
+  status: Partial<userDataResponse>;
   targetPlayerId?: number;
 }
 
@@ -88,6 +91,10 @@ export interface ChatMessageData {
   system?: boolean;
 }
 
+export interface TurnEndData {
+  gameId: string;
+}
+
 /**
  * pub/sub 메시지 생성 헬퍼 함수들
  */
@@ -101,7 +108,7 @@ export class InternalMessageBuilder {
     };
   }
 
-  static roomDataUpdate(roomId: string, roomData?: any): InternalMessage {
+  static roomDataUpdate(roomId: string, roomData?: Room): InternalMessage {
     return {
       type: InternalUpdateType.ROOM_DATA,
       data: { roomId, roomData },
@@ -137,7 +144,7 @@ export class InternalMessageBuilder {
     };
   }
 
-  static playerStatus(gameId: string, playerId: number, status: any, targetPlayerId?: number): InternalMessage {
+  static playerStatus(gameId: string, playerId: number, status: Partial<userDataResponse>, targetPlayerId?: number): InternalMessage {
     return {
       type: InternalUpdateType.PLAYER_STATUS,
       data: { gameId, playerId, status, targetPlayerId },
@@ -145,7 +152,7 @@ export class InternalMessageBuilder {
     };
   }
 
-  static turnUpdate(gameId: string, event: string, additionalData?: any): InternalMessage {
+  static turnUpdate(gameId: string, event: string, additionalData?: Partial<TurnUpdateData>): InternalMessage {
     return {
       type: InternalUpdateType.TURN_UPDATE,
       data: { gameId, event, ...additionalData },

@@ -4,7 +4,8 @@ import type {
   SurvivorInterface,
   ItemInterface,
   MyPlayerState,
-  OtherPlayerState
+  OtherPlayerState,
+  userDataResponse
 } from './synchronize.type';
 import { 
   playerId, 
@@ -41,7 +42,7 @@ import {
 // 게임 기본 정보
 export const gameId = writable<string>('');
 export const gameTurn = writable<number>(1);
-export const turnTimer = writable<number>(60); // 기본값을 60초로 설정
+export const turnTimer = writable<number>(0); // 기본값을 0으로 설정하여 자동 시작 방지
 export const gamePhase = writable<'waiting' | 'playing' | 'ended'>('waiting');
 export const gameResult = writable<'infected' | 'killed' | 'cure' | null>(null);
 
@@ -135,10 +136,9 @@ export { itemUseHistory, type ItemUseRecord } from './itemHistoryStore';
 import { showMessageBox } from '../messagebox/customStore';
 
 // 스토어 업데이트 함수들
-export function updateGameState(data: any) {
+export function updateGameState(data: userDataResponse) {
   if (data.gameTurn !== undefined) gameTurn.set(data.gameTurn);
-  if (data.turnTimer !== undefined) turnTimer.set(data.turnTimer);
-  if (data.gamePhase !== undefined) gamePhase.set(data.gamePhase);
+  if (data.count !== undefined) turnTimer.set(data.count); // count가 남은 시간
   if (data.endGame !== undefined) {
     gamePhase.set('ended');
     gameResult.set(data.endGame);
@@ -146,6 +146,8 @@ export function updateGameState(data: any) {
 }
 
 export function updateMyStatus(status: GamePlayerStatusInterface) {
+  console.log('updateMyStatus 호출됨:', status);
+  
   // playerStore의 개별 스토어들을 업데이트
   if (status.state !== undefined) {
     playerState.set(status.state);
@@ -155,8 +157,19 @@ export function updateMyStatus(status: GamePlayerStatusInterface) {
     }
   }
   if (status.region !== undefined) playerRegion.set(status.region);
-  if (status.nextRegion !== undefined) playerNextRegion.set(status.nextRegion);
-  if (status.act !== undefined) playerAct.set(status.act);
+  // next와 nextRegion 둘 다 처리 (서버가 next를 보낼 수도 있음)
+  if (status.nextRegion !== undefined) {
+    console.log('nextRegion 업데이트:', status.nextRegion);
+    playerNextRegion.set(status.nextRegion);
+  }
+  if (status.next !== undefined) {
+    console.log('next 업데이트:', status.next);
+    playerNextRegion.set(status.next);
+  }
+  if (status.act !== undefined) {
+    console.log('act 업데이트:', status.act);
+    playerAct.set(status.act);
+  }
   if (status.items !== undefined) playerItems.set(status.items);
   if (status.canEscape !== undefined) playerCanEscape.set(status.canEscape);
 }
@@ -215,10 +228,11 @@ export function showGameNotification(
 export function resetGameState() {
   // 타이머 정리
   stopCountdown();
+  lastTurn = 1; // lastTurn도 초기화
   
   gameId.set('');
   gameTurn.set(1);
-  turnTimer.set(60);
+  turnTimer.set(0); // 0으로 초기화
   gamePhase.set('waiting');
   gameResult.set(null);
   playerId.set(0);
@@ -230,19 +244,41 @@ export function resetGameState() {
 }
 
 // 서버와 동기화를 위한 함수
-export function syncWithServer(serverData: any) {
+export function syncWithServer(serverData: userDataResponse) {
   // 게임 시작 응답인 경우 채팅 초기화 (locationState가 'game'이고 gameTurn이 1인 경우)
   if (serverData.locationState === 'game' && serverData.gameTurn === 1) {
     chatMessages.set([]);
     regionMessages.set([]);
+    gamePhase.set('playing'); // 게임 시작 시 phase 설정
+  }
+  
+  // locationState가 'game'으로 변경되면 gamePhase도 업데이트
+  if (serverData.locationState === 'game') {
+    gamePhase.set('playing');
   }
   
   // myStatus를 먼저 업데이트하여 isHost가 설정되도록 함
   if (serverData.myStatus) updateMyStatus(serverData.myStatus);
   if (serverData.survivorList) updateOtherPlayers(serverData.survivorList);
   if (serverData.gameTurn) gameTurn.set(serverData.gameTurn);
-  if (serverData.count) {
-    turnTimer.set(serverData.count);
+  if (serverData.count !== undefined) {
+    console.log(`[서버] count 받음: ${serverData.count}초`);
+    const currentTimer = get(turnTimer);
+    
+    // 현재 타이머와 크게 차이가 나거나, 현재 타이머가 0일 때만 업데이트
+    // (서버와 1-2초 차이는 허용)
+    if (Math.abs(currentTimer - serverData.count) > 2 || currentTimer === 0) {
+      console.log(`[서버] 타이머 동기화: ${currentTimer} → ${serverData.count}`);
+      stopCountdown();
+      // setTimeout을 사용해 subscribe가 완료된 후 새 값 설정
+      setTimeout(() => {
+        if (serverData.count !== undefined) {
+          turnTimer.set(serverData.count);
+        }
+      }, 0);
+    } else {
+      console.log(`[서버] 타이머 동기화 건너뛰기 (차이: ${Math.abs(currentTimer - serverData.count)}초)`);
+    }
   }
   if (serverData.useRegionsNumber) totalRegions.set(serverData.useRegionsNumber);
   
@@ -257,16 +293,21 @@ export function syncWithServer(serverData: any) {
       myStatusState: serverData.myStatus?.state
     });
     if (currentIsHost) {
-      canInfect.set(serverData.hostAct.canInfect);  // canUseInfect를 canInfect로 변경
-      updateZombieInfo(serverData.hostAct.zombieList);
-      console.log('canInfect 설정됨:', serverData.hostAct.canInfect);
+      if (serverData.hostAct.canInfect !== undefined) {
+        canInfect.set(serverData.hostAct.canInfect);  // canUseInfect를 canInfect로 변경
+        console.log('canInfect 설정됨:', serverData.hostAct.canInfect);
+      }
+      if (serverData.hostAct.zombieList) {
+        updateZombieInfo(serverData.hostAct.zombieList);
+      }
     }
   }
   if (serverData.region) {
     // 채팅 메시지는 추가하는 방식으로 변경
     if (serverData.region.chatLog && serverData.region.chatLog.length > 0) {
       console.log('채팅 메시지 수신:', serverData.region.chatLog);
-      chatMessages.update(messages => [...messages, ...serverData.region.chatLog]);
+      const newChatLogs = serverData.region.chatLog;
+      chatMessages.update(messages => [...messages, ...newChatLogs]);
     }
     // 지역 메시지는 현재 구역의 메시지만 업데이트
     if (serverData.region.regionMessageList !== undefined) {
@@ -307,29 +348,62 @@ export function syncWithServer(serverData: any) {
 }
 
 // === 카운트다운 로직 (playerStore에서 이동) ===
-let countdownInterval: number | null = null;
+let countdownInterval: ReturnType<typeof setInterval> | null = null;
 
 // turnTimer 값 변경 감지하여 자동으로 카운트다운 시작/중지
 turnTimer.subscribe(value => {
-  if (value > 0 && !countdownInterval) {
-    // 타이머가 0보다 크고 카운트다운이 실행중이 아니면 시작
-    countdownInterval = setInterval(() => {
-      const currentCount = get(turnTimer);
-      if (currentCount > 0) {
-        turnTimer.set(currentCount - 1);
-      } else {
-        // 0이 되면 카운트다운 중지
-        stopCountdown();
-      }
-    }, 1000);
+  
+  if (value > 0) {
+    if (!countdownInterval) {
+      // 타이머가 0보다 크고 카운트다운이 실행중이 아니면 시작
+      countdownInterval = setInterval(() => {
+        const currentCount = get(turnTimer);
+        if (currentCount > 0) {
+          turnTimer.set(currentCount - 1);
+        } else {
+          // 0이 되면 카운트다운 중지
+          stopCountdown();
+        }
+      }, 1000);
+    }
   } else if (value === 0) {
     // 0이 되면 카운트다운 중지
     stopCountdown();
   }
 });
 
+// 턴 변경 감지하여 타이머 리셋
+let lastTurn = 1;
+gameTurn.subscribe(value => {
+  if (value !== lastTurn) {
+    console.log(`턴 변경 감지: ${lastTurn} → ${value}`);
+    lastTurn = value;
+    // 턴이 변경되면 카운트다운을 일시 중지하고 새로운 count 값을 기다림
+    stopCountdown();
+    
+    // 턴이 2 이상이고 게임 중일 때 좀비 확인
+    if (value > 1 && get(gamePhase) === 'playing') {
+      // 약간의 지연을 두어 다른 상태들이 업데이트된 후 확인
+      setTimeout(() => {
+        const hasZombie = get(hasZombieInMyRegion);
+        const currentPlayerState = get(playerState);
+        
+        // 생존자이고 같은 지역에 좀비가 있으면 경고
+        if (hasZombie && currentPlayerState === 'alive') {
+          showGameNotification(
+            '⚠️ 이 지역에 좀비가 있습니다!\n행동 메뉴에서 좀비 대처 행동을 선택하세요.',
+            'warning',
+            '/img/scence/zombie.png'
+          );
+        }
+      }, 500);
+    }
+  }
+});
+
 export function stopCountdown() {
   if (countdownInterval) {
+    console.log(`[Timer] 카운트다운 중지`);
     clearInterval(countdownInterval);
     countdownInterval = null;
   }

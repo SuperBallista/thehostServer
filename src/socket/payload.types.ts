@@ -21,7 +21,7 @@ gameStart?: boolean
 
 chatMessage?: ChatMessage
 
-
+getRemainingTurnTime?: boolean
 }
 
 interface GiveItem{
@@ -89,11 +89,12 @@ id: number;
 }
 
 export interface GamePlayerStatusInterface{ // 내 정보
- state: MyPlayerState; // 자신의 상태는 alive 또는 host만 가능
- items: ItemInterface[];
- region: number;
- nextRegion: number;
- act: Act;
+ state?: MyPlayerState; // 자신의 상태는 alive 또는 host만 가능
+ items?: ItemInterface[];
+ region?: number;
+ next?: number;  // nextRegion을 next로 변경
+ nextRegion?: number;  // 하위 호환성을 위해 남겨둠
+ act?: Act;
  canEscape?: boolean; // 도주 가능 여부 (true: 가능, false: 이미 도주 선택함)
 }
 

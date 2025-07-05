@@ -6,7 +6,7 @@ const accessToken = sessionStorage.getItem('accessToken')
 export async function authFetch(
     endpoint: string,
     method: string = "GET", // 특정 메서드로 제한하지 않음
-    body: any = null,
+    body: object | null = null,
   ) {
     const headers: HeadersInit = {
       "Content-Type": "application/json",
@@ -42,10 +42,10 @@ export const isOpen = writable<boolean>(false);
 export const messageType = writable<"error" | "confirm" | "alert" | "loading" | "input" | "success" | "tips" | 'turn' | null>(null);
 export const messageTitle = writable<string>("");
 export const messageContent = writable<
-  string | ((values: Record<string, any>) => string)
+  string | ((values: Record<string, string | number | boolean>) => string)
 >("");
 export const messageColor = writable<string>(defaultColor["default-title-background"]);
-export const messageInputs = writable<{ key: string; label: string; type?: string; placeholder?: string, value: any }[]>([]);
+export const messageInputs = writable<{ key: string; label: string; type?: string; placeholder?: string, value: string | number | boolean }[]>([]);
 export const messageResolve = writable<((res: { success: boolean; values?: Record<string, string> }) => void) | null>(null);
 export const messageIcon = writable<string | null>(null); // ✅ 아이콘을 직접 저장
 
@@ -66,7 +66,7 @@ const messageIcons = {
     title?: string;
     message?: string;
     color?: string;
-    inputs?:  { key: string; label: string; type?: string; placeholder?: string, value: any }[];
+    inputs?:  { key: string; label: string; type?: string; placeholder?: string, value: string | number | boolean }[];
     image?: string
   };
   
@@ -75,9 +75,9 @@ const messageIcons = {
 export function showMessageBox(
   type: "error" | "confirm" | "alert" | "loading" | "input" | "success" | 'tips' | 'turn' | 'turn' ,
   title: string,
-  message: string | ((values: Record<string, any>) => string),
+  message: string | ((values: Record<string, string | number | boolean>) => string),
   color?: string,
-  inputs?: { key: string; label: string; type?: string; value?: any; placeholder?: string }[],
+  inputs?: { key: string; label: string; type?: string; value?: string | number | boolean; placeholder?: string }[],
   image?:string
 ): Promise<MessageBoxResponse> {
   return new Promise((resolve) => {
@@ -86,7 +86,7 @@ export function showMessageBox(
     messageTitle.set(title ?? "제목 없음");
 
     // ✅ 메시지를 함수로도 받을 수 있게 수정
-    messageContent.set(message as any); // string | function
+    messageContent.set(message); // string | function
 
     messageColor.set(color ?? defaultColor["default-title-background"]);
 

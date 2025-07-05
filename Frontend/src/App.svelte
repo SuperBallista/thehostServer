@@ -8,7 +8,6 @@
   import NewUser from "./page/newUser/newUser.svelte";
   import WaitRoom from "./page/waitRoom/waitRoom.svelte";
   import { onMount, onDestroy } from "svelte";
-  import { get } from "svelte/store";
   import { initSocket, cleanupSocket } from "./common/store/socketStore";
 
   let authChecked = false;
@@ -21,9 +20,9 @@
       const restored = await restoreAuthFromSessionAndCookie();
       
       if (restored) {
-        const auth = get(authStore);
+        const auth = $authStore;
         if (auth.user?.nickname) {
-          const currentPage = get(pageStore);
+          const currentPage = $pageStore;
           if (currentPage === 'login') {
             pageStore.set('lobby');
           }
@@ -32,7 +31,7 @@
     }
     
     // 인증이 확인된 후 소켓 초기화
-    if (get(authStore).token) {
+    if ($authStore.token) {
       try {
         await initSocket();
       } catch (error) {

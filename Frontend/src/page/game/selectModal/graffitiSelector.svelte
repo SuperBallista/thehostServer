@@ -1,9 +1,7 @@
 <script lang="ts">
   import { selectGraffitiStore } from '../../../common/store/selectGraffitiMessageBox';
   import { THEME } from '../../../common/constant/theme';
-  import { get } from 'svelte/store';
 
-  let config = get(selectGraffitiStore);
   let selectedIndex: number | null = null;
   let hoveredIndex: number | null = null;
 

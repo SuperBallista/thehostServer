@@ -5,7 +5,6 @@
     import { socketStore } from '../../../common/store/socketStore';
     import { authStore } from '../../../common/store/authStore';
     import { currentRoom } from '../../../common/store/pageStore';
-    import { get } from 'svelte/store';
     import type { ItemInterface, userRequest, MyPlayerState } from '../../../common/store/synchronize.type';
     import { itemList } from '../common/itemObjectRefactored';
     import { showMessageBox } from '../../../common/messagebox/customStore';
@@ -52,12 +51,11 @@ async function moveNextRegion() {
 
   if (result && result.value) {
     // 선택한 지역을 서버로 전송
-    const socket = get(socketStore);
-    const token = get(authStore).token;
-    const user = get(authStore).user;
-    const currentStatus = get(myStatus);
+    const socket = $socketStore;
+    const token = $authStore.token;
+    const user = $authStore.user;
 
-    if (!socket || !token || !user || !currentStatus) return;
+    if (!socket || !token || !user || !$myStatus) return;
 
     const selectedRegion = parseInt(result.value); // result.value를 사용
     console.log('선택한 지역:', { result, selectedRegion, regionName: $regionNames[selectedRegion] });
@@ -66,11 +64,7 @@ async function moveNextRegion() {
       token,
       user,
       myStatus: {
-        state: currentStatus.state,
-        items: currentStatus.items,
-        region: currentStatus.region,
-        nextRegion: selectedRegion, // 선택한 지역 번호
-        act: currentStatus.act
+        next: selectedRegion // 변경된 필드만 전송
       }
     };
 

@@ -96,7 +96,7 @@ afterInit(server: Server) {
       // 하트비트 확인용 빈 request 처리
       if (!data.createRoom && !data.joinRoom && !data.exitRoom && !data.room && 
           !data.page && !data.gameStart && !data.hostAct && !data.myStatus && 
-          !data.chatMessage && !data.giveItem && !data.useItem) {
+          !data.chatMessage && !data.giveItem && !data.useItem && !data.getRemainingTurnTime) {
         // 빈 request는 단순히 연결 상태만 확인
         response = { 
           // 빈 응답으로 하트비트만 리셋
@@ -154,8 +154,7 @@ afterInit(server: Server) {
           response = await this.gameService.updatePlayerStatus(data.user.id, data.myStatus)
         }
 
-        // 채팅 메시지 처리
-        if (data.chatMessage && data.user.id) {
+        if ((data.chatMessage) && data.user.id) {
           response = await this.gameService.handleChatMessage(data.user.id, data.chatMessage)
         }
 
@@ -169,6 +168,12 @@ afterInit(server: Server) {
         if (data.useItem && data.user.id && data.roomId) {
           console.log('아이템 사용 요청:', { userId: data.user.id, useItem: data.useItem, roomId: data.roomId });
           response = await this.gameService.handleUseItem(data.user.id, data.useItem, data.roomId)
+        }
+        
+        // 남은 턴 시간 요청 처리
+        if (data.getRemainingTurnTime && data.user.id) {
+          console.log('남은 턴 시간 요청:', { userId: data.user.id });
+          response = await this.gameService.getRemainingTurnTime(data.user.id)
         }
       }
 

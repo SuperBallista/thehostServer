@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseProvider } from 'src/database/database.provider';
 import { UserDto, CreateUserInput } from './dto/user.dto';
+import { ResultSetHeader } from 'mysql2';
 
 @Injectable()
 export class UserRepository {
@@ -72,7 +73,7 @@ export class UserRepository {
     iv,
   }: CreateUserInput): Promise<number> {
     const now = new Date();
-    const result = await this.db.query(
+    const result = await this.db.query<ResultSetHeader>(
       `INSERT INTO users (
         oauth_provider, 
         oauth_id, 
@@ -82,7 +83,7 @@ export class UserRepository {
         created_at, 
         last_connected_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [provider, oauthId, nicknameHash, encryptedNickname, iv, now, now],
+      [provider, oauthId, nicknameHash, encryptedNickname, iv, now.toISOString(), now.toISOString()],
     );
     return result.insertId;
   }
