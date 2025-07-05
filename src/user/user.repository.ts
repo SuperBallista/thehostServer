@@ -83,7 +83,7 @@ export class UserRepository {
         created_at, 
         last_connected_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [provider, oauthId, nicknameHash, encryptedNickname, iv, now.toISOString(), now.toISOString()],
+      [provider, oauthId, nicknameHash, encryptedNickname, iv, now.toISOString().slice(0, 19).replace('T', ' '), now.toISOString().slice(0, 19).replace('T', ' ')],
     );
     return result.insertId;
   }

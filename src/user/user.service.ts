@@ -91,7 +91,7 @@ async cacheTemporaryUser(provider: string, oauthId: string): Promise<void> {
   const data = {
     oauth_id: oauthId,
     provider,
-    created_at: new Date().toISOString(),
+    created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
   };
 
   await redisClient.hset(key, data);
