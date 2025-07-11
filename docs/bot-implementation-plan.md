@@ -424,3 +424,62 @@ const speechPatterns = {
 - 봇 행동 제한 (rate limiting)
 - API 키 안전한 관리
 - 봇 식별 정보 보호
+
+## 11. 환경변수 설정
+
+### LLM 프로바이더 설정
+봇 시스템은 다양한 LLM 프로바이더를 지원합니다. 환경변수로 원하는 프로바이더를 선택할 수 있습니다.
+
+```bash
+# LLM 프로바이더 선택 (ollama, openai, openrouter)
+LLM_PROVIDER=ollama
+
+# API 키 (OpenAI, OpenRouter에 필요)
+LLM_API_KEY=your_api_key_here
+
+# API URL (Ollama 또는 커스텀 엔드포인트)
+LLM_API_URL=http://localhost:11434
+
+# 모델 선택
+# Ollama: llama2, mistral, codellama 등
+# OpenAI: gpt-3.5-turbo, gpt-4
+# OpenRouter: mistralai/mixtral-8x7b-instruct, meta-llama/llama-2-70b-chat 등
+LLM_MODEL=llama2
+
+# 온도 설정 (0.0 ~ 1.0, 기본값: 0.7)
+LLM_TEMPERATURE=0.7
+
+# 최대 토큰 수 (기본값: 1000)
+LLM_MAX_TOKENS=1000
+```
+
+### 프로바이더별 설정 예시
+
+#### Ollama (로컬 오픈소스 LLM)
+```bash
+LLM_PROVIDER=ollama
+LLM_API_URL=http://localhost:11434
+LLM_MODEL=llama2
+```
+
+#### OpenAI
+```bash
+LLM_PROVIDER=openai
+LLM_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
+LLM_MODEL=gpt-3.5-turbo
+```
+
+#### OpenRouter (다양한 오픈소스 모델)
+```bash
+LLM_PROVIDER=openrouter
+LLM_API_KEY=your_openrouter_api_key
+LLM_MODEL=mistralai/mixtral-8x7b-instruct
+```
+
+### 주의사항
+- Ollama를 사용하려면 먼저 Ollama를 설치하고 원하는 모델을 pull해야 합니다
+  ```bash
+  ollama pull llama2
+  ```
+- OpenRouter 사용 시 모델명은 'provider/model' 형식을 따릅니다
+- API 키는 절대 코드에 하드코딩하지 마세요

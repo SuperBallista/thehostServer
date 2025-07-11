@@ -67,7 +67,7 @@ alarm?: {message: string, img: string}
 }
 
 
-interface AuthUser {
+export interface AuthUser {
   id: number | null;
   nickname: string | null;
 }
