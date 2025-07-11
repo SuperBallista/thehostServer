@@ -308,6 +308,33 @@ export class RedisPubSubService implements OnModuleInit {
       timeStamp: new Date()
     };
     
+    // 현재 턴 번호 가져오기
+    const gameData = await this.redisService.getAndParse(`game:${gameId}`);
+    if (!gameData) {
+      console.error(`게임 데이터를 찾을 수 없음: ${gameId}`);
+      return false;
+    }
+    
+    const currentTurn = gameData.turn || 1;
+    
+    // Redis 키: game:roomId:region:regionId:턴수
+    const regionKey = `game:${gameId}:region:${region}:${currentTurn}`;
+    
+    // 기존 지역 데이터 가져오기
+    let regionData = await this.redisService.getAndParse(regionKey);
+    if (!regionData) {
+      regionData = {
+        chatLog: [],
+        regionMessageList: []
+      };
+    }
+    
+    // 채팅 로그에 추가
+    regionData.chatLog.push(chatData);
+    
+    // Redis에 저장 (게임과 동일한 TTL 적용)
+    await this.redisService.stringifyAndSet(regionKey, regionData, 10800); // 3시간
+    
     // 같은 지역의 플레이어들에게만 메시지 전송
     this.io?.to(`game:${gameId}:region:${region}`).emit('update', {
       region: {
@@ -315,7 +342,7 @@ export class RedisPubSubService implements OnModuleInit {
       }
     });
     
-    console.log(`💬 채팅 메시지: game:${gameId}, region:${region}, player:${playerId}, system:${system}`);
+    console.log(`💬 채팅 메시지 저장 및 전송: game:${gameId}, region:${region}, turn:${currentTurn}, player:${playerId}, system:${system}`);
     return true;
   }
 
