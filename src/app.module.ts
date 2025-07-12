@@ -21,7 +21,7 @@ import { BotModule } from './bot/bot.module';
     AuthModule,
     DatabaseModule,
     SocketModule,
-    BotModule
+    BotModule,
   ],
   controllers: [AppController],
   providers: [],

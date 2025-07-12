@@ -39,7 +39,7 @@ export class OllamaProvider implements LLMProvider {
     }
   }
 
-  async isAvailable(): boolean {
+  async isAvailable(): Promise<boolean> {
     try {
       const response = await fetch(`${this.apiUrl}/api/tags`);
       return response.ok;

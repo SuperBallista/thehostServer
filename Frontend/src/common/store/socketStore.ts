@@ -264,7 +264,6 @@ export function checkSocketListeners(): void {
     console.log('🔍 소켓 리스너 상태 확인:');
     console.log('- 연결 상태:', currentSocket.connected);
     console.log('- 소켓 ID:', currentSocket.id);
-    console.log('- 하트비트:', connectionHeartbeat);
   } else {
     console.log('�� 소켓이 없습니다');
   }

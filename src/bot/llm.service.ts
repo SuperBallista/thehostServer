@@ -13,6 +13,8 @@ import {
 } from './prompts/prompts';
 import { LLMProvider } from './llm-providers/llm-provider.interface';
 import { LLMProviderFactory } from './llm-providers/llm-provider.factory';
+import { promises as fs } from 'fs';
+import * as path from 'path';
 
 // Zod 스키마 정의
 const TriggerSchema = z.object({
@@ -73,27 +75,33 @@ export class LLMService implements OnModuleInit {
    */
   async generateTriggers(context: GameContext): Promise<BotTrigger[]> {
     try {
-      if (!this.llmProvider || !this.llmProvider.isAvailable()) {
+      if (!this.llmProvider || !(await this.llmProvider.isAvailable())) {
         return getDefaultTriggers(context);
       }
 
       const prompt = getTriggerGenerationPrompt(context);
-      
-      const content = await this.llmProvider.generateCompletion({
+      const llmInput = {
         messages: [
           {
-            role: 'system',
+            role: 'system' as const,
             content: getSystemPrompt(context),
           },
           {
-            role: 'user',
+            role: 'user' as const,
             content: prompt,
           },
         ],
-        responseFormat: 'json',
+        responseFormat: 'json' as const,
         temperature: 0.7,
         maxTokens: 1000,
-      });
+      };
+      const content = await this.llmProvider.generateCompletion(llmInput);
+
+      // 로그 기록
+      await fs.appendFile(
+        path.join(process.cwd(), 'logs', 'llm.txt'),
+        `\n[generateTriggers] INPUT: ${JSON.stringify(llmInput)}\nOUTPUT: ${content}\n`
+      );
 
       if (!content) {
         throw new Error('LLM 응답이 비어있음');
@@ -101,10 +109,8 @@ export class LLMService implements OnModuleInit {
 
       const parsed = JSON.parse(content);
       const validated = TriggersResponseSchema.parse(parsed);
-      
       this.logger.log(`트리거 생성 완료: ${validated.triggers.length}개`);
       return validated.triggers;
-      
     } catch (error) {
       this.logger.error(`트리거 생성 실패: ${error.message}`, error.stack);
       return getDefaultTriggers(context);
@@ -116,27 +122,33 @@ export class LLMService implements OnModuleInit {
    */
   async decideAction(context: GameContext, trigger: any): Promise<any> {
     try {
-      if (!this.llmProvider || !this.llmProvider.isAvailable()) {
+      if (!this.llmProvider || !(await this.llmProvider.isAvailable())) {
         return getDefaultAction(context);
       }
 
       const prompt = getActionDecisionPrompt(context, trigger);
-      
-      const content = await this.llmProvider.generateCompletion({
+      const llmInput = {
         messages: [
           {
-            role: 'system',
+            role: 'system' as const,
             content: getSystemPrompt(context),
           },
           {
-            role: 'user',
+            role: 'user' as const,
             content: prompt,
           },
         ],
-        responseFormat: 'json',
+        responseFormat: 'json' as const,
         temperature: 0.7,
         maxTokens: 500,
-      });
+      };
+      const content = await this.llmProvider.generateCompletion(llmInput);
+
+      // 로그 기록
+      await fs.appendFile(
+        path.join(process.cwd(), 'logs', 'llm.txt'),
+        `\n[decideAction] INPUT: ${JSON.stringify(llmInput)}\nOUTPUT: ${content}\n`
+      );
 
       if (!content) {
         throw new Error('LLM 응답이 비어있음');
@@ -144,10 +156,8 @@ export class LLMService implements OnModuleInit {
 
       const parsed = JSON.parse(content);
       const validated = ActionResponseSchema.parse(parsed);
-      
       this.logger.log(`행동 결정: ${validated.action}`, validated.reasoning);
       return validated;
-      
     } catch (error) {
       this.logger.error(`행동 결정 실패: ${error.message}`, error.stack);
       return getDefaultAction(context);
@@ -159,25 +169,30 @@ export class LLMService implements OnModuleInit {
    */
   async summarizeTurn(events: any[]): Promise<string> {
     try {
-      if (!this.llmProvider || !this.llmProvider.isAvailable()) {
+      if (!this.llmProvider || !(await this.llmProvider.isAvailable())) {
         return '이번 턴 요약을 생성할 수 없습니다.';
       }
 
       const prompt = getTurnSummaryPrompt(events);
-
-      const content = await this.llmProvider.generateCompletion({
+      const llmInput = {
         messages: [
           {
-            role: 'user',
+            role: 'user' as const,
             content: prompt,
           },
         ],
         temperature: 0.5,
         maxTokens: 150,
-      });
+      };
+      const content = await this.llmProvider.generateCompletion(llmInput);
+
+      // 로그 기록
+      await fs.appendFile(
+        path.join(process.cwd(), 'logs', 'llm.txt'),
+        `\n[summarizeTurn] INPUT: ${JSON.stringify(llmInput)}\nOUTPUT: ${content}\n`
+      );
 
       return content || '이번 턴에 특별한 일은 없었습니다.';
-      
     } catch (error) {
       this.logger.error(`턴 요약 실패: ${error.message}`, error.stack);
       return '이번 턴 요약을 생성할 수 없습니다.';

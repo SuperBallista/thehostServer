@@ -1,6 +1,6 @@
 export interface LLMProvider {
   generateCompletion(params: LLMCompletionParams): Promise<string>;
-  isAvailable(): boolean;
+  isAvailable(): Promise<boolean>;
 }
 
 export interface LLMCompletionParams {

@@ -30,7 +30,7 @@ export class OpenAIProvider implements LLMProvider {
     return response.choices[0]?.message?.content || '';
   }
 
-  isAvailable(): boolean {
-    return this.client !== null;
+  async isAvailable(): Promise<boolean> {
+    return Promise.resolve(this.client !== null);
   }
 }

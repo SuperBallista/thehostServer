@@ -47,6 +47,10 @@ import { TurnProcessorService } from './game/turn-processor.service';
     CombatHandlerService,
     TurnProcessorService,
   ],
+  exports: [
+    PlayerManagerService,
+    GameDataService,
+  ],
 })
 export class SocketModule implements OnModuleInit {
   constructor(
