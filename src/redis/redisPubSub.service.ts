@@ -305,7 +305,8 @@ export class RedisPubSubService implements OnModuleInit {
     const chatData = {
       system: system || false,
       message: chatMessage,
-      timeStamp: new Date()
+      timeStamp: new Date(),
+      playerId: playerId // 플레이어 ID 추가
     };
     
     // 현재 턴 번호 가져오기

@@ -1,5 +1,5 @@
 // src/socket/game/game.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { RedisPubSubService } from '../../redis/redisPubSub.service';
 import { Game, GamePlayer, GamePlayerInRedis, REGION_NAMES, ITEM_NAMES, ANIMAL_NICKNAMES } from './game.types';
@@ -18,6 +18,7 @@ import { ItemHandlerService } from './item-handler.service';
 import { CombatHandlerService } from './combat-handler.service';
 import { ZombieService } from './zombie.service';
 import { Socket } from 'socket.io';
+import { BotService } from '../../bot/bot.service';
 
 @Injectable()
 export class GameService {
@@ -33,6 +34,8 @@ export class GameService {
     private readonly itemHandlerService: ItemHandlerService,
     private readonly combatHandlerService: CombatHandlerService,
     private readonly zombieService: ZombieService,
+    @Inject(forwardRef(() => BotService))
+    private readonly botService: BotService,
   ) {}
 
   /**
@@ -292,6 +295,24 @@ export class GameService {
     // 게임 데이터 세팅 준비 완료
     await this.createNewGameData(roomData.id, hostPlayer, players);
     
+    // 봇 초기화 및 트리거 설정을 병렬로 처리
+    const botInitializationPromises = players.map(player => {
+      if (player.userId < 0) { // 봇인 경우
+        return this.botService.initializeBotForGame(
+          player.userId,
+          roomData.id,
+          player.playerId
+        );
+      }
+    }).filter(Boolean);
+    
+    // 병렬 처리된 봇 초기화
+    Promise.all(botInitializationPromises).then(() => {
+      console.log('모든 봇 초기화 완료');
+    }).catch(error => {
+      console.error('봇 초기화 중 오류 발생:', error);
+    });
+    
     // 첫 턴 아이템 지급
     await this.gameTurnService.onTurnStart(roomData.id, 1);
 
@@ -485,6 +506,9 @@ export class GameService {
    * 게임 데이터 정리
    */
   private async cleanupGameData(gameId: string): Promise<void> {
+    // 봇 정리
+    await this.botService.cleanupBotsForGame(gameId);
+    
     // 게임 데이터 정리는 GameDataService에 위임
     await this.gameDataService.cleanupGameData(gameId);
     console.log(`게임 데이터 정리 완료: ${gameId}`);

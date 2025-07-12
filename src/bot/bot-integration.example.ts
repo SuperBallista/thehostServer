@@ -26,8 +26,8 @@ export class BotIntegrationExample {
     };
 
     // 봇 생성
-    const bot = await this.botService.createBot(roomId, botConfig);
-    console.log(`봇 생성됨: ${bot.botId}`);
+    const botId = await this.botService.createBot(roomId, botConfig);
+    console.log(`봇 생성됨: ${botId}`);
 
     // 방의 플레이어 목록에 봇 추가
     // 실제 구현: RoomService에서 처리

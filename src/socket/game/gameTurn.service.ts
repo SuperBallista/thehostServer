@@ -6,6 +6,7 @@ import { GamePlayerInRedis, ItemCode, REGION_NAMES, ITEM_NAMES } from './game.ty
 import { ChatService } from './chat.service';
 import { GameDataService } from './game-data.service';
 import * as itemProbabilities from './itemProbabilities.json';
+import { BotService } from '../../bot/bot.service';
 
 
 interface ItemProbability {
@@ -27,6 +28,7 @@ export class GameTurnService {
     private readonly redisPubSubService: RedisPubSubService,
     private readonly chatService: ChatService,
     private readonly gameDataService: GameDataService,
+    private readonly botService: BotService,
   ) {}
 
   async onTurnStart(gameId: string, currentTurn?: number): Promise<void> {
@@ -193,6 +195,12 @@ export class GameTurnService {
         // 디버깅을 위한 로그 (10초마다)
         if (remainingTime % 10000 < 1000) {
           console.log(`[GameTurn] 남은 시간: ${Math.ceil(remainingTime / 1000)}초`);
+        }
+        
+        // 턴 종료 10초 전 봇의 턴 종료 행동 설정
+        if (remainingTime <= 10000 && remainingTime > 9000) {
+          console.log(`[GameTurn] 봇의 턴 종료 행동 설정 - gameId: ${gameId}`);
+          await this.botService.handleTurnEnd(gameId);
         }
         
         // 시간이 만료되었으면 턴 종료 처리

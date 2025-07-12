@@ -1,91 +1,66 @@
-import { Injectable, Logger, OnModuleInit, forwardRef, Inject } from '@nestjs/common';
-import { ModuleRef } from '@nestjs/core';
+import { Injectable, Logger, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../redis/redis.service';
-import { RedisPubSubService } from '../redis/redisPubSub.service';
-import { PlayerManagerService } from '../socket/game/player-manager.service';
 import { GameDataService } from '../socket/game/game-data.service';
-import { GamePlayerInRedis } from '../socket/game/game.types';
-import { BotConfig, BotPlayer, BotState } from './interfaces/bot.interface';
-import { TriggerService } from './trigger.service';
+import { PlayerManagerService } from '../socket/game/player-manager.service';
+import { GameContext, BotConfig } from './interfaces/bot.interface';
 import { LLMService } from './llm.service';
 import { ActionService } from './action.service';
 import { MemoryService } from './memory.service';
+import { ChatService } from '../socket/game/chat.service';
+import { GamePlayerInRedis, ITEM_NAMES } from '../socket/game/game.types';
+import { ANIMAL_NICKNAMES } from './constants/animal-nicknames';
 
 @Injectable()
 export class BotService implements OnModuleInit {
   private readonly logger = new Logger(BotService.name);
-  private botIdCounter = -1;
-  private playerManagerService: PlayerManagerService;
-  private gameDataService: GameDataService;
+  private chatTimers = new Map<string, NodeJS.Timeout>();
+  private activeBots = new Map<string, boolean>(); // gameId:botId -> active status
 
   constructor(
-    private readonly moduleRef: ModuleRef,
+    private readonly configService: ConfigService,
     private readonly redisService: RedisService,
-    private readonly redisPubSubService: RedisPubSubService,
-    @Inject(forwardRef(() => TriggerService))
-    private readonly triggerService: TriggerService,
+    @Inject(forwardRef(() => GameDataService))
+    private readonly gameDataService: GameDataService,
+    @Inject(forwardRef(() => PlayerManagerService))
+    private readonly playerManagerService: PlayerManagerService,
     private readonly llmService: LLMService,
     private readonly actionService: ActionService,
     private readonly memoryService: MemoryService,
+    @Inject(forwardRef(() => ChatService))
+    private readonly chatService: ChatService,
   ) {}
 
   async onModuleInit() {
-    // 순환 의존성 해결을 위해 지연 로딩
-    this.playerManagerService = this.moduleRef.get(PlayerManagerService, { strict: false });
-    this.gameDataService = this.moduleRef.get(GameDataService, { strict: false });
-    
-    // TriggerService에 BotService 참조 설정
-    this.triggerService.setBotService(this);
+    this.logger.log('BotService 초기화 완료');
   }
 
   /**
    * 봇 생성
    */
-  async createBot(roomId: string, botConfig: BotConfig): Promise<BotPlayer> {
-    const botId = this.getNextBotId();
-    const botName = botConfig.name || `Bot_${Math.abs(botId)}`;
+  async createBot(roomId: string, config: BotConfig): Promise<number> {
+    const botId = await this.generateBotId();
     
-    const botPlayer: BotPlayer = {
+    const botState = {
       botId,
       roomId,
-      config: botConfig,
-      status: 'active',
-      stats: {
-        turnsAlive: 0,
-        itemsUsed: 0,
-        playersHelped: 0,
-      },
+      personality: config.mbti,
+      gender: config.gender,
+      name: config.name,
+      createdAt: new Date().toISOString(),
+      isActive: false,
     };
 
-    // Redis에 봇 상태 저장
-    const botState: BotState = {
-      botId,
-      roomId,
-      personality: {
-        mbti: botConfig.mbti,
-        gender: botConfig.gender,
-      },
-      status: 'active',
-      stats: botPlayer.stats,
-    };
+    await this.redisService.stringifyAndSet(`bot:state:${roomId}:${botId}`, botState, 3600);
     
-    await this.redisService.stringifyAndSet(
-      `bot:state:${roomId}:${botId}`,
-      botState,
-      10800 // 3시간
-    );
-
-    // 플레이어 매니저에 봇 추가
-    await this.playerManagerService.updateLocationState(botId, 'room', roomId);
-
-    this.logger.log(`봇 생성 완료: ${botName} (ID: ${botId})`);
-    return botPlayer;
+    this.logger.log(`봇 생성 완료: ${config.name} (${config.mbti}/${config.gender})`);
+    return botId;
   }
 
   /**
    * 봇 상태 조회
    */
-  async getBotState(botId: number): Promise<BotState | null> {
+  async getBotState(botId: number): Promise<any | null> {
     const keys = await this.redisService.scanKeys(`bot:state:*:${botId}`);
     if (keys.length === 0) {
       return null;
@@ -97,7 +72,7 @@ export class BotService implements OnModuleInit {
   /**
    * 봇 상태 업데이트
    */
-  async updateBotState(botId: number, state: Partial<BotState>): Promise<void> {
+  async updateBotState(botId: number, state: Partial<any>): Promise<void> {
     const keys = await this.redisService.scanKeys(`bot:state:*:${botId}`);
     if (keys.length === 0) {
       this.logger.warn(`봇을 찾을 수 없음: ${botId}`);
@@ -122,9 +97,6 @@ export class BotService implements OnModuleInit {
       await this.redisService.del(keys[0]);
     }
 
-    // 트리거 정리
-    await this.triggerService.clearTriggers(botId);
-    
     // 메모리 정리
     await this.memoryService.clearMemory(botId);
 
@@ -137,19 +109,19 @@ export class BotService implements OnModuleInit {
   async initializeBotForGame(botId: number, gameId: string, playerId: number): Promise<void> {
     this.logger.log(`게임용 봇 초기화: botId=${botId}, gameId=${gameId}, playerId=${playerId}`);
     
-    // 봇의 게임 컨텍스트 생성
-    const gameContext = await this.buildGameContext(botId, gameId);
+    // 봇 상태 활성화
+    const botKey = `bot:state:${gameId}:${botId}`;
+    const botState = await this.redisService.getAndParse(botKey);
+    if (botState) {
+      botState.isActive = true;
+      botState.playerId = playerId;
+      await this.redisService.stringifyAndSet(botKey, botState, 10800);
+    }
+
+    // 봇 채팅 타이머 시작
+    this.startBotChatTimer(gameId, botId);
     
-    // LLM을 통해 초기 트리거 생성
-    const triggers = await this.llmService.generateTriggers(gameContext);
-    
-    // 트리거 저장
-    await this.triggerService.saveTriggers(gameId, botId, triggers);
-    
-    // 트리거 모니터링 시작
-    await this.triggerService.startMonitoring(gameId, botId);
-    
-    this.logger.log(`봇 초기화 완료: ${triggers.length}개 트리거 생성`);
+    this.logger.log(`봇 초기화 완료: 채팅 타이머 시작`);
   }
 
   /**
@@ -159,14 +131,8 @@ export class BotService implements OnModuleInit {
     const botPlayers = await this.getBotPlayersInGame(gameId);
     
     for (const botPlayer of botPlayers) {
-      const gameContext = await this.buildGameContext(botPlayer.userId, gameId);
-      
-      // 새로운 트리거 생성
-      const triggers = await this.llmService.generateTriggers(gameContext);
-      await this.triggerService.saveTriggers(gameId, botPlayer.userId, triggers);
-      
-      // 트리거 모니터링 재시작
-      await this.triggerService.startMonitoring(gameId, botPlayer.userId);
+      // 봇 채팅 타이머 재시작
+      this.startBotChatTimer(gameId, botPlayer.userId);
     }
   }
 
@@ -177,15 +143,8 @@ export class BotService implements OnModuleInit {
     const botPlayers = await this.getBotPlayersInGame(gameId);
     
     for (const botPlayer of botPlayers) {
-      // 이번 턴 요약 생성
-      const events = await this.memoryService.getCurrentTurnEvents(gameId, botPlayer.userId);
-      const summary = await this.llmService.summarizeTurn(events);
-      
-      // 메모리 업데이트
-      await this.memoryService.updateTurnSummary(gameId, botPlayer.userId, summary);
-      
-      // 트리거 모니터링 중지
-      await this.triggerService.stopMonitoring(gameId, botPlayer.userId);
+      // 봇 채팅 타이머 정지
+      this.stopBotChatTimer(gameId, botPlayer.userId);
     }
   }
 
@@ -245,18 +204,20 @@ export class BotService implements OnModuleInit {
     return {
       previousTurnSummary,
       currentTurnChats: currentTurnChats.map(chat => ({
-        sender: chat.system ? 'System' : 'Player',
+        sender: chat.system ? 'System' : (chat.playerId !== undefined ? ANIMAL_NICKNAMES[chat.playerId] || `Player_${chat.playerId}` : 'Player'),
         message: chat.message,
         system: chat.system,
       })),
-      currentItems: playerData.items || [],
-      playersInRegion: playersInRegion.map(p => `Player_${p.playerId}`),
+      currentItems: playerData.items?.map(item => ITEM_NAMES[item] || item) || [],
+      currentItemCodes: playerData.items || [], // 원본 아이템 코드도 유지
+      playersInRegion: playersInRegion.map(p => ANIMAL_NICKNAMES[p.playerId] || `Player_${p.playerId}`),
       currentTurn,
       regionGraffiti: regionData?.regionMessageList?.filter(msg => msg !== null) || [],
       canEscape: playerData.canEscape,
       role: this.getPlayerRole(playerData),
       currentRegion: this.getRegionName(playerData.regionId),
       personality: botState?.personality || { mbti: 'INTJ', gender: 'male' },
+      botPlayerId: playerData.playerId, // 봇의 플레이어 ID 추가
     };
   }
 
@@ -330,9 +291,115 @@ export class BotService implements OnModuleInit {
   }
 
   /**
+   * 봇 채팅 타이머 시작 (8-12초 간격)
+   */
+  private startBotChatTimer(gameId: string, botId: number): void {
+    const timerKey = `${gameId}:${botId}`;
+    
+    // 기존 타이머가 있으면 정지
+    this.stopBotChatTimer(gameId, botId);
+    
+    // 봇 활성화
+    this.activeBots.set(timerKey, true);
+    
+    const scheduleNextChat = () => {
+      if (!this.activeBots.get(timerKey)) {
+        return; // 봇이 비활성화되면 중지
+      }
+      
+      // 8-12초 사이 랜덤 간격
+      const delay = Math.random() * 4000 + 8000; // 8000-12000ms
+      
+      const timer = setTimeout(async () => {
+        try {
+          await this.processBotChat(gameId, botId);
+          scheduleNextChat(); // 다음 채팅 예약
+        } catch (error) {
+          this.logger.error(`봇 채팅 처리 실패: ${error.message}`, error.stack);
+          scheduleNextChat(); // 에러가 있어도 계속 진행
+        }
+      }, delay);
+      
+      this.chatTimers.set(timerKey, timer);
+    };
+    
+    scheduleNextChat();
+    this.logger.log(`봇 채팅 타이머 시작: ${timerKey}`);
+  }
+
+  /**
+   * 봇 채팅 타이머 정지
+   */
+  private stopBotChatTimer(gameId: string, botId: number): void {
+    const timerKey = `${gameId}:${botId}`;
+    
+    // 봇 비활성화
+    this.activeBots.set(timerKey, false);
+    
+    // 타이머 정지
+    const timer = this.chatTimers.get(timerKey);
+    if (timer) {
+      clearTimeout(timer);
+      this.chatTimers.delete(timerKey);
+      this.logger.log(`봇 채팅 타이머 정지: ${timerKey}`);
+    }
+  }
+
+  /**
+   * 봇 채팅 처리
+   */
+  private async processBotChat(gameId: string, botId: number): Promise<void> {
+    try {
+      // 현재 게임 컨텍스트 구성
+      const gameContext = await this.buildGameContext(botId, gameId);
+      
+      // LLM에 채팅 메시지 결정 요청
+      const chatDecision = await this.llmService.decideChatMessage(gameContext);
+      
+      if (chatDecision.shouldChat && chatDecision.message) {
+        // 채팅 메시지 전송
+        await this.actionService.executeAction(gameId, botId, {
+          action: 'chatMessage',
+          params: { message: chatDecision.message }
+        });
+        
+        // 동물 닉네임으로 로그 표시
+        const playerData = await this.playerManagerService.getPlayerDataByUserId(gameId, botId);
+        const botNickname = playerData ? ANIMAL_NICKNAMES[playerData.playerId] || `Bot_${Math.abs(botId)}` : `Bot_${Math.abs(botId)}`;
+        this.logger.log(`봇 채팅 전송: ${botNickname} - ${chatDecision.message}`);
+      }
+      
+      // 추가 행동이 필요한 경우 처리
+      if (chatDecision.additionalAction) {
+        await this.actionService.executeAction(gameId, botId, chatDecision.additionalAction);
+      }
+      
+    } catch (error) {
+      this.logger.error(`봇 채팅 처리 실패: ${error.message}`, error.stack);
+    }
+  }
+
+  /**
+   * 게임 종료 시 봇 정리
+   */
+  async cleanupBotsForGame(gameId: string): Promise<void> {
+    const botPlayers = await this.getBotPlayersInGame(gameId);
+    
+    for (const botPlayer of botPlayers) {
+      this.stopBotChatTimer(gameId, botPlayer.userId);
+    }
+    
+    this.logger.log(`게임 ${gameId}의 모든 봇 정리 완료`);
+  }
+
+  /**
    * 다음 봇 ID 생성
    */
-  private getNextBotId(): number {
-    return this.botIdCounter--;
+  private async generateBotId(): Promise<number> {
+    // 현재 봇 ID 범위를 확인하여 다음 ID를 생성
+    const keys = await this.redisService.scanKeys('bot:state:*');
+    const botIds = keys.map(key => parseInt(key.split(':').pop() || '0', 10));
+    const maxBotId = Math.max(...botIds);
+    return maxBotId <= 0 ? -1 : maxBotId - 1; // 음수 ID로 생성
   }
 }

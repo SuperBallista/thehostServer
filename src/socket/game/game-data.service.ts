@@ -135,6 +135,7 @@ export class GameDataService {
    * 게임 데이터 정리 (게임 종료 시)
    */
   async cleanupGameData(gameId: string): Promise<void> {
+    // 게임 데이터 삭제
     await this.deleteGameData(gameId);
   }
 

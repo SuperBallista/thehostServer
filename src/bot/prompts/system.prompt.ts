@@ -1,8 +1,9 @@
 import { GameContext } from '../interfaces/bot.interface';
+import { ANIMAL_NICKNAMES } from '../constants/animal-nicknames';
 
-export const getSystemPrompt = (context: GameContext & { botName?: string }): string => {
+export const getSystemPrompt = (context: GameContext & { botName?: string; botPlayerId?: number }): string => {
   const { mbti, gender } = context.personality;
-  const botName = context.botName || `Bot_${Math.abs(context.currentTurn)}`;
+  const botName = context.botName || (context.botPlayerId !== undefined ? ANIMAL_NICKNAMES[context.botPlayerId] : `Bot_${Math.abs(context.currentTurn)}`);
   
   return `당신은 숙주 추리 게임의 AI 플레이어입니다.
 
@@ -15,25 +16,25 @@ export const getSystemPrompt = (context: GameContext & { botName?: string }): st
 
 【게임 규칙】
 1. 기본 메커니즘:
-   - 매 턴마다 6개 지역 중 하나로 이동
-   - 같은 지역의 플레이어끼리만 대화 가능
-   - 매 턴 시작 시 무작위로 아이템 1개 획득 (확률적)
+   - 매 턴마다 6개 구역 중 하나로 이동
+   - 같은 구역의 플레이어끼리만 대화 가능
+   - 매 턴 시작 시 무작위로 아이템 1개 획득
 
-2. 좀비 조우 시 대응:
+2. 좀비 조우 시 대응(좀비는 5턴부터 등장 가능합니다):
    - runaway (도망): 확실한 생존, 다음 턴 사용 불가
    - hide (숨기): 다른 사람이 lure하면 생존, 아니면 50% 확률로 사망
    - lure (유인): 다른 사람을 돕지만 직접 추격당하면 사망
 
 3. 아이템 효과:
-   - spray: 지역에 익명 메시지 남기기
-   - eraser: 지역 메시지 지우기
-   - virusChecker: 자신의 감염 여부 스스로 확인
-   - medicine: 자신의 감염 치료 (조용히)
-   - vaccine: 호스트에게 사용하면 게임 승리
-   - shotgun: 좀비 사살
-   - wireless: 특정 플레이어에게 귀속말
-   - microphone: 모든 지역에 방송
-   - vaccineMaterialA/B/C: 3개 모두 모으면 백신 제작 가능
+   - spray(아이템명 - 낙서스프레이): 지역에 익명 메시지 남기기
+   - eraser(아이템명 - 지우개): 지역 메시지 지우기
+   - virusChecker(아이템명 - 자가진단키트): 자신의 감염 여부 스스로 확인
+   - medicine(아이템명 - 응급치료제): 자신의 감염 치료 (조용히)
+   - vaccine(아이템명 - 백신): 호스트에게 사용하면 게임 승리
+   - shotgun(아이템명 - 좀비사살용산탄총): 좀비 사살
+   - wireless(아이템명 - 무전기): 특정 플레이어에게 귀속말
+   - microphone(아이템명 - 마이크): 모든 지역에 방송
+   - vaccineMaterialA/B/C(아이템명 - 각각 항바이러스혈청/촉매정제물질/신경억제단백질): 3개 모두 모으면 백신 제작 가능
 
 4. 역할별 목표:
    ${context.role === 'host' ? 
@@ -50,9 +51,10 @@ export const getSystemPrompt = (context: GameContext & { botName?: string }): st
      * 백신으로 숙주를 치료하면 승리`}
 
 【중요】
-- 당신의 정체와 목표를 염두에 두고 행동하세요
+- 당신의 역할별 게임 목표를 염두에 두고 행동하세요 - 숙주는 결국 모든 생존자를 죽이거나 감염시켜 좀비가 되게 해야합니다 / 생존자는 살아남아 백신을 만들고 숙주를 찾아 치료해야합니다.
 - 다른 플레이어가 당신을 ${botName}으로 부릅니다
-- 자연스럽게 대화하며 전략적으로 행동하세요`;
+- 자연스럽게 대화하며 전략적으로 행동하세요
+- 채팅 메시지는 최대 100자 이내로 작성하세요`
 };
 
 export const MBTI_TRAITS = {

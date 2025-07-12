@@ -1,23 +1,30 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BotService } from './bot.service';
-import { LLMService } from './llm.service';
-import { TriggerService } from './trigger.service';
 import { ActionService } from './action.service';
 import { MemoryService } from './memory.service';
-import { RedisModule } from '../redis/redis.module';
-import { SocketModule } from '../socket/socket.module';
+import { LLMService } from './llm.service';
 import { LLMProviderFactory } from './llm-providers/llm-provider.factory';
+import { GameModule } from '../socket/game.module';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
-  imports: [RedisModule, SocketModule],
+  imports: [
+    forwardRef(() => GameModule),
+    RedisModule,
+  ],
   providers: [
     BotService,
-    LLMService,
-    TriggerService,
     ActionService,
     MemoryService,
-    LLMProviderFactory, // 의존성 문제 해결을 위해 추가
+    LLMService,
+    LLMProviderFactory,
   ],
-  exports: [BotService],
+  exports: [
+    BotService,
+    ActionService,
+    MemoryService,
+    LLMService,
+    LLMProviderFactory,
+  ],
 })
 export class BotModule {}

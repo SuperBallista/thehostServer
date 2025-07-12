@@ -14,6 +14,7 @@ import { ConnectionService } from './connection.service';
 import { RedisPubSubService } from 'src/redis/redisPubSub.service';
 import { Room, userDataResponse, userRequest } from './payload.types';
 import { GameService } from './game/game.service';
+import { TurnProcessorService } from './game/turn-processor.service';
 
 
 
@@ -32,7 +33,8 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly connectionService: ConnectionService,
     private readonly lobbyService: LobbyService,
     private readonly redisPubSubService: RedisPubSubService,
-    private readonly gameService: GameService
+    private readonly gameService: GameService,
+    private readonly turnProcessorService: TurnProcessorService
   ) {}
 
 
@@ -40,6 +42,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
 afterInit(server: Server) {
   this.redisPubSubService.io = server;
+  this.redisPubSubService.setTurnProcessorService(this.turnProcessorService);
 
   this.redisPubSubService.registerRoomListUpdateCallback(async () => {
     const roomList = await this.lobbyService.getRooms();

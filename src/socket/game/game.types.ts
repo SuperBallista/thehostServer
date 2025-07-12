@@ -60,6 +60,7 @@ export interface chatMessage{
     system: boolean
     message: string
     timeStamp: Date
+    playerId?: number // 플레이어 ID 추가 (시스템 메시지의 경우 없을 수 있음)
 }
 
 //**구역 낙서 메세지 */

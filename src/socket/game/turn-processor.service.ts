@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { BotService } from '../../bot/bot.service';
 import { GameDataService } from './game-data.service';
 import { PlayerManagerService } from './player-manager.service';
 import { ZombieService } from './zombie.service';
@@ -6,14 +7,21 @@ import { HostActionService } from './host-action.service';
 import { GameTurnService } from './gameTurn.service';
 import { ChatService } from './chat.service';
 import { RedisPubSubService } from '../../redis/redisPubSub.service';
+import { RedisService } from '../../redis/redis.service';
 import { GameStateService } from './game-state.service';
-import { ANIMAL_NICKNAMES, GamePlayerInRedis } from './game.types';
+import { GamePlayerInRedis } from './game.types';
 import { ZombieState } from './zombie.service';
 import { userDataResponse } from '../payload.types';
+
+const ANIMAL_NICKNAMES = [
+  '호랑이', '사자', '곰', '늑대', '여우', '토끼', '사슴', '다람쥐', '코끼리', '기린',
+  '펭귄', '독수리', '올빼미', '고래', '돌고래', '상어', '문어', '해파리', '거북이', '악어'
+];
 
 @Injectable()
 export class TurnProcessorService {
   constructor(
+    private readonly botService: BotService,
     private readonly gameDataService: GameDataService,
     private readonly playerManagerService: PlayerManagerService,
     private readonly zombieService: ZombieService,
@@ -21,6 +29,7 @@ export class TurnProcessorService {
     private readonly gameTurnService: GameTurnService,
     private readonly chatService: ChatService,
     private readonly redisPubSubService: RedisPubSubService,
+    private readonly redisService: RedisService,
     private readonly gameStateService: GameStateService,
   ) {}
 
@@ -48,6 +57,7 @@ export class TurnProcessorService {
       // 3단계: 이동 후 처리
       // 3-1. 감염된 플레이어의 좀비 변이 체크 (새 위치에서)
       await this.processZombieTransformations(gameId);
+      
       
       // 4단계: 다음 턴 시작
       await this.startNextTurn(gameId);
@@ -333,8 +343,15 @@ export class TurnProcessorService {
     console.log(`[TurnProcessor] 다음 턴 시작`);
     
     const gameData = await this.gameDataService.getGameData(gameId);
+    const previousTurn = gameData.turn;
     gameData.turn += 1;
     await this.gameDataService.saveGameData(gameId, gameData);
+    
+    // 이전 턴의 낙서를 새 턴으로 전달
+    await this.transferGraffitiToNewTurn(gameId, previousTurn, gameData.turn);
+    
+    // 봇의 턴 시작 세팅
+    await this.botService.handleTurnStart(gameId);
     
     // 턴 시작 처리 (아이템 지급 등)
     await this.gameTurnService.onTurnStart(gameId, gameData.turn);
@@ -352,6 +369,58 @@ export class TurnProcessorService {
     await this.sendUpdatesToAllPlayers(gameId);
     
     console.log(`[TurnProcessor] ${gameData.turn}턴 시작 (${turnDuration}초)`);
+  }
+
+  /**
+   * 이전 턴의 낙서를 새 턴으로 전달
+   */
+  private async transferGraffitiToNewTurn(gameId: string, previousTurn: number, newTurn: number): Promise<void> {
+    console.log(`[TurnProcessor] 낙서 전달: ${previousTurn}턴 → ${newTurn}턴`);
+    
+    // 모든 구역에 대해 낙서 전달 처리
+    const maxRegions = 6; // 최대 구역 수
+    
+    for (let regionId = 0; regionId < maxRegions; regionId++) {
+      try {
+        // 이전 턴의 구역 데이터 가져오기
+        const previousRegionKey = `game:${gameId}:region:${previousTurn}:${regionId}`;
+        const previousRegionData = await this.redisService.getAndParse(previousRegionKey);
+        
+        if (previousRegionData && previousRegionData.regionMessageList) {
+          // 새 턴의 구역 데이터 생성 (채팅 로그는 초기화, 낙서만 전달)
+          const newRegionData = {
+            chatLog: [],
+            regionMessageList: [...previousRegionData.regionMessageList] // 낙서 복사
+          };
+          
+          // 새 턴의 구역 데이터 저장
+          const newRegionKey = `game:${gameId}:region:${newTurn}:${regionId}`;
+          await this.redisService.stringifyAndSet(newRegionKey, newRegionData);
+          
+          console.log(`[TurnProcessor] 구역 ${regionId} 낙서 전달 완료: ${previousRegionData.regionMessageList.length}개`);
+        } else {
+          // 이전 턴 데이터가 없으면 빈 구역 데이터 생성
+          const newRegionData = {
+            chatLog: [],
+            regionMessageList: []
+          };
+          
+          const newRegionKey = `game:${gameId}:region:${newTurn}:${regionId}`;
+          await this.redisService.stringifyAndSet(newRegionKey, newRegionData);
+        }
+      } catch (error) {
+        console.error(`[TurnProcessor] 구역 ${regionId} 낙서 전달 실패:`, error);
+        
+        // 에러 발생 시 빈 구역 데이터 생성
+        const newRegionData = {
+          chatLog: [],
+          regionMessageList: []
+        };
+        
+        const newRegionKey = `game:${gameId}:region:${newTurn}:${regionId}`;
+        await this.redisService.stringifyAndSet(newRegionKey, newRegionData);
+      }
+    }
   }
 
   /**

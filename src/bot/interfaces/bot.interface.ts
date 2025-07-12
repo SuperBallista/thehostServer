@@ -66,4 +66,6 @@ export interface GameContext {
     mbti: string;
     gender: string;
   };
+  // 봇의 플레이어 ID (동물 닉네임 결정용)
+  botPlayerId?: number;
 }
