@@ -350,6 +350,9 @@ export class TurnProcessorService {
     // 이전 턴의 낙서를 새 턴으로 전달
     await this.transferGraffitiToNewTurn(gameId, previousTurn, gameData.turn);
     
+    // 모든 플레이어의 다음 구역을 무작위로 재설정
+    await this.resetPlayersNextZoneToRandom(gameId);
+    
     // 봇의 턴 시작 세팅
     await this.botService.handleTurnStart(gameId);
     
@@ -419,6 +422,36 @@ export class TurnProcessorService {
         
         const newRegionKey = `game:${gameId}:region:${newTurn}:${regionId}`;
         await this.redisService.stringifyAndSet(newRegionKey, newRegionData);
+      }
+    }
+  }
+
+  /**
+   * 모든 플레이어의 다음 구역을 무작위로 재설정
+   */
+  private async resetPlayersNextZoneToRandom(gameId: string): Promise<void> {
+    console.log(`[TurnProcessor] 모든 플레이어의 다음 구역을 무작위로 재설정`);
+    
+    const gameData = await this.gameDataService.getGameData(gameId);
+    const players = await this.playerManagerService.getAllPlayersInGame(gameId);
+    
+    // 플레이어 수에 따른 구역 수 계산
+    let regionNumber = 6;
+    if (players.length < 10) {
+      regionNumber = 3;
+    } else if (players.length < 14) {
+      regionNumber = 4;
+    } else if (players.length < 18) {
+      regionNumber = 5;
+    }
+    
+    // 각 플레이어의 다음 구역을 무작위로 설정
+    for (const player of players) {
+      if (player.state === 'alive' || player.state === 'host') {
+        player.next = Math.floor(Math.random() * regionNumber);
+        // Redis에 직접 플레이어 데이터 저장
+        await this.redisService.stringifyAndSet(`game:${gameId}:player:${player.playerId}`, player);
+        console.log(`[TurnProcessor] 플레이어 ${player.playerId}의 다음 구역을 ${player.next}로 설정`);
       }
     }
   }

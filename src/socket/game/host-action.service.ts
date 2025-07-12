@@ -24,7 +24,7 @@ export class HostActionService {
   async handleHostAction(userId: number, hostAct: HostAct): Promise<userDataResponse> {
     // 현재 위치 상태 확인
     const locationState = await this.playerManagerService.getPlayerLocationState(userId);
-    if (locationState.state !== 'game' || !locationState.roomId) {
+    if (!locationState || locationState.state !== 'game' || !locationState.roomId) {
       throw new WsException('게임 중이 아닙니다');
     }
 

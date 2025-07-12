@@ -15,6 +15,12 @@ interface BotMemory {
     }>;
     graffiti: string[];
     playersInRegion: string[];
+    wirelessMessages: Array<{
+      sender: string;
+      message: string;
+      timestamp: string;
+      turn: number;
+    }>;
   };
   longTerm: {
     turnSummaries: Array<{
@@ -65,6 +71,7 @@ export class MemoryService {
         recentChats: [],
         graffiti: [],
         playersInRegion: [],
+        wirelessMessages: [],
       },
       longTerm: {
         turnSummaries: [],
@@ -185,6 +192,40 @@ export class MemoryService {
   }
 
   /**
+   * 무전 메시지 추가
+   */
+  async addWirelessMessage(
+    gameId: string,
+    botId: number,
+    sender: string,
+    message: string,
+    turn: number
+  ): Promise<void> {
+    const memory = await this.getMemory(gameId, botId);
+    if (!memory) {
+      this.logger.warn(`메모리를 찾을 수 없음: ${gameId}:${botId}`);
+      return;
+    }
+
+    memory.shortTerm.wirelessMessages.push({
+      sender,
+      message,
+      timestamp: new Date().toISOString(),
+      turn,
+    });
+
+    // 최대 10개의 무전 메시지만 유지
+    if (memory.shortTerm.wirelessMessages.length > 10) {
+      memory.shortTerm.wirelessMessages = memory.shortTerm.wirelessMessages.slice(-10);
+    }
+
+    memory.metadata.lastUpdated = new Date().toISOString();
+
+    const key = `bot:memory:${gameId}:${botId}`;
+    await this.redisService.stringifyAndSet(key, memory, 10800);
+  }
+
+  /**
    * 현재 턴 이벤트 추가
    */
   async addEvent(gameId: string, botId: number, event: GameEvent): Promise<void> {
@@ -266,6 +307,7 @@ export class MemoryService {
       role: memory.shortTerm.role,
       canEscape: memory.shortTerm.canEscape,
       recentChats: memory.shortTerm.recentChats.slice(-5),
+      wirelessMessages: memory.shortTerm.wirelessMessages.slice(-5),
       suspicions: Object.entries(memory.longTerm.suspicions)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 3)

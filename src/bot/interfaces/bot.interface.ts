@@ -47,6 +47,12 @@ export interface GameContext {
     message: string;
     system: boolean;
   }>;
+  // 무전 메시지
+  wirelessMessages: Array<{
+    sender: string;
+    message: string;
+    turn: number;
+  }>;
   // 현재 턴 봇의 보유 아이템
   currentItems: string[];
   // 현재 턴 같은 구역의 생존자 정보
@@ -68,4 +74,9 @@ export interface GameContext {
   };
   // 봇의 플레이어 ID (동물 닉네임 결정용)
   botPlayerId?: number;
+  // 좀비 리스트 (호스트 전용, 닉네임 형식)
+  zombieList?: Array<{
+    nickname: string;
+    location: string;
+  }>;
 }

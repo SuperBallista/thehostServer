@@ -35,7 +35,12 @@ export class PlayerManagerService {
   /**
    * 플레이어의 위치 상태 가져오기
    */
-  async getPlayerLocationState(userId: number): Promise<LocationState> {
+  async getPlayerLocationState(userId: number): Promise<LocationState | null> {
+    // 봇 플레이어(userId < 0)는 location state가 없으므로 null 반환
+    if (userId < 0) {
+      return null;
+    }
+    
     const locationState: LocationState = await this.redisService.getAndParse(`locationState:${userId}`);
     if (!locationState || !locationState.roomId) {
       throw new WsException('위치 정보를 찾을 수 없습니다');

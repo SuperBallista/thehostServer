@@ -2,6 +2,7 @@
 import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { RedisPubSubService } from '../../redis/redisPubSub.service';
+import { RedisService } from '../../redis/redis.service';
 import { Game, GamePlayer, GamePlayerInRedis, REGION_NAMES, ITEM_NAMES, ANIMAL_NICKNAMES } from './game.types';
 import { Room, ItemInterface, MyPlayerState, ChatMessage, HostAct, GamePlayerStatusInterface, SurvivorInterface } from '../payload.types';
 import { getOrderRandom } from '../utils/randomManager';
@@ -24,6 +25,7 @@ import { BotService } from '../../bot/bot.service';
 export class GameService {
   constructor(
     private readonly redisPubSubService: RedisPubSubService,
+    private readonly redisService: RedisService,
     private readonly gameTurnService: GameTurnService,
     private readonly playerManagerService: PlayerManagerService,
     private readonly gameDataService: GameDataService,
@@ -43,7 +45,7 @@ export class GameService {
    */
   async gameStart(userId: number): Promise<userDataResponse> {
     const locationState = await this.playerManagerService.getPlayerLocationState(userId);
-    if (!locationState.roomId) {
+    if (!locationState || !locationState.roomId) {
       throw new WsException('방 정보를 찾을 수 없습니다');
     }
     
@@ -144,11 +146,23 @@ export class GameService {
     
     // 현재 위치 상태 확인
     const locationState = await this.playerManagerService.getPlayerLocationState(userId);
-    if (locationState.state !== 'game' || !locationState.roomId) {
-      throw new WsException('게임 중이 아닙니다');
+    
+    // 봇 플레이어(userId < 0)의 경우 별도 처리
+    let gameId: string;
+    if (!locationState) {
+      // 봇은 location state가 없으므로 모든 게임에서 봇 플레이어 검색
+      const botPlayerData = await this.findBotPlayerData(userId);
+      if (!botPlayerData) {
+        throw new WsException('봇 플레이어 데이터를 찾을 수 없습니다');
+      }
+      gameId = botPlayerData.gameId;
+    } else {
+      // 일반 플레이어
+      if (!locationState || locationState.state !== 'game' || !locationState.roomId) {
+        throw new WsException('게임 중이 아닙니다');
+      }
+      gameId = locationState.roomId;
     }
-
-    const gameId = locationState.roomId;
     
     // 플레이어 데이터 가져오기
     const playerData = await this.playerManagerService.getPlayerDataByUserId(gameId, userId);
@@ -415,7 +429,7 @@ export class GameService {
     
     // 현재 위치 상태 확인
     const locationState = await this.playerManagerService.getPlayerLocationState(userId);
-    if (locationState.state !== 'game' || !locationState.roomId) {
+    if (!locationState || locationState.state !== 'game' || !locationState.roomId) {
       throw new WsException('게임 중이 아닙니다');
     }
 
@@ -540,7 +554,7 @@ export class GameService {
    */
   async getRemainingTurnTime(userId: number): Promise<userDataResponse> {
     const locationState = await this.playerManagerService.getPlayerLocationState(userId);
-    if (locationState.state !== 'game' || !locationState.roomId) {
+    if (!locationState || locationState.state !== 'game' || !locationState.roomId) {
       throw new WsException('게임 중이 아닙니다');
     }
     
@@ -619,5 +633,29 @@ export class GameService {
       default:
         throw new Error('알 수 없는 아이템입니다');
     }
+  }
+
+  /**
+   * 봇 플레이어 데이터 찾기
+   */
+  private async findBotPlayerData(botUserId: number): Promise<{ gameId: string; playerData: GamePlayerInRedis } | null> {
+    // Redis에서 모든 게임 키 검색
+    const gameKeys = await this.redisService.scanKeys('game:*');
+    
+    for (const gameKey of gameKeys) {
+      // game:gameId:player:* 형태의 키는 제외
+      if (gameKey.includes(':player:') || gameKey.includes(':region:')) {
+        continue;
+      }
+      
+      const gameId = gameKey.replace('game:', '');
+      const playerData = await this.playerManagerService.getPlayerDataByUserId(gameId, botUserId);
+      
+      if (playerData) {
+        return { gameId, playerData };
+      }
+    }
+    
+    return null;
   }
 }

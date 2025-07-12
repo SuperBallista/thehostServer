@@ -195,11 +195,27 @@ export class BotService implements OnModuleInit {
     );
     const currentTurnChats = regionData?.chatLog || [];
     
+    // 봇 메모리에서 무전 메시지 가져오기
+    const botMemory = await this.memoryService.getMemory(gameId, botId);
+    const wirelessMessages = botMemory?.shortTerm.wirelessMessages || [];
+    
     // 같은 구역 플레이어
     const playersInRegion = await this.getPlayersInRegion(gameId, playerData.regionId);
     
     // 봇 상태
     const botState = await this.getBotState(botId);
+    
+    // 호스트인 경우 좀비 리스트 추가
+    let zombieList: Array<{ nickname: string; location: string }> | undefined;
+    if (playerData.state === 'host') {
+      const allPlayers = await this.playerManagerService.getAllPlayersInGame(gameId);
+      zombieList = allPlayers
+        .filter(p => p.state === 'zombie')
+        .map(zombie => ({
+          nickname: ANIMAL_NICKNAMES[zombie.playerId] || `Player_${zombie.playerId}`,
+          location: this.getRegionName(zombie.regionId)
+        }));
+    }
     
     return {
       previousTurnSummary,
@@ -207,6 +223,11 @@ export class BotService implements OnModuleInit {
         sender: chat.system ? 'System' : (chat.playerId !== undefined ? ANIMAL_NICKNAMES[chat.playerId] || `Player_${chat.playerId}` : 'Player'),
         message: chat.message,
         system: chat.system,
+      })),
+      wirelessMessages: wirelessMessages.map(msg => ({
+        sender: msg.sender,
+        message: msg.message,
+        turn: msg.turn,
       })),
       currentItems: playerData.items?.map(item => ITEM_NAMES[item] || item) || [],
       currentItemCodes: playerData.items || [], // 원본 아이템 코드도 유지
@@ -218,6 +239,7 @@ export class BotService implements OnModuleInit {
       currentRegion: this.getRegionName(playerData.regionId),
       personality: botState?.personality || { mbti: 'INTJ', gender: 'male' },
       botPlayerId: playerData.playerId, // 봇의 플레이어 ID 추가
+      zombieList, // 호스트 전용 좀비 리스트 추가
     };
   }
 
@@ -350,6 +372,19 @@ export class BotService implements OnModuleInit {
    */
   private async processBotChat(gameId: string, botId: number): Promise<void> {
     try {
+      // 플레이어 상태 확인
+      const playerData = await this.playerManagerService.getPlayerDataByUserId(gameId, botId);
+      if (!playerData) {
+        this.logger.warn(`봇 플레이어 데이터를 찾을 수 없음: ${botId}`);
+        return;
+      }
+      
+      // 죽었거나 좀비인 경우 채팅 불가
+      if (playerData.state === 'dead' || playerData.state === 'zombie') {
+        this.logger.debug(`봇이 죽었거나 좀비 상태여서 채팅 불가: ${botId} (${playerData.state})`);
+        return;
+      }
+      
       // 현재 게임 컨텍스트 구성
       const gameContext = await this.buildGameContext(botId, gameId);
       
@@ -364,8 +399,7 @@ export class BotService implements OnModuleInit {
         });
         
         // 동물 닉네임으로 로그 표시
-        const playerData = await this.playerManagerService.getPlayerDataByUserId(gameId, botId);
-        const botNickname = playerData ? ANIMAL_NICKNAMES[playerData.playerId] || `Bot_${Math.abs(botId)}` : `Bot_${Math.abs(botId)}`;
+        const botNickname = ANIMAL_NICKNAMES[playerData.playerId] || `Bot_${Math.abs(botId)}`;
         this.logger.log(`봇 채팅 전송: ${botNickname} - ${chatDecision.message}`);
       }
       

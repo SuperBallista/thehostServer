@@ -48,6 +48,65 @@ export class LLMService implements OnModuleInit {
     private readonly llmProviderFactory: LLMProviderFactory,
   ) {}
 
+  /**
+   * AI가 생성한 액션을 수정하는 헬퍼 함수
+   */
+  private fixActionFormat(action: any): any {
+    if (!action || !action.action) return action;
+
+    // myStatus를 myStatus.next로 수정 (params에 location이 있는 경우)
+    if (action.action === 'myStatus' && action.params?.location) {
+      this.logger.warn(`액션 형식 수정: myStatus -> myStatus.next`);
+      return {
+        ...action,
+        action: 'myStatus.next',
+        params: { location: action.params.location }
+      };
+    }
+
+    // myStatus를 myStatus.act로 수정 (params에 action이 있는 경우)
+    if (action.action === 'myStatus' && action.params?.action) {
+      this.logger.warn(`액션 형식 수정: myStatus -> myStatus.act`);
+      return {
+        ...action,
+        action: 'myStatus.act',
+        params: { action: action.params.action }
+      };
+    }
+
+    // hostAct를 hostAct.infect로 수정 (params에 target이 있는 경우)
+    if (action.action === 'hostAct' && action.params?.target && !action.params?.zombies) {
+      this.logger.warn(`액션 형식 수정: hostAct -> hostAct.infect`);
+      return {
+        ...action,
+        action: 'hostAct.infect',
+        params: { target: action.params.target }
+      };
+    }
+
+    // hostAct를 hostAct.zombieList로 수정 (params에 zombies가 있는 경우)
+    if (action.action === 'hostAct' && action.params?.zombies) {
+      this.logger.warn(`액션 형식 수정: hostAct -> hostAct.zombieList`);
+      return {
+        ...action,
+        action: 'hostAct.zombieList',
+        params: { zombies: action.params.zombies }
+      };
+    }
+
+    // params 내부의 중첩된 구조 수정
+    if (action.action === 'myStatus' && action.params?.next?.location) {
+      this.logger.warn(`액션 형식 수정: myStatus (중첩된 next) -> myStatus.next`);
+      return {
+        ...action,
+        action: 'myStatus.next',
+        params: { location: action.params.next.location }
+      };
+    }
+
+    return action;
+  }
+
   async onModuleInit() {
     try {
       this.llmProvider = this.llmProviderFactory.createProvider();
@@ -100,11 +159,40 @@ export class LLMService implements OnModuleInit {
       }
 
       try {
-        const parsed = JSON.parse(content);
+        // JSON 응답 파싱 시도
+        let parsed;
+        try {
+          parsed = JSON.parse(content);
+        } catch (jsonError) {
+          // JSON 파싱 실패 시 코드 블록 추출 시도
+          const jsonMatch = content.match(/```(?:json)?\s*({[\s\S]*?})\s*```/);
+          if (jsonMatch) {
+            parsed = JSON.parse(jsonMatch[1]);
+          } else {
+            throw jsonError;
+          }
+        }
+        
+        // additionalAction이 있으면 형식 수정
+        if (parsed.additionalAction) {
+          parsed.additionalAction = this.fixActionFormat(parsed.additionalAction);
+        }
+        
         const validated = ChatDecisionSchema.safeParse(parsed);
         if (!validated.success) {
           this.logger.warn(`LLM 채팅 결정 스키마 검증 실패: ${JSON.stringify(validated.error.issues)}`);
           this.logger.warn(`검증 실패한 응답: ${JSON.stringify(parsed)}`);
+          
+          // 부분적으로 유효한 응답 처리
+          if (parsed && typeof parsed.shouldChat === 'boolean') {
+            return {
+              shouldChat: parsed.shouldChat,
+              message: parsed.message || undefined,
+              additionalAction: parsed.additionalAction || undefined,
+              reasoning: parsed.reasoning || undefined
+            };
+          }
+          
           return getDefaultChatDecision(context);
         }
         this.logger.log(`채팅 결정 완료: ${validated.data.shouldChat ? '채팅함' : '채팅안함'}`);
@@ -159,11 +247,37 @@ export class LLMService implements OnModuleInit {
       }
 
       try {
-        const parsed = JSON.parse(content);
+        // JSON 응답 파싱 시도
+        let parsed;
+        try {
+          parsed = JSON.parse(content);
+        } catch (jsonError) {
+          // JSON 파싱 실패 시 코드 블록 추출 시도
+          const jsonMatch = content.match(/```(?:json)?\s*({[\s\S]*?})\s*```/);
+          if (jsonMatch) {
+            parsed = JSON.parse(jsonMatch[1]);
+          } else {
+            throw jsonError;
+          }
+        }
+        
+        // 액션 형식 수정
+        parsed = this.fixActionFormat(parsed);
+        
         const validated = ActionResponseSchema.safeParse(parsed);
         if (!validated.success) {
           this.logger.warn(`LLM 행동 결정 스키마 검증 실패: ${JSON.stringify(validated.error.issues)}`);
           this.logger.warn(`검증 실패한 응답: ${JSON.stringify(parsed)}`);
+          
+          // 부분적으로 유효한 응답 처리
+          if (parsed && parsed.action && typeof parsed.action === 'string') {
+            return {
+              action: parsed.action,
+              params: parsed.params || {},
+              reasoning: parsed.reasoning || undefined
+            };
+          }
+          
           return getDefaultAction(context);
         }
         this.logger.log(`행동 결정: ${validated.data.action}`, validated.data.reasoning);

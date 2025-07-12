@@ -168,7 +168,7 @@ export const ANIMAL_NICKNAMES = [
 // 아이템 이름 매핑
 export const ITEM_NAMES: { [key in ItemCode | 'none']?: string } = {
     'spray': '낙서스프레이',
-    'virusChecker': '진단키트',
+    'virusChecker': '자가진단키트',
     'medicine': '응급치료제',
     'vaccineMaterialA': '항바이러스혈청',
     'vaccineMaterialB': '촉매정제물질',

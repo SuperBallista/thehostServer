@@ -52,4 +52,68 @@ export function extractPlayerIdFromNickname(text: string, animalNicknames: strin
     }
   }
   return null;
+}
+
+/**
+ * 지역 이름 매핑
+ */
+export const REGION_NAMES: Record<number, string> = {
+  0: '해안',
+  1: '폐건물',
+  2: '정글',
+  3: '동굴',
+  4: '산 정상',
+  5: '개울'
+};
+
+/**
+ * 지역 이름을 지역 번호로 변환
+ */
+export function convertRegionNameToId(regionName: string): number | null {
+  for (const [id, name] of Object.entries(REGION_NAMES)) {
+    if (name === regionName) {
+      return parseInt(id);
+    }
+  }
+  return null;
+}
+
+/**
+ * 좀비 컨트롤 파라미터 변환 (닉네임 -> ID)
+ */
+export function convertZombieControlParams(
+  zombies: Array<{ zombie?: string; target?: string; nextRegion?: string }>,
+  animalNicknames: string[]
+): Array<{ playerId: number; targetId?: number; nextRegion?: number }> {
+  return zombies.map(zombie => {
+    const converted: { playerId: number; targetId?: number; nextRegion?: number } = {
+      playerId: -1
+    };
+
+    // 좀비 닉네임을 ID로 변환
+    if (zombie.zombie) {
+      const zombieId = extractPlayerIdFromNickname(zombie.zombie, animalNicknames);
+      if (zombieId !== null) {
+        converted.playerId = zombieId;
+      }
+    }
+
+    // 타겟 닉네임을 ID로 변환
+    if (zombie.target) {
+      const targetId = extractPlayerIdFromNickname(zombie.target, animalNicknames);
+      if (targetId !== null) {
+        converted.targetId = targetId;
+      }
+    }
+
+    // 지역 이름을 번호로 변환
+    if (zombie.nextRegion) {
+      const regionId = convertRegionNameToId(zombie.nextRegion);
+      if (regionId !== null) {
+        converted.nextRegion = regionId;
+      }
+    }
+
+    return converted;
+  }).filter(z => z.playerId !== -1); // 유효하지 않은 좀비는 제외
 } 

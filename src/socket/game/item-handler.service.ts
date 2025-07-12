@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { RedisPubSubService } from '../../redis/redisPubSub.service';
 import { ITEM_NAMES, ANIMAL_NICKNAMES, GamePlayerInRedis } from './game.types';
@@ -7,6 +7,8 @@ import { PlayerManagerService } from './player-manager.service';
 import { GameDataService } from './game-data.service';
 import { GameStateService } from './game-state.service';
 import { ChatService } from './chat.service';
+import { MemoryService } from '../../bot/memory.service';
+import { RedisService } from '../../redis/redis.service';
 
 @Injectable()
 export class ItemHandlerService {
@@ -16,6 +18,9 @@ export class ItemHandlerService {
     private readonly gameDataService: GameDataService,
     private readonly gameStateService: GameStateService,
     private readonly chatService: ChatService,
+    @Inject(forwardRef(() => MemoryService))
+    private readonly memoryService: MemoryService,
+    private readonly redisService: RedisService,
   ) {}
 
   /**
@@ -301,9 +306,9 @@ export class ItemHandlerService {
     playerData.items.splice(itemIndex, 1);
     await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
 
-    // 전체 방송
+    // 전체 방송 - 통합된 마이크 방송 기능 사용
     const playerNickname = ANIMAL_NICKNAMES[playerData.playerId] || `플레이어${playerData.playerId}`;
-    await this.chatService.broadcastToAllRegions(gameId, playerData.playerId, `📢 ${playerNickname}: ${content}`);
+    await this.chatService.sendMicrophoneBroadcast(gameId, playerData.playerId, playerNickname, content);
 
     return this.gameStateService.createPlayerGameUpdate(gameId, playerData.userId, {
       myStatus: {
@@ -356,17 +361,34 @@ export class ItemHandlerService {
     );
 
     // 수신자에게 무전 메시지 전송 (살아있는 플레이어에게만)
-    if (targetData.userId > 0 && ['alive', 'host'].includes(targetData.state)) {
-      await this.redisPubSubService.publishPlayerStatus(gameId, targetData.playerId, {
-        region: {
-          chatLog: [{
-            system: false,
-            message: `(무전) ${playerNickname}: ${messageContent}`,
-            timeStamp: new Date()
-          }],
-          regionMessageList: []
-        }
-      }, targetData.playerId);
+    if (['alive', 'host'].includes(targetData.state)) {
+      // 봇인 경우 메모리에 저장
+      if (targetData.userId < 0) {
+        // 현재 게임 턴 가져오기
+        const gameData = await this.redisService.getAndParse(`game:${gameId}`);
+        const currentTurn = gameData?.turn || 1;
+        
+        // 봇 메모리에 무전 메시지 저장
+        await this.memoryService.addWirelessMessage(
+          gameId,
+          targetData.userId,
+          playerNickname,
+          messageContent,
+          currentTurn
+        );
+      } else {
+        // 실제 플레이어에게 전송
+        await this.redisPubSubService.publishPlayerStatus(gameId, targetData.playerId, {
+          region: {
+            chatLog: [{
+              system: false,
+              message: `(무전) ${playerNickname}: ${messageContent}`,
+              timeStamp: new Date()
+            }],
+            regionMessageList: []
+          }
+        }, targetData.playerId);
+      }
     }
 
     return this.gameStateService.createPlayerGameUpdate(gameId, playerData.userId, {

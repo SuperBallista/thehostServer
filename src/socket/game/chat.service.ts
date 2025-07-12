@@ -18,7 +18,7 @@ export class ChatService {
   async handleChatMessage(userId: number, chatMessage: ChatMessage): Promise<userDataResponse> {
     // 현재 위치 상태 확인
     const locationState = await this.playerManagerService.getPlayerLocationState(userId);
-    if (locationState.state !== 'game' || !locationState.roomId) {
+    if (!locationState || locationState.state !== 'game' || !locationState.roomId) {
       throw new WsException('게임 중이 아닙니다');
     }
 
@@ -94,5 +94,24 @@ export class ChatService {
     }
     
     await Promise.all(broadcasts);
+  }
+
+  /**
+   * 통합된 마이크 방송 기능
+   * 봇과 플레이어 모두 동일한 형식으로 방송 메시지를 전송
+   * @param gameId 게임 ID
+   * @param playerId 플레이어 ID
+   * @param playerNickname 플레이어 닉네임
+   * @param content 방송 내용
+   */
+  async sendMicrophoneBroadcast(
+    gameId: string,
+    playerId: number,
+    playerNickname: string,
+    content: string
+  ): Promise<void> {
+    // 통일된 형식: [방송] 닉네임: 메시지
+    const broadcastMessage = `[방송] ${playerNickname}: ${content}`;
+    await this.broadcastToAllRegions(gameId, playerId, broadcastMessage);
   }
 }

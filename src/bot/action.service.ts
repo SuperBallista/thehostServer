@@ -5,10 +5,11 @@ import { GameDataService } from '../socket/game/game-data.service';
 import { GamePlayerInRedis, ItemCode } from '../socket/game/game.types';
 import { userRequest, AuthUser, HostAct, Act } from '../socket/payload.types';
 import { ANIMAL_NICKNAMES } from './constants/animal-nicknames';
-import { convertKoreanToItemCode, extractAndConvertItems, extractPlayerIdFromNickname } from './constants/item-mappings';
+import { convertKoreanToItemCode, extractAndConvertItems, extractPlayerIdFromNickname, convertZombieControlParams } from './constants/item-mappings';
 import { HostActionService } from '../socket/game/host-action.service';
 import { GameService } from '../socket/game/game.service';
 import { ZombieService } from '../socket/game/zombie.service';
+import { ChatService } from '../socket/game/chat.service';
 
 @Injectable()
 export class ActionService {
@@ -38,6 +39,8 @@ export class ActionService {
     private readonly gameService: GameService,
     @Inject(forwardRef(() => ZombieService))
     private readonly zombieService: ZombieService,
+    @Inject(forwardRef(() => ChatService))
+    private readonly chatService: ChatService,
   ) {}
 
   /**
@@ -45,27 +48,49 @@ export class ActionService {
    */
   async executeAction(gameId: string, botId: number, action: { action: string; params: Record<string, unknown> }): Promise<void> {
     try {
+      // 액션 유효성 검증
+      if (!action || !action.action) {
+        this.logger.warn(`봇 ${botId}: 유효하지 않은 액션 - action이 없음`);
+        return;
+      }
+
       // 파라미터에서 한글 아이템 이름을 코드로 변환
-      const convertedParams = this.convertKoreanParamsToCode(action.params);
+      const convertedParams = this.convertKoreanParamsToCode(action.params || {});
       
       const handler = this.actionMap[action.action];
       if (!handler) {
-        throw new Error(`알 수 없는 액션: ${action.action}`);
+        this.logger.warn(`봇 ${botId}: 알 수 없는 액션: ${action.action}`);
+        return;
       }
 
       // 봇의 플레이어 데이터 조회
       const playerData = await this.playerManagerService.getPlayerDataByUserId(gameId, botId);
       if (!playerData) {
-        throw new Error(`봇 플레이어 데이터를 찾을 수 없음: ${botId}`);
+        this.logger.warn(`봇 플레이어 데이터를 찾을 수 없음: ${botId}`);
+        return;
+      }
+
+      // 특정 액션에 대한 사전 검증
+      if (action.action === 'useItem' || action.action === 'giveItem') {
+        const item = convertedParams.item as string;
+        if (!item) {
+          this.logger.warn(`봇 ${botId}: ${action.action} - 아이템이 지정되지 않음`);
+          return;
+        }
+        if (!playerData.items || !playerData.items.includes(item as ItemCode)) {
+          this.logger.warn(`봇 ${botId}: ${action.action} - 보유하지 않은 아이템: ${item}`);
+          this.logger.warn(`현재 보유 아이템: ${playerData.items?.join(', ') || '없음'}`);
+          return;
+        }
       }
 
       // 액션 실행
       await handler(gameId, botId, playerData, convertedParams);
       
-      this.logger.log(`액션 실행 완료: ${action.action}`, convertedParams);
+      this.logger.log(`봇 ${botId}: 액션 실행 완료: ${action.action}`, convertedParams);
       
     } catch (error) {
-      this.logger.error(`액션 실행 실패: ${error.message}`, error.stack);
+      this.logger.error(`봇 ${botId}: 액션 실행 실패: ${error.message}`, error.stack);
     }
   }
 
@@ -79,6 +104,13 @@ export class ActionService {
     params: Record<string, unknown>
   ): Promise<void> {
     const location = params.location as string;
+    
+    if (!location) {
+      this.logger.warn(`봇 ${botId}: myStatus.next - 지역이 지정되지 않음`);
+      this.logger.warn(`전체 params: ${JSON.stringify(params)}`);
+      throw new Error('이동할 지역이 지정되지 않음');
+    }
+    
     const regionMap: Record<string, number> = {
       '해안': 0,
       '폐건물': 1,
@@ -90,10 +122,13 @@ export class ActionService {
     
     const regionId = regionMap[location];
     if (regionId === undefined) {
+      this.logger.warn(`봇 ${botId}: 잘못된 지역명: ${location}`);
+      this.logger.warn(`가능한 지역: ${Object.keys(regionMap).join(', ')}`);
       throw new Error(`잘못된 지역: ${location}`);
     }
 
-    // 실제 GameService를 통해 플레이어 상태 업데이트
+    // 봇은 location state가 없으므로 gameId를 직접 전달해야 함
+    // GameService의 updatePlayerStatus는 봇을 위한 특별 처리를 포함하고 있음
     await this.gameService.updatePlayerStatus(botId, { next: regionId });
 
     // 동물 닉네임으로 로그 출력
@@ -117,7 +152,8 @@ export class ActionService {
       throw new Error(`잘못된 좀비 대응 액션: ${action}`);
     }
 
-    // 실제 GameService를 통해 플레이어 상태 업데이트
+    // 봇은 location state가 없으므로 gameId를 직접 전달해야 함
+    // GameService의 updatePlayerStatus는 봇을 위한 특별 처리를 포함하고 있음
     await this.gameService.updatePlayerStatus(botId, { act: action as Act });
 
     // 동물 닉네임으로 로그 출력
@@ -139,6 +175,12 @@ export class ActionService {
     
     if (!message) {
       throw new Error('메시지가 비어있음');
+    }
+
+    // 죽었거나 좀비인 경우 채팅 불가
+    if (playerData.state === 'dead' || playerData.state === 'zombie') {
+      this.logger.warn(`봇이 죽었거나 좀비 상태여서 채팅 불가: ${botId} (${playerData.state})`);
+      return;
     }
 
     // 봇의 동물 닉네임 가져오기
@@ -184,8 +226,11 @@ export class ActionService {
     // receiver 파라미터도 변환 (giveItem에서 사용)
     if (typeof converted.receiver === 'string') {
       const playerId = extractPlayerIdFromNickname(converted.receiver, ANIMAL_NICKNAMES);
+      this.logger.debug(`receiver 변환: "${converted.receiver}" -> ${playerId}`);
       if (playerId !== null) {
         converted.receiver = playerId;
+      } else {
+        this.logger.warn(`receiver 닉네임을 플레이어 ID로 변환 실패: "${converted.receiver}"`);
       }
     }
     
@@ -226,7 +271,9 @@ export class ActionService {
     const content = params.content as string | undefined;
     
     // 아이템 보유 확인
-    if (!playerData.items.includes(item)) {
+    if (!playerData.items || !playerData.items.includes(item)) {
+      this.logger.warn(`봇 ${botId}이(가) 보유하지 않은 아이템 사용 시도: ${item}`);
+      this.logger.warn(`현재 보유 아이템: ${playerData.items?.join(', ') || '없음'}`);
       throw new Error(`아이템을 보유하지 않음: ${item}`);
     }
 
@@ -274,12 +321,16 @@ export class ActionService {
     const receiver = params.receiver as number;
     const item = params.item as ItemCode;
     
-    if (!playerData.items.includes(item)) {
+    if (!playerData.items || !playerData.items.includes(item)) {
+      this.logger.warn(`봇 ${botId}이(가) 보유하지 않은 아이템 전달 시도: ${item}`);
+      this.logger.warn(`현재 보유 아이템: ${playerData.items?.join(', ') || '없음'}`);
       throw new Error(`아이템을 보유하지 않음: ${item}`);
     }
 
     if (typeof receiver !== 'number') {
-      throw new Error('받는 사람이 올바르지 않음');
+      this.logger.warn(`받는 사람이 올바르지 않음. receiver 타입: ${typeof receiver}, 값: ${receiver}`);
+      this.logger.warn(`전체 params: ${JSON.stringify(params)}`);
+      throw new Error(`받는 사람이 올바르지 않음: ${receiver} (${typeof receiver})`);
     }
 
     // 실제 GameService를 통해 아이템 전달 처리
@@ -333,9 +384,20 @@ export class ActionService {
       throw new Error('호스트만 좀비를 제어할 수 있음');
     }
 
-    const zombies = params.zombies as Array<{ playerId: number; targetId?: number; nextRegion?: number }>;
+    // 닉네임 기반 좀비 리스트를 ID 기반으로 변환
+    let zombies: Array<{ playerId: number; targetId?: number; nextRegion?: number }>;
     
-    if (!Array.isArray(zombies)) {
+    if (Array.isArray(params.zombies)) {
+      // 첫 번째 요소를 확인하여 형식 판단
+      const firstZombie = (params.zombies as any[])[0];
+      if (firstZombie && typeof firstZombie.zombie === 'string') {
+        // 닉네임 형식으로 전달된 경우 변환
+        zombies = convertZombieControlParams(params.zombies as any[], ANIMAL_NICKNAMES);
+      } else {
+        // 이미 ID 형식인 경우 (레거시 지원)
+        zombies = params.zombies as Array<{ playerId: number; targetId?: number; nextRegion?: number }>;
+      }
+    } else {
       throw new Error('좀비 리스트가 올바르지 않음');
     }
 
@@ -345,7 +407,7 @@ export class ActionService {
 
     // ZombieCommand를 사용하여 직접 ZombieService 호출
     for (const zombie of zombies) {
-      if (zombie.playerId !== undefined) {
+      if (zombie.playerId !== undefined && zombie.playerId !== -1) {
         await this.zombieService.setZombieCommand(gameId, {
           playerId: zombie.playerId,
           targetId: zombie.targetId,
@@ -418,16 +480,13 @@ export class ActionService {
     // 봇의 동물 닉네임 가져오기
     const botNickname = ANIMAL_NICKNAMES[playerData.playerId] || `Bot_${Math.abs(playerData.playerId)}`;
     
-    // 전체 방송 로직
-    for (let regionId = 0; regionId < 6; regionId++) {
-      await this.redisPubSubService.publishChatMessage(
-        gameId,
-        playerData.playerId,
-        `[방송] [${botNickname}] : ${message}`,
-        regionId,
-        false
-      );
-    }
+    // 통합된 마이크 방송 기능 사용
+    await this.chatService.sendMicrophoneBroadcast(
+      gameId,
+      playerData.playerId,
+      botNickname,
+      message
+    );
   }
 
   /**
