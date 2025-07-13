@@ -145,7 +145,19 @@ export class ActionService {
     playerData: GamePlayerInRedis,
     params: Record<string, unknown>
   ): Promise<void> {
-    const action = params.action as string;
+    let action = params.action as string;
+    
+    // 한글 액션을 영어로 변환
+    const actionMap: Record<string, string> = {
+      '도주': 'runaway',
+      '숨기': 'hide',
+      '유인': 'lure'
+    };
+    
+    if (actionMap[action]) {
+      action = actionMap[action];
+    }
+    
     const validActions = ['runaway', 'hide', 'lure'];
     
     if (!validActions.includes(action)) {
@@ -178,7 +190,7 @@ export class ActionService {
     }
 
     // 죽었거나 좀비인 경우 채팅 불가
-    if (playerData.state === 'dead' || playerData.state === 'zombie') {
+    if (playerData.state === 'killed' || playerData.state === 'zombie') {
       this.logger.warn(`봇이 죽었거나 좀비 상태여서 채팅 불가: ${botId} (${playerData.state})`);
       return;
     }
@@ -305,8 +317,7 @@ export class ActionService {
         await this.useSimpleItem(gameId, playerData, item);
     }
 
-    // 아이템 제거
-    await this.removeItemFromInventory(gameId, playerData.playerId, item);
+    // 아이템 제거는 GameService에서 자동으로 처리됨
   }
 
   /**
@@ -445,8 +456,16 @@ export class ActionService {
    * 스프레이 사용
    */
   private async useSpray(gameId: string, playerData: GamePlayerInRedis, content: string): Promise<void> {
-    // 지역 메시지 추가 로직
-    this.logger.log(`그래피티 추가: ${content}`);
+    // 실제 GameService의 handleUseItem을 통해 스프레이 사용 처리
+    await this.gameService.handleUseItem(playerData.userId, {
+      item: 'spray',
+      content: content,
+      playerId: playerData.playerId
+    }, gameId);
+    
+    // 동물 닉네임으로 로그 출력
+    const botNickname = ANIMAL_NICKNAMES[playerData.playerId] || `Bot_${Math.abs(playerData.userId)}`;
+    this.logger.log(`${botNickname}이(가) 그래피티 추가: ${content}`);
   }
 
   /**
@@ -458,15 +477,18 @@ export class ActionService {
     targetId: number,
     message: string
   ): Promise<void> {
-    // 봇의 동물 닉네임 가져오기
-    const botNickname = ANIMAL_NICKNAMES[playerData.playerId] || `Bot_${Math.abs(playerData.playerId)}`;
+    // 실제 GameService의 handleUseItem을 통해 무전기 사용 처리
+    await this.gameService.handleUseItem(playerData.userId, {
+      item: 'wireless',
+      targetPlayer: targetId,
+      content: message,
+      playerId: playerData.playerId
+    }, gameId);
+    
+    // 동물 닉네임으로 로그 출력
+    const botNickname = ANIMAL_NICKNAMES[playerData.playerId] || `Bot_${Math.abs(playerData.userId)}`;
     const targetNickname = ANIMAL_NICKNAMES[targetId] || `Player_${targetId}`;
-    
-    // 개인 메시지 전송 로직 (실제 구현 필요)
-    this.logger.log(`무전기 메시지: [${botNickname}] : ${message} → ${targetNickname}`);
-    
-    // TODO: 실제 무전기 메시지 전송 로직 구현
-    // 현재는 로그만 출력
+    this.logger.log(`${botNickname}이(가) ${targetNickname}에게 무전기 메시지 전송: ${message}`);
   }
 
   /**
@@ -477,16 +499,16 @@ export class ActionService {
     playerData: GamePlayerInRedis,
     message: string
   ): Promise<void> {
-    // 봇의 동물 닉네임 가져오기
-    const botNickname = ANIMAL_NICKNAMES[playerData.playerId] || `Bot_${Math.abs(playerData.playerId)}`;
+    // 실제 GameService의 handleUseItem을 통해 마이크 사용 처리
+    await this.gameService.handleUseItem(playerData.userId, {
+      item: 'microphone',
+      content: message,
+      playerId: playerData.playerId
+    }, gameId);
     
-    // 통합된 마이크 방송 기능 사용
-    await this.chatService.sendMicrophoneBroadcast(
-      gameId,
-      playerData.playerId,
-      botNickname,
-      message
-    );
+    // 동물 닉네임으로 로그 출력
+    const botNickname = ANIMAL_NICKNAMES[playerData.playerId] || `Bot_${Math.abs(playerData.userId)}`;
+    this.logger.log(`${botNickname}이(가) 마이크로 방송: ${message}`);
   }
 
   /**
@@ -498,7 +520,17 @@ export class ActionService {
     item: string,
     targetId: number
   ): Promise<void> {
-    this.logger.log(`전투 아이템 사용: ${item} → Player_${targetId}`);
+    // 실제 GameService의 handleUseItem을 통해 전투 아이템 사용 처리
+    await this.gameService.handleUseItem(playerData.userId, {
+      item: item as ItemCode,
+      targetPlayer: targetId,
+      playerId: playerData.playerId
+    }, gameId);
+    
+    // 동물 닉네임으로 로그 출력
+    const botNickname = ANIMAL_NICKNAMES[playerData.playerId] || `Bot_${Math.abs(playerData.userId)}`;
+    const targetNickname = ANIMAL_NICKNAMES[targetId] || `Player_${targetId}`;
+    this.logger.log(`${botNickname}이(가) ${targetNickname}에게 ${item} 사용`);
   }
 
   /**
@@ -509,7 +541,15 @@ export class ActionService {
     playerData: GamePlayerInRedis,
     item: string
   ): Promise<void> {
-    this.logger.log(`아이템 사용: ${item}`);
+    // 실제 GameService의 handleUseItem을 통해 아이템 사용 처리
+    await this.gameService.handleUseItem(playerData.userId, {
+      item: item as ItemCode,
+      playerId: playerData.playerId
+    }, gameId);
+    
+    // 동물 닉네임으로 로그 출력
+    const botNickname = ANIMAL_NICKNAMES[playerData.playerId] || `Bot_${Math.abs(playerData.userId)}`;
+    this.logger.log(`${botNickname}이(가) ${item} 사용`);
   }
 
   /**
