@@ -5,11 +5,19 @@ import type { GamePlayerStatusInterface, SurvivorInterface, ItemInterface, MyPla
 // 이 파일은 오직 나(현재 플레이어)의 상태만 관리합니다.
 // 게임 전체 상태는 gameStateStore.ts에서 관리합니다.
 
+// 무작위 지역 선택 함수
+function getRandomRegion(): number {
+  // gameStateStore에서 totalRegions를 가져올 수 없으므로 기본값 6 사용
+  // 게임에서 실제 지역 수가 다르면 서버에서 받은 값으로 업데이트됨
+  const maxRegions = 6;
+  return Math.floor(Math.random() * maxRegions);
+}
+
 // 플레이어 기본 정보
 export const playerId = writable<number | undefined>(undefined);
 export const playerState = writable<MyPlayerState>('alive'); // 자신의 상태는 alive 또는 host만 가능
 export const playerRegion = writable<number>(0);
-export const playerNextRegion = writable<number>(0);
+export const playerNextRegion = writable<number>(getRandomRegion());
 export const playerAct = writable<'runaway' | 'hide' | 'lure'>('lure');
 export const playerItems = writable<ItemInterface[]>([]);
 export const playerCanEscape = writable<boolean>(true); // 도주 가능 여부
@@ -58,7 +66,7 @@ export function resetPlayerStore() {
   playerId.set(undefined);
   playerState.set('alive');
   playerRegion.set(0);
-  playerNextRegion.set(0);
+  playerNextRegion.set(getRandomRegion());
   playerAct.set('lure');
   playerItems.set([]);
   playerCanEscape.set(true);

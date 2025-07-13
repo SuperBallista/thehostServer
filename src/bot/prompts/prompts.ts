@@ -4,9 +4,10 @@ import { GameContext } from '../interfaces/bot.interface';
  * 채팅 결정 프롬프트
  */
 export const getChatDecisionPrompt = (context: GameContext): string => {
-  return `⚠️⚠️⚠️ 매우 중요: 모든 아이템은 반드시 한글로만 작성하세요! ⚠️⚠️⚠️
-❌ 절대 사용 금지: "virusChecker", "spray", "medicine" 등 영어 코드
-✅ 반드시 사용: "자가진단키트", "낙서스프레이", "응급치료제" 등 한글명
+  return `⚠️⚠️⚠️ 매우 중요: 
+- 모든 응답은 한글로 작성하세요
+- 아이템명은 반드시 한글로: "자가진단키트", "낙서스프레이", "응급치료제" 등
+- 절대 사용 금지: spray, eraser, medicine, vaccine 등 영어 코드
 
 현재 게임 상황:
 - 턴: ${context.currentTurn}
@@ -51,7 +52,7 @@ JSON 형식으로 응답하세요:
 현재 보유 아이템: ${context.currentItems.join(', ') || '없음'}
 
 기본 행동:
-- myStatus.next: { "location": "해안" } (구역 이동: 해안, 폐건물, 정글, 동굴, 산 정상, 개울)
+- myStatus.next: { "location": "[구역명]" } (구역 이동: 해안, 폐건물, 정글, 동굴, 산 정상, 개울 중 선택)
 - myStatus.act: { "action": "hide" } (좀비 대처: hide, lure, runaway - runaway는 canEscape가 true일 때만 가능)
 - giveItem: { "receiver": "동물닉네임", "item": "응급치료제" } (보유한 아이템만 전달 가능)
 
@@ -80,7 +81,7 @@ ${context.role === 'host' ? `숙주 전용 행동:
 {
   "additionalAction": {
     "action": "myStatus.next",  // ✅ 올바른 형식
-    "params": { "location": "해안" }
+    "params": { "location": "정글" }
   }
 }
 
@@ -102,7 +103,7 @@ ${context.role === 'host' ? `숙주 전용 행동:
 {
   "additionalAction": {
     "action": "myStatus",  // ❌ 잘못됨! myStatus.next 또는 myStatus.act여야 함
-    "params": { "location": "해안" }
+    "params": { "location": "동굴" }
   }
 }`;
 };
@@ -111,9 +112,12 @@ ${context.role === 'host' ? `숙주 전용 행동:
  * 행동 결정 프롬프트
  */
 export const getActionDecisionPrompt = (context: GameContext, trigger: any): string => {
-  return `⚠️⚠️⚠️ 매우 중요: 모든 아이템은 반드시 한글로만 작성하세요! ⚠️⚠️⚠️
-❌ 절대 사용 금지: "virusChecker", "spray", "medicine", "shotgun", "vaccine" 등 영어 코드
-✅ 반드시 사용: "자가진단키트", "낙서스프레이", "응급치료제", "좀비사살용산탄총", "백신" 등 한글명
+  return `⚠️⚠️⚠️ 매우 중요: 
+- 모든 응답은 한글로 작성하세요
+- 지역명은 반드시 한글로: "해안", "폐건물", "정글", "동굴", "산 정상", "개울" 
+- 아이템명은 반드시 한글로: "자가진단키트", "낙서스프레이", "응급치료제", "좀비사살용산탄총", "백신" 등
+- 절대 사용 금지: virusChecker, spray, medicine, shotgun, vaccine, eraser 등 영어 코드
+- 절대 사용 금지: Savannah, Jungle, Cave 등 영어 지역명
 
 트리거 발동: ${trigger.metadata?.description || trigger.action}
 
@@ -145,8 +149,8 @@ ${context.wirelessMessages && context.wirelessMessages.length > 0
 ✅ 올바른 예: "myStatus.next", "myStatus.act", "hostAct.infect"
 
 기본 행동:
-- myStatus.next: { "location": "해안" } (구역 이동: 해안, 폐건물, 정글, 동굴, 산 정상, 개울)
-- myStatus.act: { "action": "hide" } (좀비 대처: hide, lure, runaway - runaway는 canEscape가 true일 때만 가능)
+- myStatus.next: { "location": "[구역명]" } (구역 이동: 해안, 폐건물, 정글, 동굴, 산 정상, 개울 중 선택)
+- myStatus.act: { "action": "숨기" } (좀비 대처: 숨기, 유인, 도주 - 도주는 canEscape가 true일 때만 가능)
 - giveItem: { "receiver": "동물닉네임", "item": "응급치료제" } (보유한 아이템만 전달 가능)
 - chatMessage: { "message": "안녕하세요!" }
 - wait: {} (아무 행동도 하지 않음)
@@ -158,8 +162,7 @@ ${context.role === 'host' ? `숙주 전용 행동:
 - hostAct.infect: { "target": "동물닉네임" } (감염시키기 - 턴당 1명)
 - hostAct.zombieList: { "zombies": [{ "zombie": "좀비동물닉네임", "target": "공격대상동물닉네임", "nextRegion": "이동할구역명" }] } (좀비 조종)` : ''}
 
-⚠️ 아이템 이름은 반드시 한글로 사용하세요! 영어 코드 사용 절대 금지!
-❌ 잘못된 예: "virusChecker", "spray", "medicine", "vaccineMaterialA"
+⚠️ 아이템 이름은 반드시 한글로 사용하세요!
 ✅ 올바른 예: "자가진단키트", "낙서스프레이", "응급치료제", "항바이러스혈청"
 - 한글 아이템명: 낙서스프레이, 자가진단키트, 응급치료제, 항바이러스혈청, 촉매정제물질, 신경억제단백질, 무전기, 지우개, 좀비사살용산탄총, 마이크, 백신
 플레이어 이름은 동물 닉네임으로 사용하세요.
@@ -167,7 +170,7 @@ ${context.role === 'host' ? `숙주 전용 행동:
 아이템별 사용법:
 - 낙서스프레이: { "item": "낙서스프레이", "content": "낙서 내용" }
 - 지우개: { "item": "지우개", "targetMessage": 0 } (메시지 번호)
-- 진단키트: { "item": "진단키트" } (파라미터 없음)
+- 자가진단키트: { "item": "자가진단키트" } (파라미터 없음)
 - 응급치료제: { "item": "응급치료제" } (파라미터 없음)
 - 백신: { "item": "백신", "target": "동물닉네임" }
 - 좀비사살용산탄총: { "item": "좀비사살용산탄총", "target": "동물닉네임" }
@@ -178,12 +181,12 @@ ${context.role === 'host' ? `숙주 전용 행동:
 올바른 액션 예시:
 {
   "action": "myStatus.next",  // ✅ 올바른 형식
-  "params": { "location": "해안" }
+  "params": { "location": "폐건물" }
 }
 
 {
   "action": "myStatus.act",  // ✅ 올바른 형식
-  "params": { "action": "hide" }
+  "params": { "action": "숨기" }
 }
 
 {
@@ -194,7 +197,7 @@ ${context.role === 'host' ? `숙주 전용 행동:
 ❌ 잘못된 예시:
 {
   "action": "myStatus",  // ❌ 잘못됨! myStatus.next 또는 myStatus.act여야 함
-  "params": { "location": "해안" }
+  "params": { "location": "산 정상" }
 }`;
 };
 
@@ -206,15 +209,8 @@ export const getTurnSummaryPrompt = (events: any[]): string => {
 
 ${events.map(e => `- ${e.message}`).join('\n')}
 
-JSON 형식으로 응답하세요:
-{
-  "summary": "턴 요약",
-  "keyEvents": ["중요한 사건들"],
-  "relationships": {
-    "플레이어명": "관계 상태"
-  }
-}
-
+자유롭게 요약하되 이 메모리를 읽을 때 어떤 일이 벌어졌고 다음 추리나 행동 계획을 어떤 방향으로 생각하는지 llm이 스스로 최대한 이해하기 쉽게 메모하세요
+당신은 이후에 이 메모리를 다시 읽고 행동이나 채팅을 하게 됩니다
 게임 상황에서 게임 목표 달성을 위해 기억할 필요가 있어 보이는 상황과 그 이유 위주로만 정리해주세요.`;
 };
 

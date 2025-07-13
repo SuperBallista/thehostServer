@@ -134,7 +134,7 @@ export class LLMService implements OnModuleInit {
         messages: [
           {
             role: 'system' as const,
-            content: getSystemPrompt(context),
+            content: getSystemPrompt(context) + '\n\n【IMPORTANT】JSON 응답은 반드시 한글로 작성하세요. location은 "해안", "폐건물", "정글", "동굴", "산 정상", "개울" 중 하나여야 합니다. 아이템명도 반드시 한글로 사용하세요.',
           },
           {
             role: 'user' as const,
@@ -222,7 +222,7 @@ export class LLMService implements OnModuleInit {
         messages: [
           {
             role: 'system' as const,
-            content: getSystemPrompt(context),
+            content: getSystemPrompt(context) + '\n\n【IMPORTANT】JSON 응답은 반드시 한글로 작성하세요. location은 "해안", "폐건물", "정글", "동굴", "산 정상", "개울" 중 하나여야 합니다. 아이템명도 반드시 한글로 사용하세요.',
           },
           {
             role: 'user' as const,
@@ -311,7 +311,7 @@ export class LLMService implements OnModuleInit {
         messages: [
           {
             role: 'system' as const,
-            content: '당신은 게임 상황을 요약하는 AI입니다.',
+            content: '당신은 게임 상황을 요약하는 AI입니다.\n\n【IMPORTANT】요약은 한글로 작성하세요.',
           },
           {
             role: 'user' as const,

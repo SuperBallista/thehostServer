@@ -8,6 +8,7 @@ import { LLMService } from './llm.service';
 import { ActionService } from './action.service';
 import { MemoryService } from './memory.service';
 import { ChatService } from '../socket/game/chat.service';
+import { convertItemCodeToKorean } from './constants/item-mappings';
 import { GamePlayerInRedis, ITEM_NAMES } from '../socket/game/game.types';
 import { ANIMAL_NICKNAMES } from './constants/animal-nicknames';
 
@@ -221,19 +222,19 @@ export class BotService implements OnModuleInit {
       previousTurnSummary,
       currentTurnChats: currentTurnChats.map(chat => ({
         sender: chat.system ? 'System' : (chat.playerId !== undefined ? ANIMAL_NICKNAMES[chat.playerId] || `Player_${chat.playerId}` : 'Player'),
-        message: chat.message,
+        message: this.convertItemCodesInMessage(chat.message),
         system: chat.system,
       })),
       wirelessMessages: wirelessMessages.map(msg => ({
         sender: msg.sender,
-        message: msg.message,
+        message: this.convertItemCodesInMessage(msg.message),
         turn: msg.turn,
       })),
       currentItems: playerData.items?.map(item => ITEM_NAMES[item] || item) || [],
       currentItemCodes: playerData.items || [], // 원본 아이템 코드도 유지
       playersInRegion: playersInRegion.map(p => ANIMAL_NICKNAMES[p.playerId] || `Player_${p.playerId}`),
       currentTurn,
-      regionGraffiti: regionData?.regionMessageList?.filter(msg => msg !== null) || [],
+      regionGraffiti: regionData?.regionMessageList?.filter(msg => msg !== null).map(msg => this.convertItemCodesInMessage(msg)) || [],
       canEscape: playerData.canEscape,
       role: this.getPlayerRole(playerData),
       currentRegion: this.getRegionName(playerData.regionId),
@@ -292,6 +293,42 @@ export class BotService implements OnModuleInit {
   private getRegionName(regionId: number): string {
     const regions = ['해안', '폐건물', '정글', '동굴', '산 정상', '개울'];
     return regions[regionId] || '알 수 없음';
+  }
+
+  /**
+   * 메시지에서 아이템 코드를 한글로 변환
+   */
+  private convertItemCodesInMessage(message: string): string {
+    if (!message) return message;
+    
+    let convertedMessage = message;
+    
+    // 모든 아이템 코드를 한글로 변환
+    Object.entries(ITEM_NAMES).forEach(([code, koreanName]) => {
+      if (koreanName && convertedMessage.includes(code)) {
+        // 단어 경계를 확인하여 정확한 매칭만 변환
+        const regex = new RegExp(`\\b${code}\\b`, 'g');
+        convertedMessage = convertedMessage.replace(regex, koreanName);
+      }
+    });
+    
+    // 영어 지역 이름도 한글로 변환
+    const regionMappings: Record<string, string> = {
+      'Savannah': '해안',
+      'Jungle': '정글',
+      'Quarry': '동굴',
+      'Cave': '동굴',
+      'Mountain': '산 정상',
+      'Stream': '개울',
+      'Ruins': '폐건물'
+    };
+    
+    Object.entries(regionMappings).forEach(([eng, kor]) => {
+      const regex = new RegExp(`\\b${eng}\\b`, 'gi');
+      convertedMessage = convertedMessage.replace(regex, kor);
+    });
+    
+    return convertedMessage;
   }
 
   /**
@@ -380,7 +417,7 @@ export class BotService implements OnModuleInit {
       }
       
       // 죽었거나 좀비인 경우 채팅 불가
-      if (playerData.state === 'dead' || playerData.state === 'zombie') {
+      if (playerData.state === 'killed' || playerData.state === 'zombie') {
         this.logger.debug(`봇이 죽었거나 좀비 상태여서 채팅 불가: ${botId} (${playerData.state})`);
         return;
       }
