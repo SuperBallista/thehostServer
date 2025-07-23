@@ -7,6 +7,7 @@ import { ChatService } from './chat.service';
 import { GameDataService } from './game-data.service';
 import * as itemProbabilities from './itemProbabilities.json';
 import { BotService } from '../../bot/bot.service';
+import { TurnProcessorService } from './turn-processor.service';
 
 
 interface ItemProbability {
@@ -22,6 +23,7 @@ interface ItemProbabilities {
 @Injectable()
 export class GameTurnService {
   private turnTimers = new Map<string, NodeJS.Timeout>();
+  private summaryStarted = new Set<string>(); // 요약 생성 시작된 게임 ID 추적
 
   constructor(
     private readonly redisService: RedisService,
@@ -29,6 +31,7 @@ export class GameTurnService {
     private readonly chatService: ChatService,
     private readonly gameDataService: GameDataService,
     private readonly botService: BotService,
+    private readonly turnProcessorService: TurnProcessorService,
   ) {}
 
   async onTurnStart(gameId: string, currentTurn?: number): Promise<void> {
@@ -197,6 +200,13 @@ export class GameTurnService {
           console.log(`[GameTurn] 남은 시간: ${Math.ceil(remainingTime / 1000)}초`);
         }
         
+        // 턴 종료 15초 전 봇 요약 생성 시작
+        if (remainingTime <= 15000 && remainingTime > 14000 && !this.summaryStarted.has(gameId)) {
+          console.log(`[GameTurn] 턴 종료 15초 전 - 봇 요약 생성 시작: ${gameId}`);
+          this.summaryStarted.add(gameId);
+          this.startTurnSummaryGeneration(gameId);
+        }
+        
         // 턴 종료 10초 전 봇의 턴 종료 행동 설정
         if (remainingTime <= 10000 && remainingTime > 9000) {
           console.log(`[GameTurn] 봇의 턴 종료 행동 설정 - gameId: ${gameId}`);
@@ -210,6 +220,7 @@ export class GameTurnService {
           // 타이머 중지
           clearInterval(checkInterval);
           this.turnTimers.delete(gameId);
+          this.summaryStarted.delete(gameId); // 요약 시작 플래그 정리
           
           // Redis에서 턴 종료 시간 삭제
           await this.redisService.del(`game:${gameId}:turnEndTime`);
@@ -263,5 +274,34 @@ export class GameTurnService {
     
     const remainingTime = Math.max(0, turnEndTimeData.endTime - Date.now());
     return Math.ceil(remainingTime / 1000); // 초 단위로 반환
+  }
+
+  /**
+   * 턴 요약 생성 시작 (15초 전부터 순차적으로)
+   */
+  private async startTurnSummaryGeneration(gameId: string): Promise<void> {
+    try {
+      console.log(`[GameTurn] 턴 요약 생성 시작 - gameId: ${gameId}`);
+      
+      // 백그라운드에서 순차적으로 요약 처리 (await 없이)
+      this.processTurnSummariesSequentially(gameId);
+      
+    } catch (error) {
+      console.error(`[GameTurn] 턴 요약 생성 시작 중 오류:`, error);
+    }
+  }
+
+  /**
+   * 봇들의 턴 요약을 순차적으로 처리 (백그라운드)
+   */
+  private async processTurnSummariesSequentially(gameId: string): Promise<void> {
+    try {
+      // TurnProcessorService의 요약 생성 메서드 호출
+      await this.turnProcessorService.generateTurnSummariesSequentially(gameId);
+      
+      console.log(`[GameTurn] 모든 봇 요약 생성 완료 - gameId: ${gameId}`);
+    } catch (error) {
+      console.error(`[GameTurn] 순차적 요약 처리 중 오류:`, error);
+    }
   }
 }

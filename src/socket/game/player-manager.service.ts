@@ -145,6 +145,23 @@ export class PlayerManagerService {
     return players;
   }
 
+  /**
+   * 게임의 모든 봇 플레이어 조회 (userId < 0인 플레이어들)
+   */
+  async getBotPlayers(gameId: string): Promise<GamePlayerInRedis[]> {
+    const botPlayers: GamePlayerInRedis[] = [];
+    
+    // playerId 0-19 슬롯을 순회하면서 봇 플레이어 찾기
+    for (let playerId = 0; playerId < 20; playerId++) {
+      const playerData = await this.getPlayerData(gameId, playerId);
+      if (playerData && playerData.userId < 0) { // userId가 음수인 경우 봇
+        botPlayers.push(playerData);
+      }
+    }
+    
+    return botPlayers;
+  }
+
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
