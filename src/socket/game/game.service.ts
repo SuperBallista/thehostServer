@@ -135,6 +135,9 @@ export class GameService {
    * 플레이어 상태 업데이트 (이동 장소 설정 등)
    */
   async updatePlayerStatus(userId: number, status: GamePlayerStatusInterface): Promise<userDataResponse> {
+    // 이동 계획 메시지 변수 선언 (함수 시작 부분)
+    let moveMessage: string | undefined;
+    
     console.log('updatePlayerStatus 호출:', { 
       userId, 
       status,
@@ -223,13 +226,16 @@ export class GameService {
         playerData.next = newNext;
         await this.gameDataService.savePlayerData(gameId, playerData.playerId, playerData);
         
-        // 시스템 메시지 전송
+        // 이동 계획 정보 (개인 확인용)
         const nextRegion = Number(status.next);
         const regionName = REGION_NAMES[nextRegion] || '알 수 없는 지역';
-        const systemMessage = `다음 턴에 ${regionName}으로 이동합니다.`;
-        console.log('시스템 메시지:', { nextRegion, regionName, systemMessage });
+        console.log('이동 계획 업데이트:', { nextRegion, regionName, userId, isBot: userId < 0 });
         
-        await this.chatService.sendSystemMessage(gameId, systemMessage, playerData.regionId);
+        // 일반 플레이어(봇이 아닌 경우)에게는 개인 확인 메시지 제공
+        if (userId >= 0) {
+          // 이동 계획 변경 정보 (개인 메시지용)
+          moveMessage = `다음 턴에 ${regionName}으로 이동합니다.`;
+        }
       }
     }
 
@@ -251,14 +257,30 @@ export class GameService {
           break;
       }
       
+      // 개인 메시지들을 배열로 관리
+      const personalMessages: Array<{ system: boolean; message: string; timeStamp: Date }> = [];
+      
       if (personalMessage) {
-        // 본인에게만 보이는 메시지로 응답에 포함
+        personalMessages.push({
+          system: true,
+          message: personalMessage,
+          timeStamp: new Date()
+        });
+      }
+      
+      // 이동 계획 메시지 추가 (일반 플레이어만)
+      if (userId >= 0 && typeof moveMessage !== 'undefined' && moveMessage) {
+        personalMessages.push({
+          system: true,
+          message: moveMessage,
+          timeStamp: new Date()
+        });
+      }
+      
+      // 개인 메시지가 있으면 응답에 포함
+      if (personalMessages.length > 0) {
         response.region = {
-          chatLog: [{
-            system: true,
-            message: personalMessage,
-            timeStamp: new Date()
-          }],
+          chatLog: personalMessages,
           regionMessageList: []
         };
       }

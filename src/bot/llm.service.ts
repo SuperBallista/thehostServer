@@ -5,11 +5,25 @@ import { z } from 'zod';
 import { getSystemPrompt } from './prompts/system.prompt';
 import { 
   getChatDecisionPrompt, 
-  getActionDecisionPrompt, 
   getTurnSummaryPrompt,
   getDefaultChatDecision,
   getDefaultAction 
 } from './prompts/prompts';
+import { convertItemCodeToKorean, ITEM_CODE_TO_KOREAN } from './constants/item-mappings';
+
+
+/**
+ * GameContext를 한글로 변환하는 헬퍼 함수
+ */
+function convertContextToKorean(context: GameContext) {
+  return {
+    ...context,
+    // 아이템명을 한글로 변환
+    currentItems: context.currentItems.map(item => convertItemCodeToKorean(item) || item),
+    // 역할을 한글로 변환
+    role: context.role === 'survivor' ? '생존자' : context.role === 'host' ? '숙주' : context.role
+  };
+}
 import { LLMProvider } from './llm-providers/llm-provider.interface';
 import { LLMProviderFactory } from './llm-providers/llm-provider.factory';
 import { promises as fs } from 'fs';
@@ -42,6 +56,26 @@ const TurnSummarySchema = z.object({
 export class LLMService implements OnModuleInit {
   private readonly logger = new Logger(LLMService.name);
   private llmProvider: LLMProvider | null = null;
+
+  /**
+   * LLM 응답에서 영어 아이템 코드를 한글로 변환
+   */
+  private convertEnglishItemCodesToKorean(text: string): string {
+    if (!text) return text;
+    
+    let convertedText = text;
+    
+    // 모든 영어 아이템 코드를 한글로 변환
+    Object.entries(ITEM_CODE_TO_KOREAN).forEach(([code, koreanName]) => {
+      if (koreanName && convertedText.includes(code)) {
+        // 단어 경계를 확인하여 정확한 매칭만 변환
+        const regex = new RegExp(`\\b${code}\\b`, 'g');
+        convertedText = convertedText.replace(regex, koreanName);
+      }
+    });
+    
+    return convertedText;
+  }
 
   constructor(
     private readonly configService: ConfigService,
@@ -129,7 +163,10 @@ export class LLMService implements OnModuleInit {
         return getDefaultChatDecision(context);
       }
 
-      const prompt = getChatDecisionPrompt(context);
+      // Context를 한글로 변환
+      const koreanContext = convertContextToKorean(context);
+
+      const prompt = getChatDecisionPrompt(koreanContext as GameContext);
       const llmInput = {
         messages: [
           {
@@ -147,10 +184,19 @@ export class LLMService implements OnModuleInit {
       };
       const content = await this.llmProvider.generateCompletion(llmInput);
 
-      // 로그 기록
+      // 로그 기록 (상세한 컨텍스트 포함, currentItemCodes 제외)
+      const contextForLog = { ...context };
+      if ('currentItemCodes' in contextForLog) {
+        delete (contextForLog as any).currentItemCodes;
+      }
+      const detailedLog = {
+        llmInput,
+        gameContext: contextForLog,
+        timestamp: new Date().toISOString()
+      };
       await fs.appendFile(
         path.join(process.cwd(), 'logs', 'llm.txt'),
-        `\n[decideChatMessage] INPUT: ${JSON.stringify(llmInput)}\nOUTPUT: ${content}\n`
+        `\n[decideChatMessage] DETAILED_INPUT: ${JSON.stringify(detailedLog, null, 2)}\nOUTPUT: ${content}\n`
       );
 
       if (!content) {
@@ -159,18 +205,26 @@ export class LLMService implements OnModuleInit {
       }
 
       try {
+        // 영어 아이템 코드를 한글로 변환
+        const convertedContent = this.convertEnglishItemCodesToKorean(content);
+        
         // JSON 응답 파싱 시도
         let parsed;
         try {
-          parsed = JSON.parse(content);
+          parsed = JSON.parse(convertedContent);
         } catch (jsonError) {
           // JSON 파싱 실패 시 코드 블록 추출 시도
-          const jsonMatch = content.match(/```(?:json)?\s*({[\s\S]*?})\s*```/);
+          const jsonMatch = convertedContent.match(/```(?:json)?\s*({[\s\S]*?})\s*```/);
           if (jsonMatch) {
             parsed = JSON.parse(jsonMatch[1]);
           } else {
             throw jsonError;
           }
+        }
+        
+        // 채팅 메시지에서도 영어 아이템 코드를 한글로 변환
+        if (parsed.message) {
+          parsed.message = this.convertEnglishItemCodesToKorean(parsed.message);
         }
         
         // additionalAction이 있으면 형식 수정
@@ -208,90 +262,6 @@ export class LLMService implements OnModuleInit {
     }
   }
 
-  /**
-   * 행동 결정
-   */
-  async decideAction(context: GameContext, trigger: any): Promise<any> {
-    try {
-      if (!this.llmProvider || !(await this.llmProvider.isAvailable())) {
-        return getDefaultAction(context);
-      }
-
-      const prompt = getActionDecisionPrompt(context, trigger);
-      const llmInput = {
-        messages: [
-          {
-            role: 'system' as const,
-            content: getSystemPrompt(context) + '\n\n【IMPORTANT】JSON 응답은 반드시 한글로 작성하세요. location은 "해안", "폐건물", "정글", "동굴", "산 정상", "개울" 중 하나여야 합니다. 아이템명도 반드시 한글로 사용하세요.',
-          },
-          {
-            role: 'user' as const,
-            content: prompt,
-          },
-        ],
-        responseFormat: 'json' as const,
-        temperature: 0.7,
-        maxTokens: 400,
-      };
-      const content = await this.llmProvider.generateCompletion(llmInput);
-
-      // 로그 기록
-      await fs.appendFile(
-        path.join(process.cwd(), 'logs', 'llm.txt'),
-        `\n[decideAction] INPUT: ${JSON.stringify(llmInput)}\nOUTPUT: ${content}\n`
-      );
-
-      if (!content) {
-        this.logger.warn('LLM 응답이 비어있음, 무작위 행동 반환');
-        return getDefaultAction(context);
-      }
-
-      try {
-        // JSON 응답 파싱 시도
-        let parsed;
-        try {
-          parsed = JSON.parse(content);
-        } catch (jsonError) {
-          // JSON 파싱 실패 시 코드 블록 추출 시도
-          const jsonMatch = content.match(/```(?:json)?\s*({[\s\S]*?})\s*```/);
-          if (jsonMatch) {
-            parsed = JSON.parse(jsonMatch[1]);
-          } else {
-            throw jsonError;
-          }
-        }
-        
-        // 액션 형식 수정
-        parsed = this.fixActionFormat(parsed);
-        
-        const validated = ActionResponseSchema.safeParse(parsed);
-        if (!validated.success) {
-          this.logger.warn(`LLM 행동 결정 스키마 검증 실패: ${JSON.stringify(validated.error.issues)}`);
-          this.logger.warn(`검증 실패한 응답: ${JSON.stringify(parsed)}`);
-          
-          // 부분적으로 유효한 응답 처리
-          if (parsed && parsed.action && typeof parsed.action === 'string') {
-            return {
-              action: parsed.action,
-              params: parsed.params || {},
-              reasoning: parsed.reasoning || undefined
-            };
-          }
-          
-          return getDefaultAction(context);
-        }
-        this.logger.log(`행동 결정: ${validated.data.action}`, validated.data.reasoning);
-        return validated.data;
-      } catch (parseError) {
-        this.logger.warn(`LLM 행동 결정 파싱 실패: ${parseError.message}`);
-        this.logger.warn(`파싱 실패한 응답: ${content}`);
-        return getDefaultAction(context);
-      }
-    } catch (error) {
-      this.logger.error(`행동 결정 실패: ${error.message}`, error.stack);
-      return getDefaultAction(context);
-    }
-  }
 
   /**
    * 턴 요약
@@ -324,10 +294,15 @@ export class LLMService implements OnModuleInit {
       };
       const content = await this.llmProvider.generateCompletion(llmInput);
 
-      // 로그 기록
+      // 로그 기록 (상세한 컨텍스트 포함)
+      const detailedLog = {
+        llmInput,
+        gameContext: events,
+        timestamp: new Date().toISOString()
+      };
       await fs.appendFile(
         path.join(process.cwd(), 'logs', 'llm.txt'),
-        `\n[summarizeTurn] INPUT: ${JSON.stringify(llmInput)}\nOUTPUT: ${content}\n`
+        `\n[summarizeTurn] DETAILED_INPUT: ${JSON.stringify(detailedLog, null, 2)}\nOUTPUT: ${content}\n`
       );
 
       if (!content) {

@@ -3,12 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../redis/redis.service';
 import { GameDataService } from '../socket/game/game-data.service';
 import { PlayerManagerService } from '../socket/game/player-manager.service';
-import { GameContext, BotConfig } from './interfaces/bot.interface';
+import { BotConfig } from './interfaces/bot.interface';
 import { LLMService } from './llm.service';
 import { ActionService } from './action.service';
 import { MemoryService } from './memory.service';
 import { ChatService } from '../socket/game/chat.service';
-import { convertItemCodeToKorean } from './constants/item-mappings';
 import { GamePlayerInRedis, ITEM_NAMES } from '../socket/game/game.types';
 import { ANIMAL_NICKNAMES } from './constants/animal-nicknames';
 
@@ -150,32 +149,6 @@ export class BotService implements OnModuleInit {
   }
 
   /**
-   * 트리거 발동 시 처리
-   */
-  async handleTriggeredEvent(
-    gameId: string,
-    botId: number,
-    triggeredEvent: any
-  ): Promise<void> {
-    try {
-      // 현재 게임 컨텍스트 구성
-      const gameContext = await this.buildGameContext(botId, gameId);
-      
-      // LLM에 행동 결정 요청
-      const action = await this.llmService.decideAction(gameContext, triggeredEvent);
-      
-      // 행동 실행
-      await this.actionService.executeAction(gameId, botId, action);
-      
-      // 통계 업데이트
-      await this.updateBotStats(botId, action);
-      
-    } catch (error) {
-      this.logger.error(`봇 행동 처리 실패: ${error.message}`, error.stack);
-    }
-  }
-
-  /**
    * 게임 컨텍스트 구성
    */
   private async buildGameContext(botId: number, gameId: string): Promise<any> {
@@ -222,19 +195,18 @@ export class BotService implements OnModuleInit {
       previousTurnSummary,
       currentTurnChats: currentTurnChats.map(chat => ({
         sender: chat.system ? 'System' : (chat.playerId !== undefined ? ANIMAL_NICKNAMES[chat.playerId] || `Player_${chat.playerId}` : 'Player'),
-        message: this.convertItemCodesInMessage(chat.message),
+        message: chat.message, // 일반 채팅 메시지도 변환하지 않음
         system: chat.system,
       })),
       wirelessMessages: wirelessMessages.map(msg => ({
         sender: msg.sender,
-        message: this.convertItemCodesInMessage(msg.message),
+        message: msg.message, // 무전 메시지는 변환하지 않음
         turn: msg.turn,
       })),
       currentItems: playerData.items?.map(item => ITEM_NAMES[item] || item) || [],
-      currentItemCodes: playerData.items || [], // 원본 아이템 코드도 유지
       playersInRegion: playersInRegion.map(p => ANIMAL_NICKNAMES[p.playerId] || `Player_${p.playerId}`),
       currentTurn,
-      regionGraffiti: regionData?.regionMessageList?.filter(msg => msg !== null).map(msg => this.convertItemCodesInMessage(msg)) || [],
+      regionGraffiti: regionData?.regionMessageList?.filter(msg => msg !== null) || [],
       canEscape: playerData.canEscape,
       role: this.getPlayerRole(playerData),
       currentRegion: this.getRegionName(playerData.regionId),

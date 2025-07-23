@@ -246,15 +246,8 @@ export class ActionService {
       }
     }
     
-    // 메시지 내용에서 아이템 이름 변환
-    if (typeof converted.message === 'string') {
-      let message = converted.message;
-      const items = extractAndConvertItems(message);
-      items.forEach(({ korean, code }) => {
-        message = message.replace(korean, code);
-      });
-      converted.message = message;
-    }
+    // 채팅 메시지는 한글 아이템명 유지 (사용자에게 보여주기 위해)
+    // 메시지 내용에서 아이템 이름 변환은 제거 - 채팅은 한글로 표시되어야 함
     
     // 내용(content)에서 아이템 이름 변환
     if (typeof converted.content === 'string') {
