@@ -242,6 +242,9 @@ export class GameService {
     // 업데이트된 상태 반환
     const response = await this.gameStateService.createPlayerGameUpdate(gameId, userId, {});
     
+    // 개인 메시지들을 배열로 관리
+    const personalMessages: Array<{ system: boolean; message: string; timeStamp: Date }> = [];
+    
     // 좀비 대처 행동 메시지는 본인에게만 보여야 함
     if (actChanged && status.act !== undefined) {
       let personalMessage = '';
@@ -257,9 +260,6 @@ export class GameService {
           break;
       }
       
-      // 개인 메시지들을 배열로 관리
-      const personalMessages: Array<{ system: boolean; message: string; timeStamp: Date }> = [];
-      
       if (personalMessage) {
         personalMessages.push({
           system: true,
@@ -267,23 +267,23 @@ export class GameService {
           timeStamp: new Date()
         });
       }
-      
-      // 이동 계획 메시지 추가 (일반 플레이어만)
-      if (userId >= 0 && typeof moveMessage !== 'undefined' && moveMessage) {
-        personalMessages.push({
-          system: true,
-          message: moveMessage,
-          timeStamp: new Date()
-        });
-      }
-      
-      // 개인 메시지가 있으면 응답에 포함
-      if (personalMessages.length > 0) {
-        response.region = {
-          chatLog: personalMessages,
-          regionMessageList: []
-        };
-      }
+    }
+    
+    // 이동 계획 메시지 추가 (일반 플레이어만)
+    if (userId >= 0 && typeof moveMessage !== 'undefined' && moveMessage) {
+      personalMessages.push({
+        system: true,
+        message: moveMessage,
+        timeStamp: new Date()
+      });
+    }
+    
+    // 개인 메시지가 있으면 응답에 포함
+    if (personalMessages.length > 0) {
+      response.region = {
+        chatLog: personalMessages,
+        regionMessageList: []
+      };
     }
     
     return response;
