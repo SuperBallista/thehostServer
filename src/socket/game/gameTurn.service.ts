@@ -310,6 +310,10 @@ export class GameTurnService {
         return;
       }
 
+      // 현재 게임 데이터 조회 (턴 정보용)
+      const gameData = await this.gameDataService.getGameData(gameId);
+      const currentTurn = gameData?.turn || 1;
+      
       // 현재 턴의 이벤트 수집
       const turnEvents = await this.collectTurnEvents(gameId);
       
@@ -329,6 +333,11 @@ export class GameTurnService {
           const summary = await this.llmService.summarizeTurn(turnEvents);
           
           if (summary && summary.summary) {
+            // 봇 메모리의 현재 턴 정보 업데이트
+            await this.memoryService.updateShortTermMemory(gameId, botPlayer.userId, {
+              currentTurn: currentTurn
+            });
+            
             // 봇 메모리에 턴 요약 저장
             await this.memoryService.updateTurnSummary(
               gameId, 
@@ -336,7 +345,7 @@ export class GameTurnService {
               summary.summary
             );
             
-            console.log(`[GameTurn] 봇 ${botPlayer.userId} 요약 저장 완료`);
+            console.log(`[GameTurn] 봇 ${botPlayer.userId} 요약 저장 완료 (턴 ${currentTurn})`);
           } else {
             console.log(`[GameTurn] 봇 ${botPlayer.userId} 요약 생성 실패 - 빈 응답`);
           }

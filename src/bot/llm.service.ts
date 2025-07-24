@@ -276,8 +276,6 @@ export class LLMService implements OnModuleInit {
       if (!this.llmProvider || !(await this.llmProvider.isAvailable())) {
         return {
           summary: '턴 요약을 생성할 수 없습니다.',
-          keyEvents: [],
-          relationships: {},
         };
       }
 
@@ -286,16 +284,15 @@ export class LLMService implements OnModuleInit {
         messages: [
           {
             role: 'system' as const,
-            content: '당신은 게임 상황을 요약하는 AI입니다.\n\n【IMPORTANT】요약은 한글로 작성하세요.',
+            content: '당신은 숙주 추리 게임의 상황을 요약하는 AI입니다.\n\n【게임 설명】\n- 숙주 추리 게임: 생존자들이 숨어있는 숙주를 찾아 백신으로 치료해야 하는 게임\n- 숙주는 생존자들을 감염시켜 좀비로 만들려 하고, 생존자들은 협력하여 백신 재료를 모아 숙주를 치료해야 함\n- 5턴부터 좀비가 등장하며, 좀비가 된 플레이어의 5턴 전 위치를 통해 숙주를 추리할 수 있음\n\n【IMPORTANT】\n- 요약은 한글로 작성하세요\n- JSON 형식이 아닌 일반 텍스트로 작성하세요\n- 간결하고 핵심적인 내용만 포함하세요',
           },
           {
             role: 'user' as const,
             content: prompt,
           },
         ],
-        responseFormat: 'json' as const,
         temperature: 0.5,
-        maxTokens: 1000,
+        maxTokens: 300,
       };
       const content = await this.llmProvider.generateCompletion(llmInput);
 
@@ -310,44 +307,23 @@ export class LLMService implements OnModuleInit {
         `\n[summarizeTurn] DETAILED_INPUT: ${JSON.stringify(detailedLog, null, 2)}\nOUTPUT: ${content}\n`
       );
 
-      if (!content) {
+      if (!content || content.trim() === '') {
         this.logger.warn('LLM 응답이 비어있음, 기본 요약 반환');
         return {
           summary: '이번 턴에 특별한 일이 없었습니다.',
-          keyEvents: [],
-          relationships: {},
         };
       }
 
-      try {
-        const parsed = JSON.parse(content);
-        const validated = TurnSummarySchema.safeParse(parsed);
-        if (!validated.success) {
-          this.logger.warn(`LLM 턴 요약 스키마 검증 실패: ${JSON.stringify(validated.error.issues)}`);
-          this.logger.warn(`검증 실패한 응답: ${JSON.stringify(parsed)}`);
-          return {
-            summary: '턴 요약 생성에 실패했습니다.',
-            keyEvents: [],
-            relationships: {},
-          };
-        }
-        this.logger.log('턴 요약 완료');
-        return validated.data;
-      } catch (parseError) {
-        this.logger.warn(`LLM 턴 요약 파싱 실패: ${parseError.message}`);
-        this.logger.warn(`파싱 실패한 응답: ${content}`);
-        return {
-          summary: '턴 요약 파싱에 실패했습니다.',
-          keyEvents: [],
-          relationships: {},
-        };
-      }
+      // 일반 텍스트 응답을 그대로 사용
+      const cleanedSummary = content.trim();
+      this.logger.log('턴 요약 완료');
+      return {
+        summary: cleanedSummary,
+      };
     } catch (error) {
       this.logger.error(`턴 요약 실패: ${error.message}`, error.stack);
       return {
         summary: '턴 요약 중 오류가 발생했습니다.',
-        keyEvents: [],
-        relationships: {},
       };
     }
   }

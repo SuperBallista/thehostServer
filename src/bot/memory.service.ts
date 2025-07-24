@@ -123,7 +123,14 @@ export class MemoryService {
    * 이전 턴 요약 조회
    */
   async getPreviousTurnSummary(gameId: string, botId: number): Promise<string> {
-    const memory = await this.getMemory(gameId, botId);
+    let memory = await this.getMemory(gameId, botId);
+    if (!memory) {
+      // 메모리가 없으면 기본 메모리 생성
+      console.log(`[MemoryService] 봇 ${botId} 메모리 초기화 (요약 조회용)`);
+      await this.initializeMemory(gameId, botId, { mbti: 'INTJ', gender: 'male' });
+      memory = await this.getMemory(gameId, botId);
+    }
+    
     if (!memory || memory.longTerm.turnSummaries.length === 0) {
       return '첫 번째 턴입니다.';
     }
@@ -141,9 +148,16 @@ export class MemoryService {
     botId: number,
     summary: string
   ): Promise<void> {
-    const memory = await this.getMemory(gameId, botId);
+    let memory = await this.getMemory(gameId, botId);
     if (!memory) {
-      return;
+      // 메모리가 없으면 기본 메모리 생성
+      console.log(`[MemoryService] 봇 ${botId} 메모리 초기화 (턴 요약용)`);
+      await this.initializeMemory(gameId, botId, { mbti: 'INTJ', gender: 'male' });
+      memory = await this.getMemory(gameId, botId);
+      if (!memory) {
+        console.error(`[MemoryService] 봇 ${botId} 메모리 초기화 실패`);
+        return;
+      }
     }
 
     const currentTurn = memory.shortTerm.currentTurn;
