@@ -1,6 +1,21 @@
 export interface BotConfig {
-  mbti: 'INTJ' | 'INTP' | 'ENTJ' | 'ENTP' | 'INFJ' | 'INFP' | 'ENFJ' | 'ENFP' | 
-        'ISTJ' | 'ISFJ' | 'ESTJ' | 'ESFJ' | 'ISTP' | 'ISFP' | 'ESTP' | 'ESFP';
+  mbti:
+    | 'INTJ'
+    | 'INTP'
+    | 'ENTJ'
+    | 'ENTP'
+    | 'INFJ'
+    | 'INFP'
+    | 'ENFJ'
+    | 'ENFP'
+    | 'ISTJ'
+    | 'ISFJ'
+    | 'ESTJ'
+    | 'ESFJ'
+    | 'ISTP'
+    | 'ISFP'
+    | 'ESTP'
+    | 'ESFP';
   gender: 'male' | 'female';
   name?: string;
 }

@@ -1,6 +1,6 @@
 /**
  * 봇 시스템 통합 예제
- * 
+ *
  * 이 파일은 게임에 봇을 통합하는 방법을 보여줍니다.
  * 실제 구현 시 GameService와 SocketGateway에 통합하세요.
  */
@@ -18,7 +18,7 @@ export class BotIntegrationExample {
     // 랜덤 봇 성격 생성
     const mbtiTypes = ['INTJ', 'ENFP', 'ISTP', 'ESFJ'] as const;
     const randomMbti = mbtiTypes[Math.floor(Math.random() * mbtiTypes.length)];
-    
+
     const botConfig: BotConfig = {
       mbti: randomMbti,
       gender: Math.random() > 0.5 ? 'male' : 'female',
@@ -38,11 +38,12 @@ export class BotIntegrationExample {
    */
   async onGameStart(gameId: string, players: any[]): Promise<void> {
     for (const player of players) {
-      if (player.userId < 0) { // 봇인 경우
+      if (player.userId < 0) {
+        // 봇인 경우
         await this.botService.initializeBotForGame(
           player.userId,
           gameId,
-          player.playerId
+          player.playerId,
         );
       }
     }
@@ -80,29 +81,29 @@ export class BotIntegrationExample {
 
 /**
  * GameService 통합 예제
- * 
+ *
  * GameService에 다음 코드를 추가하세요:
- * 
+ *
  * constructor에 BotService 주입:
  * private readonly botService: BotService
- * 
+ *
  * 게임 시작 시:
  * if (this.hasBots(players)) {
  *   await this.botService.handleGameStart(gameId, players);
  * }
- * 
+ *
  * 턴 시작 시:
  * await this.botService.handleTurnStart(gameId);
- * 
+ *
  * 턴 종료 시:
  * await this.botService.handleTurnEnd(gameId);
  */
 
 /**
  * RedisPubSubService 통합 예제
- * 
+ *
  * handleChatMessage 메서드에 추가:
- * 
+ *
  * // 봇 트리거 처리
  * if (this.triggerService) {
  *   await this.triggerService.processChatMessage(gameId, chatData);
@@ -111,10 +112,10 @@ export class BotIntegrationExample {
 
 /**
  * 환경 변수 설정
- * 
+ *
  * .env 파일에 추가:
  * OPENAI_API_KEY=your_api_key_here
- * 
+ *
  * 또는 Claude API 사용 시:
  * ANTHROPIC_API_KEY=your_api_key_here
  */

@@ -4,10 +4,8 @@ import { UserModule } from '../user/user.module';
 // 필요시 추가 서비스 import
 
 @Module({
-  imports: [
-    UserModule,
-  ],
+  imports: [UserModule],
   providers: [LobbyService],
   exports: [LobbyService],
 })
-export class LobbyModule {} 
+export class LobbyModule {}

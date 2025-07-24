@@ -1,10 +1,10 @@
-import type { Socket } from "socket.io";
+import type { Socket } from 'socket.io';
 
 export function moveToRoom(client: Socket, roomId: string) {
   const targetRoom = `room:${roomId}`;
 
   // socket.io는 기본적으로 자기 자신의 ID도 room으로 가지고 있으므로 제외
-  const currentRooms = Array.from(client.rooms).filter(r => r !== client.id);
+  const currentRooms = Array.from(client.rooms).filter((r) => r !== client.id);
 
   // ✅ 이미 해당 room에 있다면 추가 조치 없이 리턴
   if (currentRooms.includes(targetRoom)) return;
@@ -18,7 +18,7 @@ export function moveToRoom(client: Socket, roomId: string) {
 }
 
 export function moveToLobby(client: Socket) {
-  const currentRooms = Array.from(client.rooms).filter(r => r !== client.id);
+  const currentRooms = Array.from(client.rooms).filter((r) => r !== client.id);
 
   // ✅ 모든 "room:" 에서 방에서 나감
   for (const room of currentRooms) {

@@ -4,10 +4,8 @@ import { UserModule } from '../user/user.module';
 // 필요시 추가 서비스 import
 
 @Module({
-  imports: [
-    UserModule,
-  ],
+  imports: [UserModule],
   providers: [ConnectionService],
   exports: [ConnectionService],
 })
-export class UserConnectionModule {} 
+export class UserConnectionModule {}

@@ -14,7 +14,7 @@ import { BotModule } from './bot/bot.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-        
+
     // 모듈 임포트
     RedisModule,
     UserModule,

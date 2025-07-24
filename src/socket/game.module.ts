@@ -45,4 +45,4 @@ import { BotModule } from '../bot/bot.module';
     TurnProcessorService,
   ],
 })
-export class GameModule {} 
+export class GameModule {}

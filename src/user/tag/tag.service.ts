@@ -10,19 +10,18 @@ export class TagService {
 
   constructor(private readonly redisService: RedisService) {}
 
-
   async generateTag(): Promise<string> {
     const redisClient = this.redisService.getClient();
-    
+
     try {
       // 캐시된 태그 리스트 10개 가져오기
       const tags = await redisClient.lrange('nickname-tag:candidates', 0, 9);
-      
+
       // 기존 태그 중 사용 가능한 것 찾기
       for (const tag of tags) {
         const key = `nickname-tag:${tag}`;
         let count = 0;
-        
+
         try {
           const countStr = await redisClient.get(key);
           count = countStr ? parseInt(countStr) : 0;
@@ -32,24 +31,24 @@ export class TagService {
             throw new Error(`태그 카운트 읽기 실패: ${err.message}`);
           }
         }
-        
+
         if (count < this.MAX_PER_TAG) {
           // 태그 사용자 수 증가
           await redisClient.incr(key);
           return tag;
         }
       }
-      
+
       // 새 태그 생성
       const cursor = await redisClient.incr('nickname-tag:cursor');
       const tag = encodeBase32(cursor);
-      
+
       // 태그 사용자 수 1로 시작
       await redisClient.set(`nickname-tag:${tag}`, '1');
-      
+
       // 후보 리스트에 추가
       await redisClient.rpush('nickname-tag:candidates', tag);
-      
+
       return tag;
     } catch (error) {
       throw new Error(`태그 생성 실패: ${error.message}`);

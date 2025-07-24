@@ -16,21 +16,26 @@ export class EncryptionService {
 
   // 닉네임 암호화
   encryptNickname(nickname: string): { encrypted: string; iv: string } {
-    const rawKey = Buffer.from(this.configService.get<string>('AES_SECRET_KEY') as string, 'base64');
-    
+    const rawKey = Buffer.from(
+      this.configService.get<string>('AES_SECRET_KEY') as string,
+      'base64',
+    );
+
     if (rawKey.length !== 32) {
-      throw new Error(`AES 키 길이가 32바이트가 아닙니다. 현재: ${rawKey.length}`);
+      throw new Error(
+        `AES 키 길이가 32바이트가 아닙니다. 현재: ${rawKey.length}`,
+      );
     }
 
     // 암호화를 위한 초기화 벡터 생성
     const iv = crypto.randomBytes(16);
-    
+
     const cipher = crypto.createCipheriv('aes-256-cbc', rawKey, iv);
-    
+
     // PKCS7 패딩이 Node.js에서는 자동으로 적용됨
     let encrypted = cipher.update(nickname, 'utf8', 'base64');
     encrypted += cipher.final('base64');
-    
+
     return {
       encrypted,
       iv: iv.toString('base64'),
@@ -38,20 +43,32 @@ export class EncryptionService {
   }
 
   // 닉네임 복호화
-decryptNickname(encryptedBase64: string | Buffer, ivBase64: string | Buffer): string {
-  try {
-    const rawKey = Buffer.from(this.configService.get<string>('AES_SECRET_KEY') as string, 'base64');
+  decryptNickname(
+    encryptedBase64: string | Buffer,
+    ivBase64: string | Buffer,
+  ): string {
+    try {
+      const rawKey = Buffer.from(
+        this.configService.get<string>('AES_SECRET_KEY') as string,
+        'base64',
+      );
 
-    const iv = typeof ivBase64 === 'string' ? Buffer.from(ivBase64, 'base64') : ivBase64;
-    const encrypted = typeof encryptedBase64 === 'string' ? Buffer.from(encryptedBase64, 'base64') : encryptedBase64;
+      const iv =
+        typeof ivBase64 === 'string'
+          ? Buffer.from(ivBase64, 'base64')
+          : ivBase64;
+      const encrypted =
+        typeof encryptedBase64 === 'string'
+          ? Buffer.from(encryptedBase64, 'base64')
+          : encryptedBase64;
 
-    const decipher = crypto.createDecipheriv('aes-256-cbc', rawKey, iv);
-    let decrypted = decipher.update(encrypted);
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
+      const decipher = crypto.createDecipheriv('aes-256-cbc', rawKey, iv);
+      let decrypted = decipher.update(encrypted);
+      decrypted = Buffer.concat([decrypted, decipher.final()]);
 
-    return decrypted.toString('utf8');
-  } catch (error) {
-    throw new Error(`복호화 실패: ${error.message}`);
+      return decrypted.toString('utf8');
+    } catch (error) {
+      throw new Error(`복호화 실패: ${error.message}`);
+    }
   }
-}
 }

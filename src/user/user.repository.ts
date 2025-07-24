@@ -7,7 +7,10 @@ import { ResultSetHeader } from 'mysql2';
 export class UserRepository {
   constructor(private readonly db: DatabaseProvider) {}
 
-  async findByOAuthId(provider: string, oauthId: string): Promise<UserDto | null> {
+  async findByOAuthId(
+    provider: string,
+    oauthId: string,
+  ): Promise<UserDto | null> {
     const query = `
       SELECT 
         id, 
@@ -83,7 +86,15 @@ export class UserRepository {
         created_at, 
         last_connected_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [provider, oauthId, nicknameHash, encryptedNickname, iv, now.toISOString().slice(0, 19).replace('T', ' '), now.toISOString().slice(0, 19).replace('T', ' ')],
+      [
+        provider,
+        oauthId,
+        nicknameHash,
+        encryptedNickname,
+        iv,
+        now.toISOString().slice(0, 19).replace('T', ' '),
+        now.toISOString().slice(0, 19).replace('T', ' '),
+      ],
     );
     return result.insertId;
   }

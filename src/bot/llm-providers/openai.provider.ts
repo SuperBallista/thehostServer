@@ -6,7 +6,10 @@ import { LLMProvider, LLMCompletionParams } from './llm-provider.interface';
 export class OpenAIProvider implements LLMProvider {
   private client: OpenAI | null = null;
 
-  constructor(private apiKey: string, private model: string) {
+  constructor(
+    private apiKey: string,
+    private model: string,
+  ) {
     if (this.apiKey) {
       this.client = new OpenAI({ apiKey: this.apiKey });
     }
@@ -22,9 +25,8 @@ export class OpenAIProvider implements LLMProvider {
       messages: params.messages,
       temperature: params.temperature ?? 0.7,
       max_tokens: params.maxTokens ?? 1000,
-      response_format: params.responseFormat === 'json' 
-        ? { type: 'json_object' } 
-        : undefined,
+      response_format:
+        params.responseFormat === 'json' ? { type: 'json_object' } : undefined,
     });
 
     return response.choices[0]?.message?.content || '';

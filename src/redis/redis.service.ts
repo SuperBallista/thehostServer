@@ -11,16 +11,15 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly configService: ConfigService) {}
 
   async onModuleInit() {
-
     this.redisClient = new Redis({
       host: this.configService.get<string>('REDIS_HOST'),
       port: this.configService.get<number>('REDIS_PORT', 6379),
     });
-  
+
     // await this.redisClient.flushdb(); // ✅ 전체 초기화
     // console.log('🧹 Redis 전체 초기화 완료');
   }
-  
+
   onModuleDestroy() {
     this.redisClient.disconnect();
   }
@@ -35,14 +34,23 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** ✅ 단일 키 저장 (기본 3시간 TTL 적용 - 테스트용) */
-  async stringifyAndSet(key: string, value: object, expireSeconds = 10800): Promise<'OK'> {
-    return await this.redisClient.set(key, JSON.stringify(value), 'EX', expireSeconds);
+  async stringifyAndSet(
+    key: string,
+    value: object,
+    expireSeconds = 10800,
+  ): Promise<'OK'> {
+    return await this.redisClient.set(
+      key,
+      JSON.stringify(value),
+      'EX',
+      expireSeconds,
+    );
   }
 
   /** ✅ 단일 키 조회 */
   async getAndParse(key: string) {
-    const value =  await this.redisClient.get(key)
-    if (!value) return null
+    const value = await this.redisClient.get(key);
+    if (!value) return null;
     return JSON.parse(value);
   }
 
@@ -52,7 +60,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** ✅ 해시 저장 */
-  async hset(key: string, data: Record<string, string | number>): Promise<number> {
+  async hset(
+    key: string,
+    data: Record<string, string | number>,
+  ): Promise<number> {
     return await this.redisClient.hset(key, data);
   }
 
@@ -69,7 +80,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async scanKeys(pattern: string): Promise<string[]> {
     const stream = this.redisClient.scanStream({ match: pattern });
     const keys: string[] = [];
-  
+
     return new Promise((resolve, reject) => {
       stream.on('data', (chunk) => keys.push(...chunk));
       stream.on('end', () => resolve(keys));
@@ -77,14 +88,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async sadd(key: string, value: string): Promise<number>{
-    return this.redisClient.sadd(key,value)
+  async sadd(key: string, value: string): Promise<number> {
+    return this.redisClient.sadd(key, value);
   }
-async smembers(key: string): Promise<string[]> {
-    return this.redisClient.smembers(key)
-}
-pipeline() {
-  return this.redisClient.pipeline();
-}
-
+  async smembers(key: string): Promise<string[]> {
+    return this.redisClient.smembers(key);
+  }
+  pipeline() {
+    return this.redisClient.pipeline();
+  }
 }

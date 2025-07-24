@@ -7,7 +7,7 @@ export class OpenRouterProvider implements LLMProvider {
 
   constructor(
     private apiKey: string,
-    private model: string = 'mistralai/mixtral-8x7b-instruct'
+    private model: string = 'mistralai/mixtral-8x7b-instruct',
   ) {}
 
   async generateCompletion(params: LLMCompletionParams): Promise<string> {
@@ -19,7 +19,7 @@ export class OpenRouterProvider implements LLMProvider {
       const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://github.com/thehost-game', // 선택사항
           'X-Title': 'TheHost Game Bot', // 선택사항
@@ -29,9 +29,10 @@ export class OpenRouterProvider implements LLMProvider {
           messages: params.messages,
           temperature: params.temperature ?? 0.7,
           max_tokens: params.maxTokens ?? 1000,
-          response_format: params.responseFormat === 'json' 
-            ? { type: 'json_object' } 
-            : undefined,
+          response_format:
+            params.responseFormat === 'json'
+              ? { type: 'json_object' }
+              : undefined,
         }),
       });
 

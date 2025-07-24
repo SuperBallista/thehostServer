@@ -1,20 +1,19 @@
 // user/dto/user.dto.ts
 export interface UserDto {
-    id: number;
-    oAuthProvider: string;
-    oAuthId: string;
-    nicknameHash?: string;
-    encryptedNickname?: string;
-    ivNickname?: string;
-    nickname?: string;
-    lastConnectedAt: Date;
-  }
+  id: number;
+  oAuthProvider: string;
+  oAuthId: string;
+  nicknameHash?: string;
+  encryptedNickname?: string;
+  ivNickname?: string;
+  nickname?: string;
+  lastConnectedAt: Date;
+}
 
-  export interface CreateUserInput {
-    oauthId: string;
-    provider: string;
-    nicknameHash: string;
-    encryptedNickname: string;
-    iv: string;
-  }
-  
+export interface CreateUserInput {
+  oauthId: string;
+  provider: string;
+  nicknameHash: string;
+  encryptedNickname: string;
+  iv: string;
+}

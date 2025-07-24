@@ -66,11 +66,14 @@ export class DocumentVectorizer {
         'DIM',
         this.VECTOR_DIM.toString(),
         'DISTANCE_METRIC',
-        'COSINE'
+        'COSINE',
       );
       console.log('Redis vector index created successfully');
     } catch (error) {
-      if (error instanceof Error && error.message?.includes('Index already exists')) {
+      if (
+        error instanceof Error &&
+        error.message?.includes('Index already exists')
+      ) {
         console.log('Redis vector index already exists');
       } else {
         throw error;
@@ -78,15 +81,17 @@ export class DocumentVectorizer {
     }
   }
 
-  private async readDocumentFiles(docsPath: string): Promise<{ path: string; content: string }[]> {
+  private async readDocumentFiles(
+    docsPath: string,
+  ): Promise<{ path: string; content: string }[]> {
     const documents: { path: string; content: string }[] = [];
-    
+
     async function scanDir(dir: string) {
       const entries = await readdir(dir, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         const fullPath = join(dir, entry.name);
-        
+
         if (entry.isDirectory()) {
           await scanDir(fullPath);
         } else if (entry.isFile()) {
@@ -98,7 +103,7 @@ export class DocumentVectorizer {
         }
       }
     }
-    
+
     await scanDir(docsPath);
     return documents;
   }
@@ -106,19 +111,21 @@ export class DocumentVectorizer {
   private chunkDocument(content: string): string[] {
     const chunks: string[] = [];
     let start = 0;
-    
+
     while (start < content.length) {
       const end = Math.min(start + this.CHUNK_SIZE, content.length);
       const chunk = content.slice(start, end);
       chunks.push(chunk);
       start += this.CHUNK_SIZE - this.CHUNK_OVERLAP;
     }
-    
+
     return chunks;
   }
 
   private generateChunkId(source: string, chunkIndex: number): string {
-    const hash = createHash('md5').update(`${source}:${chunkIndex}`).digest('hex');
+    const hash = createHash('md5')
+      .update(`${source}:${chunkIndex}`)
+      .digest('hex');
     return `chunk:${hash}`;
   }
 
@@ -127,20 +134,23 @@ export class DocumentVectorizer {
       model: 'text-embedding-ada-002',
       input: text,
     });
-    
+
     return response.data[0].embedding;
   }
 
-  async vectorizeDocument(filePath: string, content: string): Promise<VectorDocument[]> {
+  async vectorizeDocument(
+    filePath: string,
+    content: string,
+  ): Promise<VectorDocument[]> {
     const chunks = this.chunkDocument(content);
     const vectorDocs: VectorDocument[] = [];
-    
+
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
       const chunkId = this.generateChunkId(filePath, i);
-      
+
       const embedding = await this.createEmbedding(chunk);
-      
+
       const vectorDoc: VectorDocument = {
         id: chunkId,
         embedding,
@@ -152,27 +162,33 @@ export class DocumentVectorizer {
           timestamp: Date.now(),
         },
       };
-      
+
       vectorDocs.push(vectorDoc);
     }
-    
+
     return vectorDocs;
   }
 
   async storeVectorDocument(doc: VectorDocument) {
     const key = `doc:${doc.id}`;
-    
+
     // Convert embedding array to buffer for Redis
     const embeddingBuffer = Buffer.from(new Float32Array(doc.embedding).buffer);
-    
+
     await this.redis.hset(
       key,
-      'content', doc.content,
-      'source', doc.metadata.source,
-      'chunk_index', doc.metadata.chunk_index.toString(),
-      'total_chunks', doc.metadata.total_chunks.toString(),
-      'timestamp', doc.metadata.timestamp.toString(),
-      'embedding', embeddingBuffer
+      'content',
+      doc.content,
+      'source',
+      doc.metadata.source,
+      'chunk_index',
+      doc.metadata.chunk_index.toString(),
+      'total_chunks',
+      doc.metadata.total_chunks.toString(),
+      'timestamp',
+      doc.metadata.timestamp.toString(),
+      'embedding',
+      embeddingBuffer,
     );
   }
 
@@ -180,31 +196,38 @@ export class DocumentVectorizer {
     console.log('Starting document vectorization...');
     const documents = await this.readDocumentFiles(docsPath);
     console.log(`Found ${documents.length} documents to process`);
-    
+
     let totalChunks = 0;
-    
+
     for (const doc of documents) {
       console.log(`Processing: ${doc.path}`);
       const vectorDocs = await this.vectorizeDocument(doc.path, doc.content);
-      
+
       for (const vectorDoc of vectorDocs) {
         await this.storeVectorDocument(vectorDoc);
         totalChunks++;
       }
-      
+
       console.log(`  - Created ${vectorDocs.length} chunks`);
     }
-    
-    console.log(`\nVectorization complete! Processed ${totalChunks} total chunks`);
+
+    console.log(
+      `\nVectorization complete! Processed ${totalChunks} total chunks`,
+    );
   }
 
-  async searchSimilarDocuments(query: string, topK: number = 5): Promise<SearchResult[]> {
+  async searchSimilarDocuments(
+    query: string,
+    topK: number = 5,
+  ): Promise<SearchResult[]> {
     // Create embedding for the query
     const queryEmbedding = await this.createEmbedding(query);
-    const embeddingBuffer = Buffer.from(new Float32Array(queryEmbedding).buffer);
-    
+    const embeddingBuffer = Buffer.from(
+      new Float32Array(queryEmbedding).buffer,
+    );
+
     // Perform vector similarity search
-    const results = await this.redis.call(
+    const results = (await this.redis.call(
       'FT.SEARCH',
       'idx:docs',
       `*=>[KNN ${topK} @embedding $BLOB AS score]`,
@@ -221,35 +244,35 @@ export class DocumentVectorizer {
       'SORTBY',
       'score',
       'DIALECT',
-      '2'
-    ) as any[];
-    
+      '2',
+    )) as any[];
+
     // Parse results
     const documents: SearchResult[] = [];
-    
+
     // Check if results exist and have proper format
     if (!results || results.length < 2) {
       return documents;
     }
-    
+
     // First element is total count, skip it and parse actual results
     for (let i = 2; i < results.length; i += 2) {
       const fields = results[i + 1];
       if (!fields || !Array.isArray(fields)) {
         continue;
       }
-      
+
       const doc: SearchResult = {} as SearchResult;
-      
+
       for (let j = 0; j < fields.length; j += 2) {
         if (fields[j] && fields[j + 1] !== undefined) {
           doc[fields[j] as keyof SearchResult] = fields[j + 1];
         }
       }
-      
+
       documents.push(doc);
     }
-    
+
     return documents;
   }
 

@@ -3,14 +3,16 @@ import { ConfigService } from '@nestjs/config';
 import { GameContext } from './interfaces/bot.interface';
 import { z } from 'zod';
 import { getSystemPrompt } from './prompts/system.prompt';
-import { 
-  getChatDecisionPrompt, 
+import {
+  getChatDecisionPrompt,
   getTurnSummaryPrompt,
   getDefaultChatDecision,
-  getDefaultAction 
+  getDefaultAction,
 } from './prompts/prompts';
-import { convertItemCodeToKorean, ITEM_CODE_TO_KOREAN } from './constants/item-mappings';
-
+import {
+  convertItemCodeToKorean,
+  ITEM_CODE_TO_KOREAN,
+} from './constants/item-mappings';
 
 /**
  * GameContext를 한글로 변환하는 헬퍼 함수
@@ -19,9 +21,16 @@ function convertContextToKorean(context: GameContext) {
   return {
     ...context,
     // 아이템명을 한글로 변환
-    currentItems: context.currentItems.map(item => convertItemCodeToKorean(item) || item),
+    currentItems: context.currentItems.map(
+      (item) => convertItemCodeToKorean(item) || item,
+    ),
     // 역할을 한글로 변환
-    role: context.role === 'survivor' ? '생존자' : context.role === 'host' ? '숙주' : context.role
+    role:
+      context.role === 'survivor'
+        ? '생존자'
+        : context.role === 'host'
+          ? '숙주'
+          : context.role,
   };
 }
 import { LLMProvider } from './llm-providers/llm-provider.interface';
@@ -33,10 +42,12 @@ import * as path from 'path';
 const ChatDecisionSchema = z.object({
   shouldChat: z.boolean(),
   message: z.string().optional(),
-  additionalAction: z.object({
-    action: z.string(),
-    params: z.record(z.any()),
-  }).optional(),
+  additionalAction: z
+    .object({
+      action: z.string(),
+      params: z.record(z.any()),
+    })
+    .optional(),
   reasoning: z.string().optional(),
 });
 
@@ -62,9 +73,9 @@ export class LLMService implements OnModuleInit {
    */
   private convertEnglishItemCodesToKorean(text: string): string {
     if (!text) return text;
-    
+
     let convertedText = text;
-    
+
     // 모든 영어 아이템 코드를 한글로 변환
     Object.entries(ITEM_CODE_TO_KOREAN).forEach(([code, koreanName]) => {
       if (koreanName && convertedText.includes(code)) {
@@ -73,7 +84,7 @@ export class LLMService implements OnModuleInit {
         convertedText = convertedText.replace(regex, koreanName);
       }
     });
-    
+
     return convertedText;
   }
 
@@ -94,7 +105,7 @@ export class LLMService implements OnModuleInit {
       return {
         ...action,
         action: 'myStatus.next',
-        params: { location: action.params.location }
+        params: { location: action.params.location },
       };
     }
 
@@ -104,17 +115,21 @@ export class LLMService implements OnModuleInit {
       return {
         ...action,
         action: 'myStatus.act',
-        params: { action: action.params.action }
+        params: { action: action.params.action },
       };
     }
 
     // hostAct를 hostAct.infect로 수정 (params에 target이 있는 경우)
-    if (action.action === 'hostAct' && action.params?.target && !action.params?.zombies) {
+    if (
+      action.action === 'hostAct' &&
+      action.params?.target &&
+      !action.params?.zombies
+    ) {
       this.logger.warn(`액션 형식 수정: hostAct -> hostAct.infect`);
       return {
         ...action,
         action: 'hostAct.infect',
-        params: { target: action.params.target }
+        params: { target: action.params.target },
       };
     }
 
@@ -124,17 +139,19 @@ export class LLMService implements OnModuleInit {
       return {
         ...action,
         action: 'hostAct.zombieList',
-        params: { zombies: action.params.zombies }
+        params: { zombies: action.params.zombies },
       };
     }
 
     // params 내부의 중첩된 구조 수정
     if (action.action === 'myStatus' && action.params?.next?.location) {
-      this.logger.warn(`액션 형식 수정: myStatus (중첩된 next) -> myStatus.next`);
+      this.logger.warn(
+        `액션 형식 수정: myStatus (중첩된 next) -> myStatus.next`,
+      );
       return {
         ...action,
         action: 'myStatus.next',
-        params: { location: action.params.next.location }
+        params: { location: action.params.next.location },
       };
     }
 
@@ -147,7 +164,9 @@ export class LLMService implements OnModuleInit {
       if (this.llmProvider && (await this.llmProvider.isAvailable())) {
         this.logger.log('LLM 서비스 초기화 완료');
       } else {
-        this.logger.warn('LLM 서비스를 사용할 수 없습니다. 기본 응답을 사용합니다.');
+        this.logger.warn(
+          'LLM 서비스를 사용할 수 없습니다. 기본 응답을 사용합니다.',
+        );
       }
     } catch (error) {
       this.logger.error('LLM 서비스 초기화 실패:', error);
@@ -171,7 +190,9 @@ export class LLMService implements OnModuleInit {
         messages: [
           {
             role: 'system' as const,
-            content: getSystemPrompt(context) + '\n\n【IMPORTANT】JSON 응답은 반드시 한글로 작성하세요. location은 "해안", "폐건물", "정글", "동굴", "산 정상", "개울" 중 하나여야 합니다. 아이템명도 반드시 한글로 사용하세요.',
+            content:
+              getSystemPrompt(context) +
+              '\n\n【IMPORTANT】JSON 응답은 반드시 한글로 작성하세요. location은 "해안", "폐건물", "정글", "동굴", "산 정상", "개울" 중 하나여야 합니다. 아이템명도 반드시 한글로 사용하세요.',
           },
           {
             role: 'user' as const,
@@ -192,11 +213,11 @@ export class LLMService implements OnModuleInit {
       const detailedLog = {
         llmInput,
         gameContext: contextForLog,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
       await fs.appendFile(
         path.join(process.cwd(), 'logs', 'llm.txt'),
-        `\n[decideChatMessage] DETAILED_INPUT: ${JSON.stringify(detailedLog, null, 2)}\nOUTPUT: ${content}\n`
+        `\n[decideChatMessage] DETAILED_INPUT: ${JSON.stringify(detailedLog, null, 2)}\nOUTPUT: ${content}\n`,
       );
 
       if (!content) {
@@ -207,54 +228,69 @@ export class LLMService implements OnModuleInit {
       try {
         // 영어 아이템 코드를 한글로 변환
         const convertedContent = this.convertEnglishItemCodesToKorean(content);
-        
+
         // JSON 응답 파싱 시도
         let parsed;
         try {
           parsed = JSON.parse(convertedContent);
         } catch (jsonError) {
           // JSON 파싱 실패 시 코드 블록 추출 시도
-          const jsonMatch = convertedContent.match(/```(?:json)?\s*({[\s\S]*?})\s*```/);
+          const jsonMatch = convertedContent.match(
+            /```(?:json)?\s*({[\s\S]*?})\s*```/,
+          );
           if (jsonMatch) {
             parsed = JSON.parse(jsonMatch[1]);
           } else {
             throw jsonError;
           }
         }
-        
+
         // 채팅 메시지에서도 영어 아이템 코드를 한글로 변환
         if (parsed.message) {
           parsed.message = this.convertEnglishItemCodesToKorean(parsed.message);
         }
-        
+
         // additionalAction의 content 파라미터도 변환 (마이크, 무전기, 낙서 등)
-        if (parsed.additionalAction && parsed.additionalAction.params && parsed.additionalAction.params.content) {
-          parsed.additionalAction.params.content = this.convertEnglishItemCodesToKorean(parsed.additionalAction.params.content);
+        if (
+          parsed.additionalAction &&
+          parsed.additionalAction.params &&
+          parsed.additionalAction.params.content
+        ) {
+          parsed.additionalAction.params.content =
+            this.convertEnglishItemCodesToKorean(
+              parsed.additionalAction.params.content,
+            );
         }
-        
+
         // additionalAction이 있으면 형식 수정
         if (parsed.additionalAction) {
-          parsed.additionalAction = this.fixActionFormat(parsed.additionalAction);
+          parsed.additionalAction = this.fixActionFormat(
+            parsed.additionalAction,
+          );
         }
-        
+
         const validated = ChatDecisionSchema.safeParse(parsed);
         if (!validated.success) {
-          this.logger.warn(`LLM 채팅 결정 스키마 검증 실패: ${JSON.stringify(validated.error.issues)}`);
+          this.logger.warn(
+            `LLM 채팅 결정 스키마 검증 실패: ${JSON.stringify(validated.error.issues)}`,
+          );
           this.logger.warn(`검증 실패한 응답: ${JSON.stringify(parsed)}`);
-          
+
           // 부분적으로 유효한 응답 처리
           if (parsed && typeof parsed.shouldChat === 'boolean') {
             return {
               shouldChat: parsed.shouldChat,
               message: parsed.message || undefined,
               additionalAction: parsed.additionalAction || undefined,
-              reasoning: parsed.reasoning || undefined
+              reasoning: parsed.reasoning || undefined,
             };
           }
-          
+
           return getDefaultChatDecision(context);
         }
-        this.logger.log(`채팅 결정 완료: ${validated.data.shouldChat ? '채팅함' : '채팅안함'}`);
+        this.logger.log(
+          `채팅 결정 완료: ${validated.data.shouldChat ? '채팅함' : '채팅안함'}`,
+        );
         return validated.data;
       } catch (parseError) {
         this.logger.warn(`LLM 채팅 결정 파싱 실패: ${parseError.message}`);
@@ -266,7 +302,6 @@ export class LLMService implements OnModuleInit {
       return getDefaultChatDecision(context);
     }
   }
-
 
   /**
    * 턴 요약
@@ -284,7 +319,8 @@ export class LLMService implements OnModuleInit {
         messages: [
           {
             role: 'system' as const,
-            content: '당신은 숙주 추리 게임의 상황을 요약하는 AI입니다.\n\n【게임 설명】\n- 숙주 추리 게임: 생존자들이 숨어있는 숙주를 찾아 백신으로 치료해야 하는 게임\n- 숙주는 생존자들을 감염시켜 좀비로 만들려 하고, 생존자들은 협력하여 백신 재료를 모아 숙주를 치료해야 함\n- 5턴부터 좀비가 등장하며, 좀비가 된 플레이어의 5턴 전 위치를 통해 숙주를 추리할 수 있음\n\n【IMPORTANT】\n- 요약은 한글로 작성하세요\n- JSON 형식이 아닌 일반 텍스트로 작성하세요\n- 간결하고 핵심적인 내용만 포함하세요',
+            content:
+              '당신은 숙주 추리 게임의 상황을 요약하는 AI입니다.\n\n【게임 설명】\n- 숙주 추리 게임: 생존자들이 숨어있는 숙주를 찾아 백신으로 치료해야 하는 게임\n- 숙주는 생존자들을 감염시켜 좀비로 만들려 하고, 생존자들은 협력하여 백신 재료를 모아 숙주를 치료해야 함\n- 5턴부터 좀비가 등장하며, 좀비가 된 플레이어의 5턴 전 위치를 통해 숙주를 추리할 수 있음\n\n【IMPORTANT】\n- 요약은 한글로 작성하세요\n- JSON 형식이 아닌 일반 텍스트로 작성하세요\n- 간결하고 핵심적인 내용만 포함하세요',
           },
           {
             role: 'user' as const,
@@ -300,11 +336,11 @@ export class LLMService implements OnModuleInit {
       const detailedLog = {
         llmInput,
         gameContext: events,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
       await fs.appendFile(
         path.join(process.cwd(), 'logs', 'llm.txt'),
-        `\n[summarizeTurn] DETAILED_INPUT: ${JSON.stringify(detailedLog, null, 2)}\nOUTPUT: ${content}\n`
+        `\n[summarizeTurn] DETAILED_INPUT: ${JSON.stringify(detailedLog, null, 2)}\nOUTPUT: ${content}\n`,
       );
 
       if (!content || content.trim() === '') {

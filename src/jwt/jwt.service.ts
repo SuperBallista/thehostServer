@@ -16,45 +16,62 @@ export class JwtService {
     private readonly jwtService: NestJwtService,
     private readonly configService: ConfigService,
   ) {
-    console.log('JWT_ACCESS_SECRET 존재 여부:', !!this.configService.get<string>('JWT_ACCESS_SECRET'));
-    console.log('ACCESS_EXPIRE_MINUTES 존재 여부:', !!this.configService.get<number>('ACCESS_EXPIRE_MINUTES'));  
+    console.log(
+      'JWT_ACCESS_SECRET 존재 여부:',
+      !!this.configService.get<string>('JWT_ACCESS_SECRET'),
+    );
+    console.log(
+      'ACCESS_EXPIRE_MINUTES 존재 여부:',
+      !!this.configService.get<number>('ACCESS_EXPIRE_MINUTES'),
+    );
   }
 
   async generateAccessToken(userId: number, nickname: string): Promise<string> {
-    const accessExpireMinutes = this.configService.get<number>('ACCESS_EXPIRE_MINUTES');
-    
+    const accessExpireMinutes = this.configService.get<number>(
+      'ACCESS_EXPIRE_MINUTES',
+    );
+
     const payload: AuthClaims = {
       userId,
       nickname,
     };
-    
-    return encodeURIComponent(await this.jwtService.signAsync(payload, {
-      secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
-      expiresIn: `${accessExpireMinutes}m`,
-    }));
+
+    return encodeURIComponent(
+      await this.jwtService.signAsync(payload, {
+        secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+        expiresIn: `${accessExpireMinutes}m`,
+      }),
+    );
   }
 
-  async generateRefreshToken(userId: number, nickname: string): Promise<string> {
-    const refreshExpireDays = this.configService.get<number>('REFRESH_EXPIRE_DAYS');
-    
+  async generateRefreshToken(
+    userId: number,
+    nickname: string,
+  ): Promise<string> {
+    const refreshExpireDays = this.configService.get<number>(
+      'REFRESH_EXPIRE_DAYS',
+    );
+
     const payload: AuthClaims = {
       userId,
       nickname,
     };
-    
-    return encodeURIComponent(await this.jwtService.signAsync(payload, {
-      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: `${refreshExpireDays}d`,
-    }));
+
+    return encodeURIComponent(
+      await this.jwtService.signAsync(payload, {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        expiresIn: `${refreshExpireDays}d`,
+      }),
+    );
   }
 
   async parseAccessToken(tokenStr: string): Promise<AuthClaims> {
-    tokenStr = decodeURIComponent(tokenStr)
+    tokenStr = decodeURIComponent(tokenStr);
     try {
       const payload = await this.jwtService.verifyAsync<AuthClaims>(tokenStr, {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
       });
-      
+
       return payload;
     } catch (error) {
       throw new Error('Invalid access token');
@@ -62,12 +79,12 @@ export class JwtService {
   }
 
   async parseRefreshToken(tokenStr: string): Promise<AuthClaims> {
-    tokenStr = decodeURIComponent(tokenStr)
+    tokenStr = decodeURIComponent(tokenStr);
     try {
       const payload = await this.jwtService.verifyAsync<AuthClaims>(tokenStr, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       });
-      
+
       return payload;
     } catch (error) {
       throw new Error('Invalid refresh token');
@@ -76,22 +93,29 @@ export class JwtService {
 
   async generateTempToken(oauthId: string, provider: string): Promise<string> {
     const tempTokenExpireMinutes = 10; // 10분짜리 임시 토큰
-  
+
     const payload = {
       oauthId,
       provider,
     };
-  
-    return encodeURIComponent(await this.jwtService.signAsync(payload, {
-      secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
-      expiresIn: `${tempTokenExpireMinutes}m`,
-    }));
+
+    return encodeURIComponent(
+      await this.jwtService.signAsync(payload, {
+        secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+        expiresIn: `${tempTokenExpireMinutes}m`,
+      }),
+    );
   }
-  
-  async parseTempToken(tokenStr: string): Promise<{ oauthId: string; provider: string }> {
-    tokenStr = decodeURIComponent(tokenStr)
+
+  async parseTempToken(
+    tokenStr: string,
+  ): Promise<{ oauthId: string; provider: string }> {
+    tokenStr = decodeURIComponent(tokenStr);
     try {
-      const payload = await this.jwtService.verifyAsync<{ oauthId: string; provider: string }>(tokenStr, {
+      const payload = await this.jwtService.verifyAsync<{
+        oauthId: string;
+        provider: string;
+      }>(tokenStr, {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
       });
       return payload;
@@ -99,5 +123,4 @@ export class JwtService {
       throw new Error('Invalid temp token');
     }
   }
-  
 }

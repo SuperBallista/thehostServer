@@ -1,5 +1,10 @@
 // auth/guards/jwt-auth.guard.ts
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '../jwt.service';
 
 @Injectable()
@@ -18,13 +23,13 @@ export class JwtAuthGuard implements CanActivate {
 
     try {
       const claims = await this.jwtService.parseAccessToken(tokenStr);
-      
+
       // 사용자 정보를 request 객체에 저장
       request.user = {
         userId: claims.userId,
         nickname: claims.nickname,
       };
-      
+
       return true;
     } catch (error) {
       throw new UnauthorizedException(error.message);

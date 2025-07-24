@@ -6,11 +6,7 @@ import { GameModule } from './game.module';
 import { UserConnectionModule } from './user-connection.module';
 
 @Module({
-  imports: [
-    LobbyModule,
-    GameModule,
-    UserConnectionModule,
-  ],
+  imports: [LobbyModule, GameModule, UserConnectionModule],
   providers: [SocketGateway],
 })
 export class SocketModule {}

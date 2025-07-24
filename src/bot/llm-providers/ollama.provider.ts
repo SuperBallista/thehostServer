@@ -5,7 +5,7 @@ import { LLMProvider, LLMCompletionParams } from './llm-provider.interface';
 export class OllamaProvider implements LLMProvider {
   constructor(
     private apiUrl: string = 'http://localhost:11434',
-    private model: string = 'llama2'
+    private model: string = 'llama2',
   ) {}
 
   async generateCompletion(params: LLMCompletionParams): Promise<string> {

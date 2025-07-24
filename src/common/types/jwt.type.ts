@@ -1,5 +1,4 @@
 export interface UserTypeDecorater {
-    userId: number;
-    nickname: string;
-  }
-  
+  userId: number;
+  nickname: string;
+}

@@ -10,4 +10,3 @@ export function getOrderRandom<T>(array: T[]): T[] {
   }
   return result;
 }
-

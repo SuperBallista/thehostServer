@@ -8,10 +8,7 @@ import { GameModule } from '../socket/game.module';
 import { RedisModule } from '../redis/redis.module';
 
 @Module({
-  imports: [
-    forwardRef(() => GameModule),
-    RedisModule,
-  ],
+  imports: [forwardRef(() => GameModule), RedisModule],
   providers: [
     BotService,
     ActionService,

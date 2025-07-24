@@ -13,29 +13,37 @@ export class LLMProviderFactory {
 
   createProvider(): LLMProvider {
     const config = this.getLLMConfig();
-    
-    this.logger.log(`LLM 프로바이더 생성: ${config.provider} (모델: ${config.model})`);
+
+    this.logger.log(
+      `LLM 프로바이더 생성: ${config.provider} (모델: ${config.model})`,
+    );
 
     switch (config.provider) {
       case 'openai':
         return new OpenAIProvider(config.apiKey || '', config.model);
-      
+
       case 'ollama':
         return new OllamaProvider(config.apiUrl, config.model);
-      
+
       case 'openrouter':
         return new OpenRouterProvider(config.apiKey || '', config.model);
-      
+
       default:
         throw new Error(`지원하지 않는 LLM 프로바이더: ${config.provider}`);
     }
   }
 
   private getLLMConfig(): LLMConfig {
-    const provider = this.configService.get<string>('LLM_PROVIDER', 'ollama') as any;
+    const provider = this.configService.get<string>(
+      'LLM_PROVIDER',
+      'ollama',
+    ) as any;
     const apiKey = this.configService.get<string>('LLM_API_KEY');
     const apiUrl = this.configService.get<string>('LLM_API_URL');
-    const model = this.configService.get<string>('LLM_MODEL', this.getDefaultModel(provider));
+    const model = this.configService.get<string>(
+      'LLM_MODEL',
+      this.getDefaultModel(provider),
+    );
     const temperature = this.configService.get<number>('LLM_TEMPERATURE', 0.7);
     const maxTokens = this.configService.get<number>('LLM_MAX_TOKENS', 1000);
 

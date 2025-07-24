@@ -1,11 +1,11 @@
-import { State } from "./payload.types";
+import { State } from './payload.types';
 
-export interface LocationState{
+export interface LocationState {
   state: State;
   roomId?: string;
 }
 
-export interface userShortInfo{
-nickname: string;
-id: number;
+export interface userShortInfo {
+  nickname: string;
+  id: number;
 }

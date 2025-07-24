@@ -13,7 +13,7 @@ export enum InternalUpdateType {
   PLAYER_STATUS = 'PLAYER_STATUS',
   TURN_UPDATE = 'TURN_UPDATE',
   CHAT_MESSAGE = 'CHAT_MESSAGE',
-  TURN_END = 'TURN_END'
+  TURN_END = 'TURN_END',
 }
 
 /**
@@ -30,9 +30,9 @@ export interface InternalMessage {
 /**
  * 메시지 데이터 타입
  */
-export type InternalMessageData = 
+export type InternalMessageData =
   | RoomListUpdateData
-  | RoomDataUpdateData  
+  | RoomDataUpdateData
   | RoomDeleteData
   | GameStartData
   | UserLocationData
@@ -99,12 +99,14 @@ export interface TurnEndData {
  * pub/sub 메시지 생성 헬퍼 함수들
  */
 export class InternalMessageBuilder {
-  
-  static roomListUpdate(roomId: string, action: 'create' | 'update' | 'delete'): InternalMessage {
+  static roomListUpdate(
+    roomId: string,
+    action: 'create' | 'update' | 'delete',
+  ): InternalMessage {
     return {
       type: InternalUpdateType.ROOM_LIST,
       data: { roomId, action },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
@@ -113,7 +115,7 @@ export class InternalMessageBuilder {
       type: InternalUpdateType.ROOM_DATA,
       data: { roomId, roomData },
       targetRoomId: roomId,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
@@ -122,51 +124,74 @@ export class InternalMessageBuilder {
       type: InternalUpdateType.ROOM_DELETE,
       data: { roomId, kickedUserIds },
       targetRoomId: roomId,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
-  static gameStart(roomId: string, gameId: string, playerIds: number[]): InternalMessage {
+  static gameStart(
+    roomId: string,
+    gameId: string,
+    playerIds: number[],
+  ): InternalMessage {
     return {
       type: InternalUpdateType.GAME_START,
       data: { roomId, gameId, playerIds },
       targetRoomId: roomId,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
-  static userLocation(userId: number, locationState: string, roomId?: string): InternalMessage {
+  static userLocation(
+    userId: number,
+    locationState: string,
+    roomId?: string,
+  ): InternalMessage {
     return {
       type: InternalUpdateType.USER_LOCATION,
       data: { userId, locationState, roomId },
       targetUserId: userId,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
-  static playerStatus(gameId: string, playerId: number, status: Partial<userDataResponse>, targetPlayerId?: number): InternalMessage {
+  static playerStatus(
+    gameId: string,
+    playerId: number,
+    status: Partial<userDataResponse>,
+    targetPlayerId?: number,
+  ): InternalMessage {
     return {
       type: InternalUpdateType.PLAYER_STATUS,
       data: { gameId, playerId, status, targetPlayerId },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
-  static turnUpdate(gameId: string, event: string, additionalData?: Partial<TurnUpdateData>): InternalMessage {
+  static turnUpdate(
+    gameId: string,
+    event: string,
+    additionalData?: Partial<TurnUpdateData>,
+  ): InternalMessage {
     return {
       type: InternalUpdateType.TURN_UPDATE,
       data: { gameId, event, ...additionalData },
       targetRoomId: gameId,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
-  static chatMessage(gameId: string, playerId: number, message: string, region: number, system: boolean = false): InternalMessage {
+  static chatMessage(
+    gameId: string,
+    playerId: number,
+    message: string,
+    region: number,
+    system: boolean = false,
+  ): InternalMessage {
     return {
       type: InternalUpdateType.CHAT_MESSAGE,
       data: { gameId, playerId, message, region, system },
       targetRoomId: gameId,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 }

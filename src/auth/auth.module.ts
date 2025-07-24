@@ -10,13 +10,9 @@ import { TagService } from 'src/user/tag/tag.service';
 import { EncryptionService } from 'src/common/utils/encryption.service';
 
 @Module({
-  imports: [
-    ConfigModule,
-    UserModule,
-    JwtModule,
-    ],
+  imports: [ConfigModule, UserModule, JwtModule],
   controllers: [AuthController],
-  providers: [AuthService, GoogleOAuthProvider,TagService, EncryptionService],
+  providers: [AuthService, GoogleOAuthProvider, TagService, EncryptionService],
   exports: [AuthService],
 })
 export class AuthModule {}

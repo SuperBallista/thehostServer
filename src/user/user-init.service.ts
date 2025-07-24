@@ -15,7 +15,7 @@ export class UserInitService implements OnModuleInit {
       // users 테이블 존재 여부 확인 (information_schema 사용)
       const result = await connection.query(
         `SELECT COUNT(*) as count FROM information_schema.tables 
-         WHERE table_schema = DATABASE() AND table_name = 'users'`
+         WHERE table_schema = DATABASE() AND table_name = 'users'`,
       );
 
       const tableExists = result[0][0].count > 0;

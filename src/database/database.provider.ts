@@ -16,13 +16,13 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
       const username = this.configService.get<string>('DB_USERNAME');
       const password = this.configService.get<string>('DB_PASSWORD');
       const database = this.configService.get<string>('DB_DATABASE');
-      
+
       if (!host || !username || !password || !database) {
         throw new Error('Database configuration is incomplete');
       }
-      
+
       console.log(`>>> Connecting to MySQL at ${host}:${port}`);
-      
+
       this.connection = await mysql.createConnection({
         host,
         port,
@@ -30,7 +30,7 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
         password,
         database,
       });
-      
+
       // 연결 테스트
       await this.connection.query('SELECT 1');
       console.log('✅ MySQL connected successfully');
@@ -51,7 +51,10 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
     return this.connection;
   }
 
-  async query<T = mysql.RowDataPacket[]>(sql: string, params?: (string | number | boolean | null)[]): Promise<T> {
+  async query<T = mysql.RowDataPacket[]>(
+    sql: string,
+    params?: (string | number | boolean | null)[],
+  ): Promise<T> {
     const [rows] = await this.connection.query(sql, params);
     return rows as T;
   }

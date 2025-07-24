@@ -1,5 +1,16 @@
 // auth/auth.controller.ts
-import { Controller, Get, Post, Req, Res, Query, UseGuards, HttpStatus, Redirect, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Req,
+  Res,
+  Query,
+  UseGuards,
+  HttpStatus,
+  Redirect,
+  Body,
+} from '@nestjs/common';
 import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../jwt/guards/jwt-auth.guard';
@@ -10,13 +21,10 @@ import { ConfigService } from '@nestjs/config';
 
 @Controller('auth')
 export class AuthController {
-
   constructor(
     private readonly authService: AuthService,
-    private readonly configService: ConfigService
-  ) {
-   
-  }
+    private readonly configService: ConfigService,
+  ) {}
 
   @Get('google/login')
   @Redirect()
@@ -26,13 +34,10 @@ export class AuthController {
   }
 
   @Get('google/callback')
-  async googleCallback(
-    @Query('code') code: string,
-    @Res() res: Response,
-  ) {
-      const {refreshToken , url } = await this.authService.authCallbackFlow(code)
+  async googleCallback(@Query('code') code: string, @Res() res: Response) {
+    const { refreshToken, url } = await this.authService.authCallbackFlow(code);
 
-    if (refreshToken){
+    if (refreshToken) {
       // ✅ 기존 계정인 경우: 리프레시 토큰 쿠키 설정
       res.cookie('refresh_token', refreshToken, {
         httpOnly: true,
@@ -41,17 +46,17 @@ export class AuthController {
         expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       });
     }
-      // ✅ 기존 유저: 닉네임 유무와 관계없이
-      return res.redirect(url)
-}
+    // ✅ 기존 유저: 닉네임 유무와 관계없이
+    return res.redirect(url);
+  }
 
   @Post('refresh')
   async refreshToken(@Req() req: Request, @Res() res: Response) {
-      const { token, user } = await this.authService.handleRefreshToken(req);
-      return res.json({
-        token,
-        user,
-      });
+    const { token, user } = await this.authService.handleRefreshToken(req);
+    return res.json({
+      token,
+      user,
+    });
   }
 
   @Get('me')
@@ -79,19 +84,21 @@ export class AuthController {
   @Post('nickname')
   async setNickname(
     @Res() res: Response,
-    @CurrentUser() user: UserTypeDecorater, 
-    @Body() body: changeNicknameInfo
+    @CurrentUser() user: UserTypeDecorater,
+    @Body() body: changeNicknameInfo,
   ) {
-    const { url, refreshToken } = await this.authService.createNewNickname(body, user);
-  
+    const { url, refreshToken } = await this.authService.createNewNickname(
+      body,
+      user,
+    );
+
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
       secure: this.configService.get<string>('LOCAL_TEST') !== 'true',
       sameSite: 'strict',
       path: '/',
     });
-  
+
     return res.json({ url });
   }
-  
 }

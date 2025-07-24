@@ -14,7 +14,10 @@ export class UserService {
   ) {}
 
   // ✅ 1. 계정 조회
-  async findUserByOAuthId(oauthId: string, provider: string): Promise<UserDto | null> {
+  async findUserByOAuthId(
+    oauthId: string,
+    provider: string,
+  ): Promise<UserDto | null> {
     // Redis 캐시 확인
     const cached = await this.userCache.getUserByOAuth(provider, oauthId);
     if (cached) return cached;
@@ -61,7 +64,6 @@ export class UserService {
     return newUser;
   }
 
-
   async findById(userId: number): Promise<UserDto> {
     const cached = await this.userCache.getUser(userId);
     if (cached) return cached;
@@ -75,7 +77,7 @@ export class UserService {
     if (user.encryptedNickname && user.ivNickname) {
       user.nickname = this.encryptionService.decryptNickname(
         user.encryptedNickname,
-        user.ivNickname
+        user.ivNickname,
       );
     }
 
@@ -84,38 +86,47 @@ export class UserService {
   }
 
   // user.service.ts
-async cacheTemporaryUser(provider: string, oauthId: string): Promise<void> {
-  const redisClient = this.userCache.getClient(); // 내부에 redisService.getClient() 래핑돼 있으면 좋음
-  const key = `temp_user:${provider}:${oauthId}`;
+  async cacheTemporaryUser(provider: string, oauthId: string): Promise<void> {
+    const redisClient = this.userCache.getClient(); // 내부에 redisService.getClient() 래핑돼 있으면 좋음
+    const key = `temp_user:${provider}:${oauthId}`;
 
-  const data = {
-    oauth_id: oauthId,
-    provider,
-    created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
-  };
+    const data = {
+      oauth_id: oauthId,
+      provider,
+      created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+    };
 
-  await redisClient.hset(key, data);
-  await redisClient.expire(key, 60 * 30); // 30분 유효
-}
-
-async getTemporaryUser(provider: string, oauthId: string): Promise<{ oauth_id: string; provider: string } | null> {
-  const redisClient = this.userCache.getClient();
-  const key = `temp_user:${provider}:${oauthId}`;
-
-  const result = await redisClient.hgetall(key);
-  if (!result || Object.keys(result).length === 0) {
-    return null;
+    await redisClient.hset(key, data);
+    await redisClient.expire(key, 60 * 30); // 30분 유효
   }
 
-  return {
-    oauth_id: result.oauth_id,
-    provider: result.provider,
-  };
-}
- async addNewAccount(oauthId:string, provider:string, nickname:string){
-  const nickname_hash = await this.encryptionService.hashString(nickname)
-  const {encrypted, iv } = await this.encryptionService.encryptNickname(nickname)
-   return await this.createUser(oauthId, provider, nickname_hash,encrypted,iv)
-      }
+  async getTemporaryUser(
+    provider: string,
+    oauthId: string,
+  ): Promise<{ oauth_id: string; provider: string } | null> {
+    const redisClient = this.userCache.getClient();
+    const key = `temp_user:${provider}:${oauthId}`;
 
+    const result = await redisClient.hgetall(key);
+    if (!result || Object.keys(result).length === 0) {
+      return null;
+    }
+
+    return {
+      oauth_id: result.oauth_id,
+      provider: result.provider,
+    };
+  }
+  async addNewAccount(oauthId: string, provider: string, nickname: string) {
+    const nickname_hash = await this.encryptionService.hashString(nickname);
+    const { encrypted, iv } =
+      await this.encryptionService.encryptNickname(nickname);
+    return await this.createUser(
+      oauthId,
+      provider,
+      nickname_hash,
+      encrypted,
+      iv,
+    );
+  }
 }

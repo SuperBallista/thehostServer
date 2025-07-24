@@ -8,13 +8,20 @@ export class GoogleOAuthProvider {
   private readonly clientId: string;
   private readonly clientSecret: string;
   private readonly scopes: string[];
-  private readonly authUrl: string = 'https://accounts.google.com/o/oauth2/auth';
+  private readonly authUrl: string =
+    'https://accounts.google.com/o/oauth2/auth';
   private readonly tokenUrl: string = 'https://oauth2.googleapis.com/token';
 
   constructor(private readonly configService: ConfigService) {
-    this.redirectUrl = this.configService.get<string>('GOOGLE_REDIRECT_URL') as string;
-    this.clientId = this.configService.get<string>('GOOGLE_CLIENT_ID') as string;
-    this.clientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET') as string;
+    this.redirectUrl = this.configService.get<string>(
+      'GOOGLE_REDIRECT_URL',
+    ) as string;
+    this.clientId = this.configService.get<string>(
+      'GOOGLE_CLIENT_ID',
+    ) as string;
+    this.clientSecret = this.configService.get<string>(
+      'GOOGLE_CLIENT_SECRET',
+    ) as string;
     this.scopes = [
       'https://www.googleapis.com/auth/userinfo.email',
       'https://www.googleapis.com/auth/userinfo.profile',
