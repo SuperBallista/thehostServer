@@ -227,6 +227,11 @@ export class LLMService implements OnModuleInit {
           parsed.message = this.convertEnglishItemCodesToKorean(parsed.message);
         }
         
+        // additionalAction의 content 파라미터도 변환 (마이크, 무전기, 낙서 등)
+        if (parsed.additionalAction && parsed.additionalAction.params && parsed.additionalAction.params.content) {
+          parsed.additionalAction.params.content = this.convertEnglishItemCodesToKorean(parsed.additionalAction.params.content);
+        }
+        
         // additionalAction이 있으면 형식 수정
         if (parsed.additionalAction) {
           parsed.additionalAction = this.fixActionFormat(parsed.additionalAction);

@@ -13,6 +13,7 @@ import { ZombieState } from './zombie.service';
 import { userDataResponse } from '../payload.types';
 import { LLMService } from '../../bot/llm.service';
 import { MemoryService } from '../../bot/memory.service';
+import { GameTurnService } from './gameTurn.service';
 
 const ANIMAL_NICKNAMES = [
   '호랑이', '사자', '곰', '늑대', '여우', '토끼', '사슴', '다람쥐', '코끼리', '기린',
@@ -33,6 +34,7 @@ export class TurnProcessorService {
     private readonly llmService: LLMService,
     private readonly memoryService: MemoryService,
     private readonly gameStateService: GameStateService,
+    private readonly gameTurnService: GameTurnService,
   ) {}
 
   /**
@@ -360,8 +362,8 @@ export class TurnProcessorService {
     // 봇의 턴 시작 세팅
     await this.botService.handleTurnStart(gameId);
     
-    // 턴 시작 처리는 gameTurnService에서 직접 처리됨 (순환 참조 방지)
-    // await this.gameTurnService.onTurnStart(gameId, gameData.turn);
+    // 턴 시작 처리 (아이템 지급 등)
+    await this.gameTurnService.onTurnStart(gameId, gameData.turn);
     
     // 턴 시간 설정 (1-4턴: 60초, 5턴+: 90초)
     const turnDuration = gameData.turn <= 4 ? 60 : 90;
@@ -579,104 +581,5 @@ export class TurnProcessorService {
     }, 3000);
   }
 
-  /**
-   * 턴 요약을 순차적으로 생성 (15초 전부터 호출)
-   */
-  async generateTurnSummariesSequentially(gameId: string): Promise<void> {
-    try {
-      console.log(`[TurnProcessor] 순차적 턴 요약 생성 시작 - gameId: ${gameId}`);
-      
-      // 봇 플레이어들 조회
-      const botPlayers = await this.playerManagerService.getBotPlayers(gameId);
-      
-      if (botPlayers.length === 0) {
-        console.log(`[TurnProcessor] 요약할 봇이 없음: ${gameId}`);
-        return;
-      }
-
-      // 현재 턴의 이벤트 수집
-      const turnEvents = await this.collectTurnEvents(gameId);
-      
-      if (turnEvents.length === 0) {
-        console.log(`[TurnProcessor] 요약할 턴 이벤트가 없음: ${gameId}`);
-        return;
-      }
-
-      // 각 봇에 대해 순차적으로 요약 생성 (2초 간격)
-      for (let i = 0; i < botPlayers.length; i++) {
-        const botPlayer = botPlayers[i];
-        
-        try {
-          console.log(`[TurnProcessor] 봇 ${botPlayer.userId} 요약 생성 중... (${i + 1}/${botPlayers.length})`);
-          
-          // LLM을 사용하여 턴 요약 생성
-          const summary = await this.llmService.summarizeTurn(turnEvents);
-          
-          if (summary && summary.summary) {
-            // 봇 메모리에 턴 요약 저장
-            await this.memoryService.updateTurnSummary(
-              gameId, 
-              botPlayer.userId, 
-              summary.summary
-            );
-            
-            console.log(`[TurnProcessor] 봇 ${botPlayer.userId} 요약 저장 완료`);
-          } else {
-            console.log(`[TurnProcessor] 봇 ${botPlayer.userId} 요약 생성 실패 - 빈 응답`);
-          }
-          
-          // 마지막 봇이 아니면 2초 대기
-          if (i < botPlayers.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          }
-          
-        } catch (error) {
-          console.error(`[TurnProcessor] 봇 ${botPlayer.userId} 순차적 요약 생성 실패:`, error);
-        }
-      }
-      
-      console.log(`[TurnProcessor] 순차적 턴 요약 생성 완료 - gameId: ${gameId}`);
-    } catch (error) {
-      console.error(`[TurnProcessor] 순차적 턴 요약 생성 중 오류:`, error);
-    }
-  }
-
-  /**
-   * 현재 턴의 이벤트 수집
-   */
-  private async collectTurnEvents(gameId: string): Promise<Array<{type: string, message: string, timestamp?: any}>> {
-    const events: Array<{type: string, message: string, timestamp?: any}> = [];
-    
-    try {
-      // 현재 턴의 채팅 메시지들 수집 (Redis에서 직접 조회)
-      const chatKey = `game:${gameId}:chats`;
-      const chatData = await this.redisService.getAndParse(chatKey);
-      
-      if (chatData && Array.isArray(chatData)) {
-        chatData.forEach((chat: any) => {
-          events.push({
-            type: 'chat',
-            message: `${chat.sender || 'Unknown'}: ${chat.message || ''}`,
-            timestamp: chat.timestamp
-          });
-        });
-      }
-      
-      // 시스템 메시지 추가 (게임 상태 변화 등)
-      const gameData = await this.gameDataService.getGameData(gameId);
-      events.push({
-        type: 'system',
-        message: `턴 ${gameData?.turn || '알 수 없음'} 종료 - 게임 상황 변화`,
-        timestamp: new Date()
-      });
-      
-      console.log(`[TurnProcessor] 수집된 이벤트 수: ${events.length}`);
-      return events;
-      
-    } catch (error) {
-      console.error(`[TurnProcessor] 턴 이벤트 수집 중 오류:`, error);
-      return [];
-    }
-  }
 
 }

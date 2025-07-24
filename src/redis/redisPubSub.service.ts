@@ -21,8 +21,6 @@ import {
   ChatMessageData
 } from './pubsub.types';
 import { TurnProcessorService } from 'src/socket/game/turn-processor.service';
-import { GameDataService } from 'src/socket/game/game-data.service';
-import { GameTurnService } from 'src/socket/game/gameTurn.service';
 
 @Injectable()
 export class RedisPubSubService implements OnModuleInit {
@@ -445,13 +443,6 @@ export class RedisPubSubService implements OnModuleInit {
     
     try {
       await this.turnProcessorService.processTurnEnd(gameId);
-      
-      // 턴 종료 처리 완료 후 새 턴 시작 처리 (아이템 지급 등)
-      const gameData = await this.gameDataService.getGameData(gameId);
-      if (gameData && this.gameTurnService) {
-        await this.gameTurnService.onTurnStart(gameId, gameData.turn);
-      }
-      
       console.log(`✅ 턴 종료 처리 완료: ${gameId}`);
       return true;
     } catch (error) {

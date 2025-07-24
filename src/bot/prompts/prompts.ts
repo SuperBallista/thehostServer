@@ -8,7 +8,6 @@ export const getChatDecisionPrompt = (context: GameContext): string => {
   return `⚠️⚠️⚠️ 매우 중요: 
 - 모든 응답은 한글로 작성하세요
 - 아이템명은 반드시 한글로: "자가진단키트", "낙서스프레이", "응급치료제" 등
-- 절대 사용 금지: spray, eraser, medicine, vaccine 등 영어 코드
 
 현재 게임 상황:
 - 턴: ${context.currentTurn}
