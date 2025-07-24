@@ -102,6 +102,25 @@ src/
 │   ├── redisPubSubHelper.ts
 │   ├── pubsub-usage-guide.ts  # PubSub 사용 가이드
 │   └── pubsub.types.ts     # PubSub 타입 정의 (InternalUpdateType 포함)
+├── bot/                    # LLM 봇 플레이어 시스템
+│   ├── bot.service.ts              # 봇 메인 오케스트레이터 (146줄)
+│   ├── llm.service.ts              # LLM 통신 서비스 (330줄)
+│   ├── action.service.ts           # 봇 액션 처리 서비스 (204줄)
+│   ├── memory.service.ts           # 봇 메모리 관리 서비스 (332줄)
+│   ├── interfaces/                 # 봇 인터페이스 정의
+│   │   └── bot.interface.ts
+│   ├── llm-providers/              # LLM 프로바이더 구현
+│   │   ├── llm-provider.interface.ts
+│   │   ├── llm-provider.factory.ts
+│   │   ├── openai-provider.ts      # OpenAI API 프로바이더
+│   │   ├── openrouter-provider.ts  # OpenRouter API 프로바이더
+│   │   └── ollama-provider.ts      # Ollama 로컬 프로바이더
+│   ├── prompts/                    # LLM 프롬프트 템플릿
+│   │   ├── system.prompt.ts        # 시스템 프롬프트
+│   │   └── prompts.ts              # 게임 상황별 프롬프트
+│   ├── constants/                  # 봇 관련 상수
+│   │   └── item-mappings.ts        # 아이템 코드 한글 매핑
+│   └── bot.module.ts               # 봇 모듈 정의
 ├── services/               # 추가 서비스
 │   └── document-search.service.ts  # 문서 벡터 검색 서비스
 ├── user/                   # 사용자 관리
@@ -503,9 +522,24 @@ npm run pm2:status   # PM2 프로세스 상태 확인
 ### 환경 변수
 - `.env`: 환경 변수 설정 (`.env.example` 참조)
 - 필수 환경 변수: DB 연결, Redis, JWT, Google OAuth
-- 선택적 환경 변수: OpenAI API (문서 벡터 검색용)
+- 선택적 환경 변수: 
+  - OpenAI API (문서 벡터 검색용)
+  - LLM 봇 프로바이더 설정 (OPENAI_API_KEY, OPENROUTER_API_KEY, OLLAMA_BASE_URL)
 
 ## 최근 주요 업데이트
+
+### LLM 봇 플레이어 시스템 구현 (2025.01)
+- **종합적인 AI 봇 시스템** - 여러 LLM 프로바이더 지원 (OpenAI, OpenRouter, Ollama)
+- **지능형 게임플레이**:
+  - 채팅 메시지 결정 AI (맥락 기반 대화)
+  - 턴 요약 생성 (게임 상황 분석)
+  - 영어 아이템 코드 자동 한글 변환
+- **메모리 관리 시스템**:
+  - 단기 메모리: 현재 턴 상황, 아이템, 채팅 기록
+  - 장기 메모리: 턴별 요약, 플레이어 의심도
+  - Redis 기반 지속성 및 자동 초기화
+- **턴 요약 시스템** - 15초 전 순차적 요약 생성으로 게임 지연 방지
+- **한국어 지원** - 모든 봇 응답 및 게임 내 메시지 한국어 처리
 
 ### 아이템 전달 기능 구현 (2025.01)
 - **giveItem** 핸들러 추가 - 같은 지역 플레이어에게 아이템 전달

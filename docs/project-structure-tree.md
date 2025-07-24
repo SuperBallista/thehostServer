@@ -41,6 +41,25 @@ thehostServer/
 │   │   │   ├── redis.service.ts
 │   │   │   ├── redisPubSub.service.ts
 │   │   │   └── redisPubSubHelper.ts
+│   │   ├── bot/                       # LLM Bot Player System
+│   │   │   ├── bot.service.ts
+│   │   │   ├── llm.service.ts
+│   │   │   ├── action.service.ts
+│   │   │   ├── memory.service.ts
+│   │   │   ├── bot.module.ts
+│   │   │   ├── interfaces/
+│   │   │   │   └── bot.interface.ts
+│   │   │   ├── llm-providers/
+│   │   │   │   ├── llm-provider.interface.ts
+│   │   │   │   ├── llm-provider.factory.ts
+│   │   │   │   ├── openai-provider.ts
+│   │   │   │   ├── openrouter-provider.ts
+│   │   │   │   └── ollama-provider.ts
+│   │   │   ├── prompts/
+│   │   │   │   ├── system.prompt.ts
+│   │   │   │   └── prompts.ts
+│   │   │   └── constants/
+│   │   │       └── item-mappings.ts
 │   │   ├── services/                  # Additional services
 │   │   │   └── document-search.service.ts
 │   │   ├── socket/                    # Socket.io real-time communication
@@ -133,10 +152,11 @@ thehostServer/
 │   │   │       ├── vaccine.png
 │   │   │       └── zombie.png
 │   │   └── index.html
-│   ├── logs/                          # PM2 logs
+│   ├── logs/                          # PM2 logs and LLM logs
 │   │   ├── pm2-combined.log
 │   │   ├── pm2-error.log
-│   │   └── pm2-out.log
+│   │   ├── pm2-out.log
+│   │   └── llm.txt                    # LLM 요청/응답 로그
 │   ├── scripts/                       # Utility scripts
 │   │   ├── read-vector-data.ts
 │   │   ├── search-docs.ts
