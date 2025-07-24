@@ -1,152 +1,208 @@
 import { GameContext } from '../interfaces/bot.interface';
 
 /**
- * 채팅 결정 프롬프트
+ * 채팅 결정 전용 프롬프트 생성
  */
-export const getChatDecisionPrompt = (context: GameContext): string => {
-  return `⚠️⚠️⚠️ 매우 중요: 
-- 모든 응답은 한글로 작성하세요
-- 아이템명은 반드시 한글로: "자가진단키트", "낙서스프레이", "응급치료제" 등
+export const buildChatOnlyPrompt = (context: GameContext): string => {
+  const gameInfo = buildGameInfoSection(context);
 
-현재 게임 상황:
-- 턴: ${context.currentTurn}
-- 위치: ${context.currentRegion}
-- 역할: ${context.role}
-- 보유 아이템: ${context.currentItems.join(', ') || '없음'}
-- 같은 구역 플레이어: ${context.playersInRegion.join(', ') || '없음'}
-- 도주 가능: ${context.canEscape ? '가능' : '불가능'}${
-    context.zombieList && context.zombieList.length > 0
-      ? `
-- 좀비 현황: ${context.zombieList.map((z) => `${z.nickname}(${z.location})`).join(', ')}`
-      : ''
-  }
+  return `# 💬 채팅 메시지 생성
 
-이전 턴 요약: ${context.previousTurnSummary}
+## 📊 현재 상황
+${gameInfo}
 
-최근 채팅:
-${context.currentTurnChats
-  .slice(-3)
-  .map((c) => `${c.sender}: ${c.message}`)
-  .join('\n')}
+## 🎭 성격 특성
+**${context.personality.mbti} / ${context.personality.gender === 'male' ? '남성' : '여성'}**
+${getMBTIChatStyle(context.personality.mbti)}
 
-무전 메시지:
-${
-  context.wirelessMessages && context.wirelessMessages.length > 0
-    ? context.wirelessMessages
-        .slice(-3)
-        .map((m) => `턴 ${m.turn} - ${m.sender}: ${m.message}`)
-        .join('\n')
-    : '없음'
-}
+## 📝 응답 규칙
+- **채팅할 경우**: 메시지 내용만 출력 (100자 이내, 반드시 한국어로 작성)
+- **채팅하지 않을 경우**: \`###\`
+- **아이템/지역명**: 반드시 한글 사용
 
-현재 상황을 분석하여 채팅을 할지 결정하세요. 당신은 8-12초마다 이 결정을 내려야 합니다.
-
-
-JSON 형식으로 응답하세요:
-{
-  "shouldChat": true/false,
-  "message": "채팅 메시지 (shouldChat이 true일 때만)",
-  "additionalAction": {
-    "action": "추가 행동명",
-    "params": { "필요한 파라미터들" }
-  },
-  "reasoning": "결정 이유 (선택사항)"
-}
-
-⚠️ 중요: action은 반드시 정확한 형식으로 작성하세요!
-❌ 잘못된 예: "myStatus", "hostAct"
-✅ 올바른 예: "myStatus.next", "myStatus.act", "hostAct.infect"
-
-가능한 추가 행동: myStatus.next, myStatus.act, useItem, giveItem${context.role === 'host' ? ', hostAct.infect, hostAct.zombieList' : ''}
-
-중요: useItem과 giveItem은 현재 보유한 아이템만 사용 가능합니다!
-현재 보유 아이템: ${context.currentItems.join(', ') || '없음'}
-
-기본 행동:
-- myStatus.next: { "location": "[구역명]" } (구역 이동: 해안, 폐건물, 정글, 동굴, 산 정상, 개울 중 선택)
-- myStatus.act: { "action": "숨기" } (좀비 대처: 숨기, 유인, 도주 - 도주는 도주 가능이 true일 때만 가능)
-- giveItem: { "receiver": "동물닉네임", "item": "응급치료제" } (보유한 아이템만 전달 가능)
-
-${
-  context.role === 'host'
-    ? `숙주 전용 행동:
-- hostAct.infect: { "target": "동물닉네임" } (감염시키기 - 턴당 1명)
-- hostAct.zombieList: { "zombies": [{ "zombie": "좀비동물닉네임", "target": "공격대상동물닉네임", "nextRegion": "이동할구역명" }] } (좀비 조종)`
-    : ''
-}
-
-- 한글 아이템명: 낙서스프레이, 자가진단키트, 응급치료제, 항바이러스혈청, 촉매정제물질, 신경억제단백질, 무전기, 지우개, 좀비사살용산탄총, 마이크, 백신
-플레이어 이름은 동물 닉네임으로 사용하세요.
-
-아이템별 사용법 (보유한 아이템만 사용 가능):
-- 낙서스프레이: useItem { "item": "낙서스프레이", "content": "내용" }
-- 지우개: useItem { "item": "지우개", "targetMessage": 0 } (메시지 배열 번호)
-- 자가진단키트: useItem { "item": "자가진단키트" } (파라미터 없음)
-- 응급치료제: useItem { "item": "응급치료제" } (파라미터 없음)
-- 백신: useItem { "item": "백신", "target": "동물닉네임" }
-- 좀비사살용산탄총: useItem { "item": "좀비사살용산탄총", "target": "동물닉네임" }
-- 무전기: useItem { "item": "무전기", "target": "동물닉네임", "content": "메시지 내용" }
-- 마이크: useItem { "item": "마이크", "content": "메시지 내용" }
-- 백신재료(항바이러스혈청,촉매정제물질,신경억제단백질): useItem { "item": "항바이러스혈청" } (파라미터 없고 3가지 모두 보유시 사용가능)
-
-올바른 액션 예시:
-{
-  "additionalAction": {
-    "action": "myStatus.next",  // ✅ 올바른 형식
-    "params": { "location": "정글" }
-  }
-}
-
-{
-  "additionalAction": {
-    "action": "myStatus.act",  // ✅ 올바른 형식
-    "params": { "action": "숨기" }
-  }
-}
-
-{
-  "additionalAction": {
-    "action": "giveItem",
-    "params": { "receiver": "말많은다람쥐", "item": "응급치료제" }
-  }
-}
-
-❌ 잘못된 예시:
-{
-  "additionalAction": {
-    "action": "myStatus",  // ❌ 잘못됨! myStatus.next 또는 myStatus.act여야 함
-    "params": { "location": "동굴" }
-  }
-}`;
+현재 상황을 고려하여 자연스러운 채팅 메시지를 작성하거나 \`###\`를 응답하세요.`;
 };
+
+/**
+ * 행동 판단 전용 프롬프트 생성
+ */
+export const buildActionOnlyPrompt = (context: GameContext): string => {
+  const gameInfo = buildGameInfoSection(context);
+
+  return `# 🎮 게임 행동 결정
+
+## 📊 현재 상황
+${gameInfo}
+
+## 🎯 ${context.role === 'host' ? '숙주' : '생존자'} 전략
+${context.role === 'host' ? getHostActionPriority() : getSurvivorActionPriority()}
+
+## 🔧 사용 가능한 행동
+${buildActionGuideSection(context)}
+
+## 🎒 핵심 아이템
+${buildItemGuideSection()}
+
+**JSON 형식으로 최적의 행동을 결정하세요:**
+\`\`\`json
+{
+  "action": "행동명",
+  "params": {"파라미터": "값"},
+  "reasoning": "결정 이유"
+}
+\`\`\``;
+};
+
+/**
+ * 게임 정보 섹션 구성 (간소화)
+ */
+const buildGameInfoSection = (context: GameContext): string => {
+  const zombieInfo =
+    context.zombieList && context.zombieList.length > 0
+      ? `**좀비 현황**: ${context.zombieList.map((z) => `${z.nickname}(${z.location})`).join(', ')}\n`
+      : '';
+
+  const recentChats =
+    context.currentTurnChats.length > 0
+      ? context.currentTurnChats
+          .slice(-2)
+          .map((c) => `${c.sender}: ${c.message}`)
+          .join(' | ')
+      : '없음';
+
+  const wirelessInfo =
+    context.wirelessMessages && context.wirelessMessages.length > 0
+      ? `**무전**: ${context.wirelessMessages
+          .slice(-2)
+          .map((m) => `${m.sender}: ${m.message}`)
+          .join(' | ')}\n`
+      : '';
+
+  return `**턴**: ${context.currentTurn} | **위치**: ${context.currentRegion} | **역할**: ${context.role === 'host' ? '숙주' : '생존자'} | **도주**: ${context.canEscape ? '가능' : '불가능'}
+
+**보유 아이템**: ${context.currentItems.length > 0 ? context.currentItems.join(', ') : '없음'}
+
+**같은 구역**: ${context.playersInRegion.join(', ') || '혼자'}
+
+**전체 참여자**: ${context.allPlayers.join(', ')}
+
+${zombieInfo}**이전 턴 요약**: ${context.previousTurnSummary}
+
+**최근 채팅**: ${recentChats}
+
+${wirelessInfo}`;
+};
+
+/**
+ * 행동 가이드 섹션 구성 (간소화)
+ */
+const buildActionGuideSection = (context: GameContext): string => {
+  const basicActions = `**기본 행동**
+- \`myStatus.next\`: 이동 {"location": "해안|폐건물|정글|동굴|산 정상|개울"}
+- \`myStatus.act\`: 좀비 대처 {"action": "숨기|유인|도주"}
+- \`giveItem\`: 아이템 전달 {"receiver": "닉네임", "item": "아이템명"}
+- \`useItem\`: 아이템 사용 {"item": "아이템명"}`;
+
+  const roleActions =
+    context.role === 'host'
+      ? `**숙주 전용**
+- \`hostAct.infect\`: 감염 {"target": "닉네임"}
+- \`hostAct.zombieList\`: 좀비 조종 {"zombies": [{"zombie": "좀비닉네임", "target": "대상", "nextRegion": "구역"}]}`
+      : `**생존자 핵심**
+- 백신재료 수집: 항바이러스혈청 + 촉매정제물질 + 신경억제단백질
+- 자가진단키트로 감염 검사 필수`;
+
+  return `${basicActions}
+
+${roleActions}`;
+};
+
+/**
+ * 아이템 가이드 섹션 구성 (간소화)
+ */
+const buildItemGuideSection = (): string => {
+  return `**백신재료**: 항바이러스혈청, 촉매정제물질, 신경억제단백질 (3개 모두 모으면 백신 제작)
+**진단**: 자가진단키트 - 감염 확인 필수
+**소통**: 무전기 - 은밀한 정보 교환
+**기타**: 낙서스프레이, 지우개, 응급치료제, 마이크, 좀비사살용산탄총`;
+};
+
+/**
+ * MBTI별 채팅 스타일 가이드
+ */
+const getMBTIChatStyle = (mbti: string): string => {
+  const styles: Record<string, string> = {
+    INTJ: '• 논리적이고 간결한 표현\n• 전략적 사고를 드러내는 발언',
+    INTP: '• 호기심 많은 질문\n• 분석적이고 탐구적인 태도',
+    ENTJ: '• 리더십 있는 제안\n• 명확하고 직접적인 소통',
+    ENTP: '• 창의적이고 유머러스한 표현\n• 활발한 소통과 아이디어 공유',
+    INFJ: '• 공감적이고 배려하는 말투\n• 직관적 통찰 공유',
+    INFP: '• 부드럽고 조심스러운 표현\n• 도덕적 관점에서의 의견',
+    ENFJ: '• 따뜻하고 격려하는 말투\n• 팀워크와 협력 강조',
+    ENFP: '• 열정적이고 긍정적인 표현\n• 감정이 풍부한 반응',
+    ISTJ: '• 신중하고 사실적인 표현\n• 체계적인 정보 공유',
+    ISFJ: '• 친근하고 도움을 주려는 말투\n• 안전을 걱정하는 표현',
+    ESTJ: '• 실무적이고 효율적인 표현\n• 계획과 조직화 제안',
+    ESFJ: '• 사교적이고 친화적인 말투\n• 분위기를 밝게 만드는 발언',
+    ISTP: '• 간결하고 실용적인 표현\n• 필요시에만 발언',
+    ISFP: '• 온화하고 겸손한 표현\n• 갈등을 피하는 평화로운 말투',
+    ESTP: '• 활동적이고 즉흥적인 표현\n• 현재 상황에 집중',
+    ESFP: '• 밝고 에너지 넘치는 표현\n• 감정을 솔직하게 표현',
+  };
+
+  return styles[mbti] || '• 상황에 맞는 자연스러운 대화';
+};
+
+/**
+ * 숙주 행동 우선순위
+ */
+const getHostActionPriority = (): string => {
+  return `1. **감염 최우선** - 백신재료 보유자 우선 타겟
+2. **은밀성 유지** - 생존자처럼 행동
+3. **좀비 활용** - 전략적 위치로 이동 지시
+4. **정보 교란** - 거짓 정보 유포`;
+};
+
+/**
+ * 생존자 행동 우선순위
+ */
+const getSurvivorActionPriority = (): string => {
+  return `1. **백신재료 수집** - 3개 모두 확보 시 백신 제작
+2. **감염 검사** - 자가진단키트로 정기 검사
+3. **협력과 정보공유** - 신뢰할 수 있는 플레이어와 협력
+4. **안전한 이동** - 좀비 회피`;
+};
+
+/**
+ * 기존 함수 유지 (하위 호환성)
+ */
+export const getChatDecisionPrompt = buildChatOnlyPrompt;
 
 /**
  * 턴 요약 프롬프트
  */
-export const getTurnSummaryPrompt = (events: any[]): string => {
-  return `다음 숙주 추리 게임의 진행상황을 요약해주세요:
+export const getTurnSummaryPrompt = (
+  events: Array<{ message: string }>,
+): string => {
+  return `# 턴 요약 작성
 
-${events.map((e: any) => `- ${(e as { message: string }).message}`).join('\n')}
+이번 턴의 게임 이벤트를 분석하여 **개인 전략 메모**를 2-4문장으로 작성하세요.
 
-【요약 가이드라인】
-- 이 요약은 다음 턴에서 전략적 행동과 추리에 활용됩니다
-- 플레이어들의 발언, 위치 이동, 아이템 사용 등 중요한 정보만 간략히 정리
-- 의심스러운 행동이나 추리에 도움이 될 만한 단서 위주로 기록
-- 1-3문장으로 간결하게 작성
+**이번 턴 이벤트:**
+${events.length > 0 ? events.map((e) => `- ${e.message}`).join('\n') : '- 특별한 이벤트가 없었습니다.'}
 
-예시: "2턴에서 A가 정글로 이동했고, B가 마이크로 전체 방송을 했다. C는 응급치료제를 사용했는데 이는 감염 치료 목적일 수 있다."
-
-간결하고 핵심적인 내용만 포함하여 요약하세요:`;
+중요한 사건과 다음 턴 계획을 포함하여 간결하게 작성하세요.`;
 };
 
 /**
  * 기본 채팅 결정 (LLM 실패 시 사용)
  */
-export const getDefaultChatDecision = (
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  context: GameContext,
-): { shouldChat: boolean; message?: string; reasoning: string } => {
-  const shouldChat = Math.random() < 0.3; // 30% 확률로 채팅
+export const getDefaultChatDecision = (): {
+  shouldChat: boolean;
+  message?: string;
+  reasoning: string;
+} => {
+  const shouldChat = Math.random() < 0.3;
 
   if (!shouldChat) {
     return {
@@ -177,7 +233,6 @@ export const getDefaultChatDecision = (
 export const getDefaultAction = (
   context: GameContext,
 ): { action: string; params: Record<string, string>; reasoning: string } => {
-  // 좀비가 없는 초반 턴에는 이동, 좀비가 있으면 대응
   if (context.currentTurn < 5) {
     const locations = ['해안', '폐건물', '정글', '동굴', '산 정상', '개울'];
     const randomLocation =

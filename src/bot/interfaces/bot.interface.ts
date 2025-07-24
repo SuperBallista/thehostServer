@@ -72,6 +72,8 @@ export interface GameContext {
   currentItems: string[];
   // 현재 턴 같은 구역의 생존자 정보
   playersInRegion: string[];
+  // 전체 게임 참여자 정보 (생존자, 숙주, 좀비 포함)
+  allPlayers: string[];
   // 턴 정보
   currentTurn: number;
   // 구역 낙서
