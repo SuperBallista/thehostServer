@@ -1,6 +1,5 @@
 import { GameContext } from '../interfaces/bot.interface';
 
-
 /**
  * 채팅 결정 프롬프트
  */
@@ -15,18 +14,30 @@ export const getChatDecisionPrompt = (context: GameContext): string => {
 - 역할: ${context.role}
 - 보유 아이템: ${context.currentItems.join(', ') || '없음'}
 - 같은 구역 플레이어: ${context.playersInRegion.join(', ') || '없음'}
-- 도주 가능: ${context.canEscape ? '가능' : '불가능'}${context.zombieList && context.zombieList.length > 0 ? `
-- 좀비 현황: ${context.zombieList.map(z => `${z.nickname}(${z.location})`).join(', ')}` : ''}
+- 도주 가능: ${context.canEscape ? '가능' : '불가능'}${
+    context.zombieList && context.zombieList.length > 0
+      ? `
+- 좀비 현황: ${context.zombieList.map((z) => `${z.nickname}(${z.location})`).join(', ')}`
+      : ''
+  }
 
 이전 턴 요약: ${context.previousTurnSummary}
 
 최근 채팅:
-${context.currentTurnChats.slice(-3).map(c => `${c.sender}: ${c.message}`).join('\n')}
+${context.currentTurnChats
+  .slice(-3)
+  .map((c) => `${c.sender}: ${c.message}`)
+  .join('\n')}
 
 무전 메시지:
-${context.wirelessMessages && context.wirelessMessages.length > 0 
-  ? context.wirelessMessages.slice(-3).map(m => `턴 ${m.turn} - ${m.sender}: ${m.message}`).join('\n')
-  : '없음'}
+${
+  context.wirelessMessages && context.wirelessMessages.length > 0
+    ? context.wirelessMessages
+        .slice(-3)
+        .map((m) => `턴 ${m.turn} - ${m.sender}: ${m.message}`)
+        .join('\n')
+    : '없음'
+}
 
 현재 상황을 분석하여 채팅을 할지 결정하세요. 당신은 8-12초마다 이 결정을 내려야 합니다.
 
@@ -56,9 +67,13 @@ JSON 형식으로 응답하세요:
 - myStatus.act: { "action": "숨기" } (좀비 대처: 숨기, 유인, 도주 - 도주는 도주 가능이 true일 때만 가능)
 - giveItem: { "receiver": "동물닉네임", "item": "응급치료제" } (보유한 아이템만 전달 가능)
 
-${context.role === 'host' ? `숙주 전용 행동:
+${
+  context.role === 'host'
+    ? `숙주 전용 행동:
 - hostAct.infect: { "target": "동물닉네임" } (감염시키기 - 턴당 1명)
-- hostAct.zombieList: { "zombies": [{ "zombie": "좀비동물닉네임", "target": "공격대상동물닉네임", "nextRegion": "이동할구역명" }] } (좀비 조종)` : ''}
+- hostAct.zombieList: { "zombies": [{ "zombie": "좀비동물닉네임", "target": "공격대상동물닉네임", "nextRegion": "이동할구역명" }] } (좀비 조종)`
+    : ''
+}
 
 - 한글 아이템명: 낙서스프레이, 자가진단키트, 응급치료제, 항바이러스혈청, 촉매정제물질, 신경억제단백질, 무전기, 지우개, 좀비사살용산탄총, 마이크, 백신
 플레이어 이름은 동물 닉네임으로 사용하세요.
@@ -105,14 +120,13 @@ ${context.role === 'host' ? `숙주 전용 행동:
 }`;
 };
 
-
 /**
  * 턴 요약 프롬프트
  */
 export const getTurnSummaryPrompt = (events: any[]): string => {
   return `다음 숙주 추리 게임의 진행상황을 요약해주세요:
 
-${events.map(e => `- ${e.message}`).join('\n')}
+${events.map((e: any) => `- ${(e as { message: string }).message}`).join('\n')}
 
 【요약 가이드라인】
 - 이 요약은 다음 턴에서 전략적 행동과 추리에 활용됩니다
@@ -128,9 +142,12 @@ ${events.map(e => `- ${e.message}`).join('\n')}
 /**
  * 기본 채팅 결정 (LLM 실패 시 사용)
  */
-export const getDefaultChatDecision = (context: GameContext): { shouldChat: boolean; message?: string; reasoning: string } => {
+export const getDefaultChatDecision = (
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  context: GameContext,
+): { shouldChat: boolean; message?: string; reasoning: string } => {
   const shouldChat = Math.random() < 0.3; // 30% 확률로 채팅
-  
+
   if (!shouldChat) {
     return {
       shouldChat: false,
@@ -148,7 +165,8 @@ export const getDefaultChatDecision = (context: GameContext): { shouldChat: bool
 
   return {
     shouldChat: true,
-    message: defaultMessages[Math.floor(Math.random() * defaultMessages.length)],
+    message:
+      defaultMessages[Math.floor(Math.random() * defaultMessages.length)],
     reasoning: '기본 소통 메시지',
   };
 };
@@ -156,18 +174,21 @@ export const getDefaultChatDecision = (context: GameContext): { shouldChat: bool
 /**
  * 기본 행동 (LLM 실패 시 사용)
  */
-export const getDefaultAction = (context: GameContext): { action: string; params: Record<string, string>; reasoning: string } => {
+export const getDefaultAction = (
+  context: GameContext,
+): { action: string; params: Record<string, string>; reasoning: string } => {
   // 좀비가 없는 초반 턴에는 이동, 좀비가 있으면 대응
   if (context.currentTurn < 5) {
     const locations = ['해안', '폐건물', '정글', '동굴', '산 정상', '개울'];
-    const randomLocation = locations[Math.floor(Math.random() * locations.length)];
+    const randomLocation =
+      locations[Math.floor(Math.random() * locations.length)];
     return {
       action: 'myStatus.next',
       params: { location: randomLocation },
       reasoning: '게임 초반 탐색',
     };
   }
-  
+
   return {
     action: 'myStatus.act',
     params: { action: '숨기' },
