@@ -298,14 +298,15 @@ export class BotService implements OnModuleInit {
     }
 
     return {
-      previousTurnSummary,
+      gameId,
+      previousTurnSummary: previousTurnSummary || '이전 턴 정보가 없습니다.',
       currentTurnChats: currentTurnChats.map((chat) => ({
         sender: chat.system
           ? 'System'
-          : chat.playerId !== undefined
-            ? ANIMAL_NICKNAMES[chat.playerId] || `Player_${chat.playerId}`
-            : 'Player',
-        message: chat.message,
+          : chat.playerId
+            ? `Player${chat.playerId}`
+            : 'Unknown',
+        message: chat.message || '',
         system: chat.system || false,
       })),
       wirelessMessages: wirelessMessages.map((msg: WirelessMessage) => ({

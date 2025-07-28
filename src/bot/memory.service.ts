@@ -8,9 +8,17 @@ interface BotMemory {
     items: string[];
     canEscape: boolean;
     role: string;
+    gameInfo?: {
+      startTime: string;
+      participants: string[];
+    };
     recentChats: Array<{
       sender: string;
       message: string;
+      timestamp: string;
+    }>;
+    recentActions: Array<{
+      action: string;
       timestamp: string;
     }>;
     graffiti: string[];
@@ -28,15 +36,52 @@ interface BotMemory {
       summary: string;
     }>;
     suspicions: Record<string, number>; // 플레이어별 호스트 의심도
+    gameResults: Array<{
+      endTime: string;
+      result: string;
+    }>;
   };
-  metadata: {
-    lastUpdated: string;
-    memoryVersion: number;
-    personality: {
-      mbti: string;
-      gender: string;
-    };
+}
+
+interface ShortTermMemory {
+  currentTurn: number;
+  location: string;
+  items: string[];
+  canEscape: boolean;
+  role: string;
+  gameInfo?: {
+    startTime: string;
+    participants: string[];
   };
+  recentChats: Array<{
+    sender: string;
+    message: string;
+    timestamp: string;
+  }>;
+  recentActions: Array<{
+    action: string;
+    timestamp: string;
+  }>;
+  graffiti: string[];
+  playersInRegion: string[];
+  wirelessMessages: Array<{
+    sender: string;
+    message: string;
+    timestamp: string;
+    turn: number;
+  }>;
+}
+
+interface LongTermMemory {
+  turnSummaries: Array<{
+    turn: number;
+    summary: string;
+  }>;
+  suspicions: Record<string, number>;
+  gameResults: Array<{
+    endTime: string;
+    result: string;
+  }>;
 }
 
 interface GameEvent {
@@ -54,21 +99,18 @@ export class MemoryService {
   constructor(private readonly redisService: RedisService) {}
 
   /**
-   * 봇 메모리 초기화
+   * 초기 메모리 생성
    */
-  async initializeMemory(
-    gameId: string,
-    botId: number,
-    personality: { mbti: string; gender: string },
-  ): Promise<void> {
+  async initializeMemory(gameId: string, botId: number): Promise<void> {
     const memory: BotMemory = {
       shortTerm: {
         currentTurn: 1,
-        location: '해안',
+        location: '',
         items: [],
-        canEscape: true,
-        role: 'survivor',
+        canEscape: false,
+        role: '',
         recentChats: [],
+        recentActions: [],
         graffiti: [],
         playersInRegion: [],
         wirelessMessages: [],
@@ -76,26 +118,19 @@ export class MemoryService {
       longTerm: {
         turnSummaries: [],
         suspicions: {},
-      },
-      metadata: {
-        lastUpdated: new Date().toISOString(),
-        memoryVersion: 1,
-        personality,
+        gameResults: [],
       },
     };
 
-    const key = `bot:memory:${gameId}:${botId}`;
-    await this.redisService.stringifyAndSet(key, memory, 10800);
-
-    this.logger.log(`봇 메모리 초기화: ${gameId}:${botId}`);
+    await this.saveMemory(gameId, botId, memory);
   }
 
   /**
-   * 메모리 조회
+   * 봇 메모리 조회
    */
   async getMemory(gameId: string, botId: number): Promise<BotMemory | null> {
     const key = `bot:memory:${gameId}:${botId}`;
-    return await this.redisService.getAndParse(key);
+    return (await this.redisService.getAndParse(key)) as BotMemory | null;
   }
 
   /**
@@ -104,174 +139,158 @@ export class MemoryService {
   async updateShortTermMemory(
     gameId: string,
     botId: number,
-    updates: Partial<BotMemory['shortTerm']>,
+    updates: Partial<ShortTermMemory>,
   ): Promise<void> {
     const memory = await this.getMemory(gameId, botId);
-    if (!memory) {
-      this.logger.warn(`메모리를 찾을 수 없음: ${gameId}:${botId}`);
-      return;
+    if (memory) {
+      Object.assign(memory.shortTerm, updates);
+      await this.saveMemory(gameId, botId, memory);
     }
-
-    memory.shortTerm = { ...memory.shortTerm, ...updates };
-    memory.metadata.lastUpdated = new Date().toISOString();
-
-    const key = `bot:memory:${gameId}:${botId}`;
-    await this.redisService.stringifyAndSet(key, memory, 10800);
   }
 
   /**
-   * 이전 턴 요약 조회
+   * 장기 메모리 업데이트
    */
-  async getPreviousTurnSummary(gameId: string, botId: number): Promise<string> {
-    let memory = await this.getMemory(gameId, botId);
-    if (!memory) {
-      // 메모리가 없으면 기본 메모리 생성
-      console.log(`[MemoryService] 봇 ${botId} 메모리 초기화 (요약 조회용)`);
-      await this.initializeMemory(gameId, botId, {
-        mbti: 'INTJ',
-        gender: 'male',
-      });
-      memory = await this.getMemory(gameId, botId);
-    }
-
-    if (!memory || memory.longTerm.turnSummaries.length === 0) {
-      return '첫 번째 턴입니다.';
-    }
-
-    // 최근 2개 턴의 요약 반환
-    const recentSummaries = memory.longTerm.turnSummaries.slice(-2);
-    return recentSummaries.map((s) => `턴 ${s.turn}: ${s.summary}`).join(' ');
-  }
-
-  /**
-   * 턴 요약 업데이트
-   */
-  async updateTurnSummary(
+  async updateLongTermMemory(
     gameId: string,
     botId: number,
-    summary: string,
-  ): Promise<void> {
-    let memory = await this.getMemory(gameId, botId);
-    if (!memory) {
-      // 메모리가 없으면 기본 메모리 생성
-      console.log(`[MemoryService] 봇 ${botId} 메모리 초기화 (턴 요약용)`);
-      await this.initializeMemory(gameId, botId, {
-        mbti: 'INTJ',
-        gender: 'male',
-      });
-      memory = await this.getMemory(gameId, botId);
-      if (!memory) {
-        console.error(`[MemoryService] 봇 ${botId} 메모리 초기화 실패`);
-        return;
-      }
-    }
-
-    const currentTurn = memory.shortTerm.currentTurn;
-
-    // 기존 요약 찾기 또는 새로 추가
-    const existingIndex = memory.longTerm.turnSummaries.findIndex(
-      (s) => s.turn === currentTurn,
-    );
-
-    if (existingIndex !== -1) {
-      memory.longTerm.turnSummaries[existingIndex].summary = summary;
-    } else {
-      memory.longTerm.turnSummaries.push({ turn: currentTurn, summary });
-    }
-
-    // 최대 10개 턴만 유지
-    if (memory.longTerm.turnSummaries.length > 10) {
-      memory.longTerm.turnSummaries = memory.longTerm.turnSummaries.slice(-10);
-    }
-
-    memory.metadata.lastUpdated = new Date().toISOString();
-
-    const key = `bot:memory:${gameId}:${botId}`;
-    await this.redisService.stringifyAndSet(key, memory, 10800);
-  }
-
-  /**
-   * 의심도 업데이트
-   */
-  async updateSuspicion(
-    gameId: string,
-    botId: number,
-    playerId: string,
-    suspicionLevel: number,
+    updates: Partial<LongTermMemory>,
   ): Promise<void> {
     const memory = await this.getMemory(gameId, botId);
-    if (!memory) {
-      return;
+    if (memory) {
+      Object.assign(memory.longTerm, updates);
+      await this.saveMemory(gameId, botId, memory);
     }
-
-    memory.longTerm.suspicions[playerId] = Math.max(
-      0,
-      Math.min(1, suspicionLevel),
-    );
-    memory.metadata.lastUpdated = new Date().toISOString();
-
-    const key = `bot:memory:${gameId}:${botId}`;
-    await this.redisService.stringifyAndSet(key, memory, 10800);
   }
 
   /**
-   * 무전 메시지 추가
+   * 메모리 저장
    */
-  async addWirelessMessage(
+  private async saveMemory(
     gameId: string,
     botId: number,
-    sender: string,
-    message: string,
-    turn: number,
+    memory: BotMemory,
   ): Promise<void> {
-    const memory = await this.getMemory(gameId, botId);
-    if (!memory) {
-      this.logger.warn(`메모리를 찾을 수 없음: ${gameId}:${botId}`);
-      return;
-    }
-
-    memory.shortTerm.wirelessMessages.push({
-      sender,
-      message,
-      timestamp: new Date().toISOString(),
-      turn,
-    });
-
-    // 최대 10개의 무전 메시지만 유지
-    if (memory.shortTerm.wirelessMessages.length > 10) {
-      memory.shortTerm.wirelessMessages =
-        memory.shortTerm.wirelessMessages.slice(-10);
-    }
-
-    memory.metadata.lastUpdated = new Date().toISOString();
-
     const key = `bot:memory:${gameId}:${botId}`;
-    await this.redisService.stringifyAndSet(key, memory, 10800);
+    const ttl = 24 * 60 * 60; // 24시간
+    await this.redisService.stringifyAndSet(key, memory, ttl);
   }
 
   /**
-   * 현재 턴 이벤트 추가
+   * 이벤트 기반 메모리 업데이트
    */
-  async addEvent(
+  async updateMemoryFromEvent(
     gameId: string,
     botId: number,
     event: GameEvent,
   ): Promise<void> {
-    const key = `${gameId}:${botId}`;
+    // 이벤트 타입에 따른 처리
+    switch (event.type) {
+      case 'game_start':
+        await this.handleGameStartEvent(gameId, botId, event);
+        break;
+      case 'turn_start':
+        await this.handleTurnStartEvent(gameId, botId, event);
+        break;
+      case 'action':
+        await this.handleActionEvent(gameId, botId, event);
+        break;
+      case 'chat':
+        await this.handleChatEvent(gameId, botId, event);
+        break;
+      case 'game_end':
+        await this.handleGameEndEvent(gameId, botId, event);
+        break;
+    }
 
+    // 현재 턴 이벤트에 추가
+    const key = `${gameId}:${botId}`;
     if (!this.currentTurnEvents.has(key)) {
       this.currentTurnEvents.set(key, []);
     }
+    this.currentTurnEvents.get(key)!.push(event);
+  }
 
-    const events = this.currentTurnEvents.get(key);
-    events?.push(event);
+  /**
+   * 게임 시작 이벤트 처리
+   */
+  private async handleGameStartEvent(
+    gameId: string,
+    botId: number,
+    event: GameEvent,
+  ): Promise<void> {
+    const memory = await this.getMemory(gameId, botId);
+    if (!memory) {
+      await this.initializeMemory(gameId, botId);
+    }
+    // 게임 정보 업데이트
+    const gameInfo = {
+      startTime: event.timestamp.toISOString(),
+      participants: [], // 실제 참가자 정보로 업데이트 필요
+    };
+    await this.updateShortTermMemory(gameId, botId, { gameInfo });
+  }
 
-    // 메모리에도 저장 (최근 채팅)
+  /**
+   * 턴 시작 이벤트 처리
+   */
+  private async handleTurnStartEvent(
+    gameId: string,
+    botId: number,
+    event: GameEvent,
+  ): Promise<void> {
+    // 이전 턴 이벤트 정리
+    this.clearTurnEvents(gameId, botId);
+
+    // 새 턴 정보 업데이트
+    const turnNumber = (event.data?.turnNumber as number) || 1;
+    await this.updateShortTermMemory(gameId, botId, {
+      currentTurn: turnNumber,
+    });
+  }
+
+  /**
+   * 액션 이벤트 처리
+   */
+  private async handleActionEvent(
+    gameId: string,
+    botId: number,
+    event: GameEvent,
+  ): Promise<void> {
+    const memory = await this.getMemory(gameId, botId);
+    if (memory?.shortTerm?.recentActions) {
+      // 최근 액션에 추가
+      memory.shortTerm.recentActions.push({
+        action: event.message,
+        timestamp: event.timestamp.toISOString(),
+      });
+
+      // 최대 10개 액션만 유지
+      if (memory.shortTerm.recentActions.length > 10) {
+        memory.shortTerm.recentActions =
+          memory.shortTerm.recentActions.slice(-10);
+      }
+
+      await this.saveMemory(gameId, botId, memory);
+    }
+  }
+
+  /**
+   * 채팅 이벤트 처리
+   */
+  private async handleChatEvent(
+    gameId: string,
+    botId: number,
+    event: GameEvent,
+  ): Promise<void> {
     if (event.type === 'chat') {
       const memory = await this.getMemory(gameId, botId);
       if (memory) {
+        const playerId = event.data?.playerId as number | undefined;
+        const sender = playerId ? `Player${playerId}` : 'System';
+
         memory.shortTerm.recentChats.push({
-          sender: event.data?.sender || 'Unknown',
+          sender: sender,
           message: event.message,
           timestamp: event.timestamp.toISOString(),
         });
@@ -282,19 +301,33 @@ export class MemoryService {
             memory.shortTerm.recentChats.slice(-20);
         }
 
-        const memKey = `bot:memory:${gameId}:${botId}`;
-        await this.redisService.stringifyAndSet(memKey, memory, 10800);
+        await this.saveMemory(gameId, botId, memory);
       }
     }
   }
 
   /**
-   * 현재 턴 이벤트 조회
+   * 게임 종료 이벤트 처리
    */
-  async getCurrentTurnEvents(
+  private async handleGameEndEvent(
     gameId: string,
     botId: number,
-  ): Promise<GameEvent[]> {
+    event: GameEvent,
+  ): Promise<void> {
+    // 게임 결과를 장기 메모리에 저장
+    const gameResult = {
+      endTime: event.timestamp.toISOString(),
+      result: event.message,
+    };
+    await this.updateLongTermMemory(gameId, botId, {
+      gameResults: [gameResult],
+    });
+  }
+
+  /**
+   * 현재 턴 이벤트 조회
+   */
+  getCurrentTurnEvents(gameId: string, botId: number): GameEvent[] {
     const key = `${gameId}:${botId}`;
     return this.currentTurnEvents.get(key) || [];
   }
@@ -302,7 +335,7 @@ export class MemoryService {
   /**
    * 턴 종료 시 이벤트 정리
    */
-  async clearTurnEvents(gameId: string, botId: number): Promise<void> {
+  clearTurnEvents(gameId: string, botId: number): void {
     const key = `${gameId}:${botId}`;
     this.currentTurnEvents.delete(key);
   }
@@ -310,41 +343,131 @@ export class MemoryService {
   /**
    * 메모리 삭제
    */
+  async deleteMemory(gameId: string, botId: number): Promise<void> {
+    const key = `bot:memory:${gameId}:${botId}`;
+    await this.redisService.del(key);
+
+    // 현재 턴 이벤트도 정리
+    this.clearTurnEvents(gameId, botId);
+  }
+
+  /**
+   * 봇 메모리 정리 (호환성을 위한 별칭)
+   */
   async clearMemory(botId: number): Promise<void> {
-    const keys = await this.redisService.scanKeys(`bot:memory:*:${botId}`);
+    // 모든 게임에서 해당 봇의 메모리를 찾아서 삭제
+    const pattern = `bot:memory:*:${botId}`;
+    const keys = await this.redisService.scanKeys(pattern);
+
     for (const key of keys) {
       await this.redisService.del(key);
     }
 
-    // 이벤트도 정리
-    for (const [key] of this.currentTurnEvents) {
-      if (key.endsWith(`:${botId}`)) {
-        this.currentTurnEvents.delete(key);
+    // 현재 턴 이벤트도 정리
+    for (const eventKey of this.currentTurnEvents.keys()) {
+      if (eventKey.endsWith(`:${botId}`)) {
+        this.currentTurnEvents.delete(eventKey);
       }
     }
   }
 
   /**
-   * 게임 컨텍스트를 위한 메모리 요약
+   * 이전 턴 요약 조회
    */
-  async getMemorySummary(gameId: string, botId: number): Promise<any> {
+  async getPreviousTurnSummary(
+    gameId: string,
+    botId: number,
+  ): Promise<string | null> {
     const memory = await this.getMemory(gameId, botId);
-    if (!memory) {
+    if (!memory || !memory.longTerm.turnSummaries.length) {
       return null;
     }
 
-    return {
-      currentLocation: memory.shortTerm.location,
-      items: memory.shortTerm.items,
-      role: memory.shortTerm.role,
-      canEscape: memory.shortTerm.canEscape,
-      recentChats: memory.shortTerm.recentChats.slice(-5),
-      wirelessMessages: memory.shortTerm.wirelessMessages.slice(-5),
-      suspicions: Object.entries(memory.longTerm.suspicions)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 3)
-        .map(([player, level]) => ({ player, level })),
-      turnHistory: memory.longTerm.turnSummaries.slice(-3),
-    };
+    // 가장 최근 턴 요약 반환
+    const latestSummary =
+      memory.longTerm.turnSummaries[memory.longTerm.turnSummaries.length - 1];
+    return latestSummary?.summary || null;
+  }
+
+  /**
+   * 턴 요약 업데이트
+   */
+  async updateTurnSummary(
+    gameId: string,
+    botId: number,
+    summary: string,
+  ): Promise<void> {
+    const memory = await this.getMemory(gameId, botId);
+    if (memory) {
+      const currentTurn = memory.shortTerm.currentTurn;
+
+      // 기존 턴 요약이 있으면 업데이트, 없으면 추가
+      const existingSummaryIndex = memory.longTerm.turnSummaries.findIndex(
+        (s) => s.turn === currentTurn,
+      );
+
+      if (existingSummaryIndex >= 0) {
+        memory.longTerm.turnSummaries[existingSummaryIndex].summary = summary;
+      } else {
+        memory.longTerm.turnSummaries.push({
+          turn: currentTurn,
+          summary,
+        });
+      }
+
+      await this.saveMemory(gameId, botId, memory);
+    }
+  }
+
+  /**
+   * 무전 메시지 추가
+   */
+  async addWirelessMessage(
+    gameId: string,
+    botId: number,
+    sender: string,
+    message: string,
+    turn?: number,
+  ): Promise<void> {
+    const memory = await this.getMemory(gameId, botId);
+    if (memory) {
+      const wirelessMessage = {
+        sender,
+        message,
+        timestamp: new Date().toISOString(),
+        turn: turn || memory.shortTerm.currentTurn,
+      };
+
+      memory.shortTerm.wirelessMessages.push(wirelessMessage);
+
+      // 최대 20개 무전 메시지만 유지
+      if (memory.shortTerm.wirelessMessages.length > 20) {
+        memory.shortTerm.wirelessMessages =
+          memory.shortTerm.wirelessMessages.slice(-20);
+      }
+
+      await this.saveMemory(gameId, botId, memory);
+    }
+  }
+
+  /**
+   * 게임별 모든 봇 메모리 삭제
+   */
+  async deleteGameMemories(gameId: string): Promise<void> {
+    // 패턴으로 키 찾기
+    const pattern = `bot:memory:${gameId}:*`;
+    const keys = await this.redisService.scanKeys(pattern);
+
+    // 각 키를 개별적으로 삭제
+    for (const key of keys) {
+      await this.redisService.del(key);
+    }
+
+    // 현재 턴 이벤트도 정리
+    for (const key of this.currentTurnEvents.keys()) {
+      if (key.startsWith(`${gameId}:`)) {
+        this.currentTurnEvents.delete(key);
+      }
+    }
   }
 }

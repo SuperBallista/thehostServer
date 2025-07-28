@@ -54,6 +54,8 @@ export interface BotState {
 }
 
 export interface GameContext {
+  // 게임 ID
+  gameId: string;
   // 이전 턴 요약
   previousTurnSummary: string;
   // 현재 턴 채팅 내용

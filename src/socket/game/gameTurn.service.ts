@@ -120,8 +120,9 @@ export class GameTurnService {
 
     if (selectedItem && selectedItem.itemId !== 'none') {
       const playerKey = `game:${gameId}:player:${playerId}`;
-      const playerData: GamePlayerInRedis =
-        await this.redisService.getAndParse(playerKey);
+      const playerData = (await this.redisService.getAndParse(
+        playerKey,
+      )) as GamePlayerInRedis | null;
 
       if (!playerData) {
         throw new WsException(
@@ -133,7 +134,7 @@ export class GameTurnService {
         playerData.items = [];
       }
 
-      playerData.items.push(selectedItem.itemId as ItemCode);
+      playerData.items.push(selectedItem.itemId);
 
       await this.redisService.stringifyAndSet(playerKey, playerData);
 
@@ -190,9 +191,9 @@ export class GameTurnService {
     const MAX_PLAYERS = 20;
 
     for (let i = 0; i < MAX_PLAYERS; i++) {
-      const playerData = await this.redisService.getAndParse(
+      const playerData = (await this.redisService.getAndParse(
         `game:${gameId}:player:${i}`,
-      );
+      )) as GamePlayerInRedis | null;
       if (playerData) {
         players.push(playerData);
       }
@@ -226,74 +227,77 @@ export class GameTurnService {
     // 기존 타이머가 있으면 제거
     this.clearTurnTimer(gameId);
 
-    const checkInterval = setInterval(async () => {
-      try {
-        // Redis에서 턴 종료 시간 가져오기
-        const turnEndTimeData = await this.redisService.getAndParse(
-          `game:${gameId}:turnEndTime`,
-        );
+    const checkInterval = setInterval(() => {
+      void (async () => {
+        try {
+          // Redis에서 턴 종료 시간 가져오기
+          const turnEndTimeData = (await this.redisService.getAndParse(
+            `game:${gameId}:turnEndTime`,
+          )) as { endTime: number } | null;
 
-        if (!turnEndTimeData || !turnEndTimeData.endTime) {
-          console.log(`[GameTurn] 턴 종료 시간이 없음 - 타이머 중지`);
-          clearInterval(checkInterval);
-          this.turnTimers.delete(gameId);
-          return;
+          if (!turnEndTimeData || !turnEndTimeData.endTime) {
+            console.log(`[GameTurn] 턴 종료 시간이 없음 - 타이머 중지`);
+            clearInterval(checkInterval);
+            this.turnTimers.delete(gameId);
+            return;
+          }
+
+          const currentTime = Date.now();
+          const remainingTime = turnEndTimeData.endTime - currentTime;
+
+          // 디버깅을 위한 로그 (10초마다)
+          if (remainingTime % 10000 < 1000) {
+            console.log(
+              `[GameTurn] 남은 시간: ${Math.ceil(remainingTime / 1000)}초`,
+            );
+          }
+
+          // 15초 전에 봇 요약 생성 시작
+          if (
+            remainingTime <= 15000 &&
+            remainingTime > 14000 &&
+            !this.summaryStarted.has(gameId)
+          ) {
+            console.log(
+              `[GameTurn] 턴 종료 15초 전 - 봇 요약 생성 시작: ${gameId}`,
+            );
+            this.summaryStarted.add(gameId);
+            // 15초 전에 턴 요약 시작
+            this.startTurnSummaryGeneration(gameId);
+          }
+
+          // 턴 종료 10초 전 봇의 턴 종료 행동 설정
+          if (remainingTime <= 10000 && remainingTime > 9000) {
+            console.log(
+              `[GameTurn] 봇의 턴 종료 행동 설정 - gameId: ${gameId}`,
+            );
+            await this.botService.handleTurnEnd(gameId);
+          }
+
+          // 턴 종료 시간이 되었는지 확인
+          if (remainingTime <= 0) {
+            console.log(`[GameTurn] 턴 종료 시간 도달 - gameId: ${gameId}`);
+            clearInterval(checkInterval);
+            this.turnTimers.delete(gameId);
+            this.summaryStarted.delete(gameId);
+
+            // Redis에서 턴 종료 시간 삭제
+            await this.redisService.del(`game:${gameId}:turnEndTime`);
+
+            // 턴 종료 이벤트 발행
+            const { InternalUpdateType } = await import(
+              '../../redis/pubsub.types'
+            );
+            await this.redisPubSubService.publishInternal({
+              type: InternalUpdateType.TURN_END,
+              data: { gameId },
+              timestamp: Date.now(),
+            });
+          }
+        } catch (error) {
+          console.error(`[GameTurn] 타이머 체크 중 오류:`, error);
         }
-
-        const currentTime = Date.now();
-        const remainingTime = turnEndTimeData.endTime - currentTime;
-
-        // 디버깅을 위한 로그 (10초마다)
-        if (remainingTime % 10000 < 1000) {
-          console.log(
-            `[GameTurn] 남은 시간: ${Math.ceil(remainingTime / 1000)}초`,
-          );
-        }
-
-        // 턴 종료 15초 전 봇 요약 생성 시작
-        if (
-          remainingTime <= 15000 &&
-          remainingTime > 14000 &&
-          !this.summaryStarted.has(gameId)
-        ) {
-          console.log(
-            `[GameTurn] 턴 종료 15초 전 - 봇 요약 생성 시작: ${gameId}`,
-          );
-          this.summaryStarted.add(gameId);
-          this.startTurnSummaryGeneration(gameId);
-        }
-
-        // 턴 종료 10초 전 봇의 턴 종료 행동 설정
-        if (remainingTime <= 10000 && remainingTime > 9000) {
-          console.log(`[GameTurn] 봇의 턴 종료 행동 설정 - gameId: ${gameId}`);
-          await this.botService.handleTurnEnd(gameId);
-        }
-
-        // 시간이 만료되었으면 턴 종료 처리
-        if (remainingTime <= 0) {
-          console.log(`[GameTurn] 턴 타이머 만료 - gameId: ${gameId}`);
-
-          // 타이머 중지
-          clearInterval(checkInterval);
-          this.turnTimers.delete(gameId);
-          this.summaryStarted.delete(gameId); // 요약 시작 플래그 정리
-
-          // Redis에서 턴 종료 시간 삭제
-          await this.redisService.del(`game:${gameId}:turnEndTime`);
-
-          // 턴 종료 이벤트 발행
-          const { InternalUpdateType, InternalMessageBuilder } = await import(
-            '../../redis/pubsub.types'
-          );
-          await this.redisPubSubService.publishInternal({
-            type: InternalUpdateType.TURN_END,
-            data: { gameId },
-            timestamp: Date.now(),
-          });
-        }
-      } catch (error) {
-        console.error(`[GameTurn] 타이머 체크 중 오류:`, error);
-      }
+      })();
     }, 1000); // 1초마다 체크
 
     // NodeJS.Timeout 타입으로 저장
@@ -325,9 +329,9 @@ export class GameTurnService {
    * 현재 턴의 남은 시간 가져오기 (프론트엔드 동기화용)
    */
   async getRemainingTurnTime(gameId: string): Promise<number> {
-    const turnEndTimeData = await this.redisService.getAndParse(
+    const turnEndTimeData = (await this.redisService.getAndParse(
       `game:${gameId}:turnEndTime`,
-    );
+    )) as { endTime: number } | null;
     if (!turnEndTimeData || !turnEndTimeData.endTime) {
       return 0;
     }
@@ -339,12 +343,14 @@ export class GameTurnService {
   /**
    * 턴 요약 생성 시작 (15초 전부터 순차적으로)
    */
-  private async startTurnSummaryGeneration(gameId: string): Promise<void> {
+  private startTurnSummaryGeneration(gameId: string): void {
     try {
       console.log(`[GameTurn] 턴 요약 생성 시작 - gameId: ${gameId}`);
 
-      // 백그라운드에서 순차적으로 요약 처리 (await 없이)
-      this.processTurnSummariesSequentially(gameId);
+      // 백그라운드에서 순차적으로 요약 처리
+      this.processTurnSummariesSequentially(gameId).catch((error) => {
+        console.error(`[GameTurn] 턴 요약 처리 중 오류:`, error);
+      });
     } catch (error) {
       console.error(`[GameTurn] 턴 요약 생성 시작 중 오류:`, error);
     }
@@ -389,7 +395,10 @@ export class GameTurnService {
           );
 
           // LLM을 사용하여 턴 요약 생성
-          const summary = await this.llmService.summarizeTurn(turnEvents);
+          const summary = await this.llmService.summarizeTurn(
+            turnEvents,
+            gameId,
+          );
 
           if (summary && summary.summary) {
             // 봇 메모리의 현재 턴 정보 업데이트
@@ -447,11 +456,15 @@ export class GameTurnService {
     try {
       // 현재 턴의 채팅 메시지들 수집 (Redis에서 직접 조회)
       const chatKey = `game:${gameId}:chats`;
-      const chatData = await this.redisService.getAndParse(chatKey);
+      const chatData = (await this.redisService.getAndParse(chatKey)) as
+        | chatMessage[]
+        | null;
 
       if (chatData && Array.isArray(chatData)) {
         chatData.forEach((chat: chatMessage) => {
-          const playerName = chat.playerId ? `Player${chat.playerId}` : 'System';
+          const playerName = chat.playerId
+            ? `Player${chat.playerId}`
+            : 'System';
           events.push({
             type: 'chat',
             message: `${playerName}: ${chat.message || ''}`,

@@ -15,6 +15,8 @@ import {
   convertItemCodeToKorean,
   ITEM_CODE_TO_KOREAN,
 } from './constants/item-mappings';
+import { promises as fs } from 'fs';
+import * as path from 'path';
 
 /**
  * GameContext를 한글로 변환하는 헬퍼 함수
@@ -37,8 +39,6 @@ function convertContextToKorean(context: GameContext) {
 }
 import { LLMProvider } from './llm-providers/llm-provider.interface';
 import { LLMProviderFactory } from './llm-providers/llm-provider.factory';
-import { promises as fs } from 'fs';
-import * as path from 'path';
 
 // 타입 정의 추가
 interface ParsedActionResponse {
@@ -80,6 +80,33 @@ const ActionResponseSchema = z.object({
 export class LLMService implements OnModuleInit {
   private readonly logger = new Logger(LLMService.name);
   private llmProvider: LLMProvider | null = null;
+
+  /**
+   * 로그 파일에 기록하는 헬퍼 메소드
+   */
+  private async writeLog(gameId: string, logType: string, input: any, output: string): Promise<void> {
+    try {
+      const logsDir = path.join(process.cwd(), 'logs');
+      
+      // logs 디렉토리가 없으면 생성
+      try {
+        await fs.access(logsDir);
+      } catch {
+        await fs.mkdir(logsDir, { recursive: true });
+        this.logger.log(`Created logs directory: ${logsDir}`);
+      }
+
+      const logFileName = `llm_${gameId}.txt`;
+      const logPath = path.join(logsDir, logFileName);
+      const logEntry = `\n[${logType}] INPUT: ${JSON.stringify(input, null, 2)}\nOUTPUT: ${output}\nTIMESTAMP: ${new Date().toISOString()}\n${'='.repeat(50)}\n`;
+      
+      await fs.appendFile(logPath, logEntry);
+      
+      this.logger.debug(`Log written to: ${logPath}`);
+    } catch (error) {
+      this.logger.error(`Failed to write log for game ${gameId}:`, error);
+    }
+  }
 
   /**
    * LLM 응답에서 영어 아이템 코드를 한글로 변환
@@ -223,7 +250,8 @@ export class LLMService implements OnModuleInit {
         temperature: 0.8,
         maxTokens: 400,
       };
-      const content = await this.llmProvider.generateCompletion(llmInput);
+      const response = await this.llmProvider.generateCompletion(llmInput);
+      const content = response.content;
 
       // 로그 기록 (상세한 컨텍스트 포함, currentItemCodes 제외)
       const contextForLog = { ...context };
@@ -235,10 +263,7 @@ export class LLMService implements OnModuleInit {
         gameContext: contextForLog,
         timestamp: new Date().toISOString(),
       };
-      await fs.appendFile(
-        path.join(process.cwd(), 'logs', 'llm.txt'),
-        `\n[decideChatMessage] DETAILED_INPUT: ${JSON.stringify(detailedLog, null, 2)}\nOUTPUT: ${content}\n`,
-      );
+      await this.writeLog(context.gameId, 'decideChatMessage', detailedLog, content);
 
       if (!content) {
         this.logger.warn('LLM 응답이 비어있음, 기본 채팅 결정 반환');
@@ -368,13 +393,11 @@ export class LLMService implements OnModuleInit {
         maxTokens: 200,
       };
 
-      const content = await this.llmProvider.generateCompletion(llmInput);
+      const llmResponse = await this.llmProvider.generateCompletion(llmInput);
+      const content = llmResponse.content;
 
       // 로그 기록
-      await fs.appendFile(
-        path.join(process.cwd(), 'logs', 'llm.txt'),
-        `\n[decideChatOnly] INPUT: ${JSON.stringify(llmInput, null, 2)}\nOUTPUT: ${content}\n`,
-      );
+      await this.writeLog(context.gameId, 'decideChatOnly', llmInput, content);
 
       if (!content) {
         this.logger.warn('LLM 응답이 비어있음, 기본 채팅 결정 반환');
@@ -382,10 +405,10 @@ export class LLMService implements OnModuleInit {
       }
 
       // 텍스트 응답 파싱
-      const response = content.trim();
+      const responseText = content.trim();
 
       // 채팅하지 않는 경우 (특수문자 조합)
-      if (response === '###') {
+      if (responseText === '###') {
         this.logger.log('채팅 결정: 채팅안함');
         return {
           shouldChat: false,
@@ -394,25 +417,26 @@ export class LLMService implements OnModuleInit {
       }
 
       // 나머지는 모두 채팅 메시지로 처리
-      const convertedMessage = this.convertEnglishItemCodesToKorean(response);
+      const convertedMessage =
+        this.convertEnglishItemCodesToKorean(responseText);
 
       this.logger.log(`채팅 결정: 채팅함 - ${convertedMessage}`);
       return {
         shouldChat: true,
         message: convertedMessage,
-        reasoning: '상황에 맞는 채팅',
+        reasoning: '상황에 적절한 채팅 메시지',
       };
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
-      this.logger.error(`채팅 전용 결정 실패: ${errorMessage}`, errorStack);
+      this.logger.error(`채팅 결정 실패: ${errorMessage}`, errorStack);
       return getDefaultChatDecision();
     }
   }
 
   /**
-   * 게임 행동 전용 결정 (JSON 출력)
+   * 게임 액션 결정 (JSON 응답)
    */
   async decideGameAction(context: GameContext): Promise<{
     action: string;
@@ -450,13 +474,11 @@ location은 "해안", "폐건물", "정글", "동굴", "산 정상", "개울" �
         maxTokens: 300,
       };
 
-      const content = await this.llmProvider.generateCompletion(llmInput);
+      const llmResponse = await this.llmProvider.generateCompletion(llmInput);
+      const content = llmResponse.content;
 
       // 로그 기록
-      await fs.appendFile(
-        path.join(process.cwd(), 'logs', 'llm.txt'),
-        `\n[decideGameAction] INPUT: ${JSON.stringify(llmInput, null, 2)}\nOUTPUT: ${content}\n`,
-      );
+      await this.writeLog(context.gameId, 'decideGameAction', llmInput, content);
 
       if (!content) {
         this.logger.warn('LLM 응답이 비어있음, 기본 행동 반환');
@@ -550,6 +572,7 @@ location은 "해안", "폐건물", "정글", "동굴", "산 정상", "개울" �
    */
   async summarizeTurn(
     events: Array<{ message: string }>,
+    gameId: string,
   ): Promise<{ summary: string }> {
     try {
       if (!this.llmProvider || !(await this.llmProvider.isAvailable())) {
@@ -574,7 +597,8 @@ location은 "해안", "폐건물", "정글", "동굴", "산 정상", "개울" �
         temperature: 0.5,
         maxTokens: 300,
       };
-      const content = await this.llmProvider.generateCompletion(llmInput);
+      const llmResponse = await this.llmProvider.generateCompletion(llmInput);
+      const content = llmResponse.content;
 
       // 로그 기록 (상세한 컨텍스트 포함)
       const detailedLog = {
@@ -582,10 +606,7 @@ location은 "해안", "폐건물", "정글", "동굴", "산 정상", "개울" �
         gameContext: events,
         timestamp: new Date().toISOString(),
       };
-      await fs.appendFile(
-        path.join(process.cwd(), 'logs', 'llm.txt'),
-        `\n[summarizeTurn] DETAILED_INPUT: ${JSON.stringify(detailedLog, null, 2)}\nOUTPUT: ${content}\n`,
-      );
+      await this.writeLog(gameId, 'summarizeTurn', detailedLog, content);
 
       if (!content || content.trim() === '') {
         this.logger.warn('LLM 응답이 비어있음, 기본 요약 반환');

@@ -37,7 +37,8 @@ export class LLMProviderFactory {
     const provider = this.configService.get<string>(
       'LLM_PROVIDER',
       'ollama',
-    ) as any;
+    ) as 'openai' | 'anthropic' | 'google' | 'ollama' | 'openrouter' | 'custom';
+
     const apiKey = this.configService.get<string>('LLM_API_KEY');
     const apiUrl = this.configService.get<string>('LLM_API_URL');
     const model = this.configService.get<string>(
@@ -45,7 +46,7 @@ export class LLMProviderFactory {
       this.getDefaultModel(provider),
     );
     const temperature = this.configService.get<number>('LLM_TEMPERATURE', 0.7);
-    const maxTokens = this.configService.get<number>('LLM_MAX_TOKENS', 1000);
+    const maxTokens = this.configService.get<number>('LLM_MAX_TOKENS', 2000);
 
     return {
       provider,
@@ -57,16 +58,20 @@ export class LLMProviderFactory {
     };
   }
 
-  private getDefaultModel(provider: string): string {
+  private getDefaultModel(provider: LLMConfig['provider']): string {
     switch (provider) {
       case 'openai':
-        return 'gpt-3.5-turbo';
+        return 'gpt-4o-mini';
       case 'ollama':
-        return 'llama2';
+        return 'llama3.2';
       case 'openrouter':
-        return 'mistralai/mixtral-8x7b-instruct';
+        return 'openai/gpt-4o-mini';
+      case 'anthropic':
+        return 'claude-3.5-sonnet';
+      case 'google':
+        return 'gemini-2.5-flash';
       default:
-        return 'default-model';
+        return 'llama3.2';
     }
   }
 }
