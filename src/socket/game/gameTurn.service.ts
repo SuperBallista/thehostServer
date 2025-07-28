@@ -7,6 +7,7 @@ import {
   ItemCode,
   REGION_NAMES,
   ITEM_NAMES,
+  chatMessage,
 } from './game.types';
 import { ChatService } from './chat.service';
 import { GameDataService } from './game-data.service';
@@ -439,8 +440,8 @@ export class GameTurnService {
    */
   private async collectTurnEvents(
     gameId: string,
-  ): Promise<Array<{ type: string; message: string; timestamp?: any }>> {
-    const events: Array<{ type: string; message: string; timestamp?: any }> =
+  ): Promise<Array<{ type: string; message: string; timestamp?: Date }>> {
+    const events: Array<{ type: string; message: string; timestamp?: Date }> =
       [];
 
     try {
@@ -449,11 +450,12 @@ export class GameTurnService {
       const chatData = await this.redisService.getAndParse(chatKey);
 
       if (chatData && Array.isArray(chatData)) {
-        chatData.forEach((chat: any) => {
+        chatData.forEach((chat: chatMessage) => {
+          const playerName = chat.playerId ? `Player${chat.playerId}` : 'System';
           events.push({
             type: 'chat',
-            message: `${chat.sender || 'Unknown'}: ${chat.message || ''}`,
-            timestamp: chat.timestamp,
+            message: `${playerName}: ${chat.message || ''}`,
+            timestamp: chat.timeStamp,
           });
         });
       }

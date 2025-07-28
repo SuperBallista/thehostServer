@@ -12,7 +12,9 @@ export class GameDataService {
    * 게임 데이터 가져오기
    */
   async getGameData(gameId: string): Promise<GameInRedis> {
-    const gameData = await this.redisService.getAndParse(`game:${gameId}`);
+    const gameData = (await this.redisService.getAndParse(
+      `game:${gameId}`,
+    )) as GameInRedis | null;
     if (!gameData) {
       throw new WsException('게임 데이터를 찾을 수 없습니다');
     }
@@ -30,7 +32,9 @@ export class GameDataService {
    * 대기실 데이터 가져오기
    */
   async getWaitRoomData(roomId: string): Promise<Room> {
-    const roomData = await this.redisService.getAndParse(`room:data:${roomId}`);
+    const roomData = (await this.redisService.getAndParse(
+      `room:data:${roomId}`,
+    )) as Room | null;
     if (!roomData) {
       throw new WsException('방정보가 없습니다');
     }
@@ -41,7 +45,9 @@ export class GameDataService {
    * 호스트 데이터 가져오기
    */
   async getHostData(gameId: string): Promise<Host | null> {
-    return await this.redisService.getAndParse(`game:${gameId}:host`);
+    return (await this.redisService.getAndParse(
+      `game:${gameId}:host`,
+    )) as Host | null;
   }
 
   /**
@@ -153,11 +159,13 @@ export class GameDataService {
    */
   async getRegionData(gameId: string, regionId: number): Promise<Region> {
     // Redis ERD에 맞게 키 수정: game:gameId:region:turn:regionId
-    const gameData = await this.redisService.getAndParse(`game:${gameId}`);
+    const gameData = (await this.redisService.getAndParse(
+      `game:${gameId}`,
+    )) as GameInRedis | null;
     const turn = gameData?.turn || 1;
-    const regionData = await this.redisService.getAndParse(
+    const regionData = (await this.redisService.getAndParse(
       `game:${gameId}:region:${turn}:${regionId}`,
-    );
+    )) as Region | null;
 
     if (!regionData) {
       // 구역 데이터가 없으면 기본 구조 생성
@@ -178,7 +186,9 @@ export class GameDataService {
     regionData: Region,
   ): Promise<void> {
     // Redis ERD에 맞게 키 수정: game:gameId:region:turn:regionId
-    const gameData = await this.redisService.getAndParse(`game:${gameId}`);
+    const gameData = (await this.redisService.getAndParse(
+      `game:${gameId}`,
+    )) as GameInRedis | null;
     const turn = gameData?.turn || 1;
     await this.redisService.stringifyAndSet(
       `game:${gameId}:region:${turn}:${regionId}`,

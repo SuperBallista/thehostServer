@@ -1,5 +1,6 @@
 // src/socket/game/game.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { Socket } from 'socket.io';
 import { RedisPubSubService } from '../../redis/redisPubSub.service';
 import {
   Game,
@@ -164,7 +165,7 @@ export class GameService {
   }
 
   async subscribeGameStart(
-    client: any,
+    client: Socket,
     userId: number,
     users: userShortInfo[],
     roomId: string,

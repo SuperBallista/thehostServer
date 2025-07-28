@@ -37,7 +37,7 @@ export interface BotStats {
 
 export interface BotAction {
   type: string;
-  params: any;
+  params: Record<string, unknown>;
   startedAt: Date;
 }
 

@@ -7,6 +7,8 @@
 
 import { BotService } from './bot.service';
 import { BotConfig } from './interfaces/bot.interface';
+import { GamePlayerInRedis } from '../socket/game/game.types';
+import { chatMessage } from '../socket/game/game.types';
 
 export class BotIntegrationExample {
   constructor(private readonly botService: BotService) {}
@@ -36,7 +38,10 @@ export class BotIntegrationExample {
   /**
    * 게임 시작 시 봇 초기화
    */
-  async onGameStart(gameId: string, players: any[]): Promise<void> {
+  async onGameStart(
+    gameId: string,
+    players: GamePlayerInRedis[],
+  ): Promise<void> {
     for (const player of players) {
       if (player.userId < 0) {
         // 봇인 경우
@@ -66,9 +71,11 @@ export class BotIntegrationExample {
   /**
    * 채팅 메시지 수신 시
    */
-  async onChatMessage(gameId: string, chatData: any): Promise<void> {
+  onChatMessage(gameId: string, chatData: chatMessage): void {
     // TriggerService에 채팅 메시지 전달
     // 실제 구현: RedisPubSubService에서 처리
+    void gameId; // 향후 사용 예정
+    void chatData; // 향후 사용 예정
   }
 
   /**
