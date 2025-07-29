@@ -65,7 +65,7 @@ export class LLMProviderFactory {
       case 'ollama':
         return 'llama3.2';
       case 'openrouter':
-        return 'openai/gpt-4o-mini';
+        return 'google/gemini-2.5-flash-lite';
       case 'anthropic':
         return 'claude-3.5-sonnet';
       case 'google':

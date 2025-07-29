@@ -81,13 +81,32 @@ export class LLMService implements OnModuleInit {
   private readonly logger = new Logger(LLMService.name);
   private llmProvider: LLMProvider | null = null;
 
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly llmProviderFactory: LLMProviderFactory,
+  ) {}
+
+  onModuleInit() {
+    try {
+      this.llmProvider = this.llmProviderFactory.createProvider();
+      this.logger.log('LLM Provider 초기화 완료');
+    } catch (error) {
+      this.logger.error('LLM Provider 초기화 실패:', error);
+    }
+  }
+
   /**
    * 로그 파일에 기록하는 헬퍼 메소드
    */
-  private async writeLog(gameId: string, logType: string, input: any, output: string): Promise<void> {
+  private async writeLog(
+    gameId: string,
+    logType: string,
+    input: any,
+    output: string,
+  ): Promise<void> {
     try {
       const logsDir = path.join(process.cwd(), 'logs');
-      
+
       // logs 디렉토리가 없으면 생성
       try {
         await fs.access(logsDir);
@@ -98,10 +117,16 @@ export class LLMService implements OnModuleInit {
 
       const logFileName = `llm_${gameId}.txt`;
       const logPath = path.join(logsDir, logFileName);
-      const logEntry = `\n[${logType}] INPUT: ${JSON.stringify(input, null, 2)}\nOUTPUT: ${output}\nTIMESTAMP: ${new Date().toISOString()}\n${'='.repeat(50)}\n`;
-      
+      const logEntry = `\n[${logType}] INPUT: ${JSON.stringify(
+        input,
+        null,
+        2,
+      )}\nOUTPUT: ${output}\nTIMESTAMP: ${new Date().toISOString()}\n${'='.repeat(
+        50,
+      )}\n`;
+
       await fs.appendFile(logPath, logEntry);
-      
+
       this.logger.debug(`Log written to: ${logPath}`);
     } catch (error) {
       this.logger.error(`Failed to write log for game ${gameId}:`, error);
@@ -127,11 +152,6 @@ export class LLMService implements OnModuleInit {
 
     return convertedText;
   }
-
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly llmProviderFactory: LLMProviderFactory,
-  ) {}
 
   /**
    * AI가 생성한 액션을 수정하는 헬퍼 함수
@@ -205,21 +225,6 @@ export class LLMService implements OnModuleInit {
     return action;
   }
 
-  async onModuleInit() {
-    try {
-      this.llmProvider = this.llmProviderFactory.createProvider();
-      if (this.llmProvider && (await this.llmProvider.isAvailable())) {
-        this.logger.log('LLM 서비스 초기화 완료');
-      } else {
-        this.logger.warn(
-          'LLM 서비스를 사용할 수 없습니다. 기본 응답을 사용합니다.',
-        );
-      }
-    } catch (error) {
-      this.logger.error('LLM 서비스 초기화 실패:', error);
-    }
-  }
-
   /**
    * 채팅 메시지 결정 (기존 함수 - 하위 호환성 유지)
    */
@@ -263,7 +268,12 @@ export class LLMService implements OnModuleInit {
         gameContext: contextForLog,
         timestamp: new Date().toISOString(),
       };
-      await this.writeLog(context.gameId, 'decideChatMessage', detailedLog, content);
+      await this.writeLog(
+        context.gameId,
+        'decideChatMessage',
+        detailedLog,
+        content,
+      );
 
       if (!content) {
         this.logger.warn('LLM 응답이 비어있음, 기본 채팅 결정 반환');
@@ -362,6 +372,14 @@ export class LLMService implements OnModuleInit {
   async decideChatOnly(
     context: GameContext,
   ): Promise<{ shouldChat: boolean; message?: string; reasoning: string }> {
+    let llmInput: {
+      messages: { role: 'user'; content: string }[];
+      responseFormat: 'text';
+      temperature: number;
+      maxTokens: number;
+    } | null = null;
+    let responseContent = '';
+
     try {
       if (!this.llmProvider || !(await this.llmProvider.isAvailable())) {
         return getDefaultChatDecision();
@@ -371,18 +389,8 @@ export class LLMService implements OnModuleInit {
       const koreanContext = convertContextToKorean(context);
       const prompt = buildChatOnlyPrompt(koreanContext as GameContext);
 
-      const llmInput = {
+      llmInput = {
         messages: [
-          {
-            role: 'system' as const,
-            content: `당신은 숙주 추리 게임의 봇 플레이어입니다. 현재 상황을 분석하여 채팅 메세지를 보내세요.
-성격: ${context.personality.mbti} / ${context.personality.gender === 'male' ? '남성' : '여성'}
-역할: ${context.role === 'host' ? '숙주 (다른 플레이어에게는 생존자로 보임)' : '생존자'}
-
-응답 형식:
-- 채팅하는 경우: 메시지 내용만 출력 (큰따옴표 없이)
-- 채팅을 원치 않는 경우: ### (특수문자 3개만)`,
-          },
           {
             role: 'user' as const,
             content: prompt,
@@ -394,18 +402,15 @@ export class LLMService implements OnModuleInit {
       };
 
       const llmResponse = await this.llmProvider.generateCompletion(llmInput);
-      const content = llmResponse.content;
+      responseContent = llmResponse.content;
 
-      // 로그 기록
-      await this.writeLog(context.gameId, 'decideChatOnly', llmInput, content);
-
-      if (!content) {
+      if (!responseContent) {
         this.logger.warn('LLM 응답이 비어있음, 기본 채팅 결정 반환');
         return getDefaultChatDecision();
       }
 
       // 텍스트 응답 파싱
-      const responseText = content.trim();
+      const responseText = responseContent.trim();
 
       // 채팅하지 않는 경우 (특수문자 조합)
       if (responseText === '###') {
@@ -431,7 +436,21 @@ export class LLMService implements OnModuleInit {
         error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(`채팅 결정 실패: ${errorMessage}`, errorStack);
+
+      // 에러 시에도 에러 내용을 응답으로 설정
+      responseContent = `ERROR: ${errorMessage}`;
+
       return getDefaultChatDecision();
+    } finally {
+      // 성공/실패 여부와 관계없이 로그 기록
+      if (llmInput) {
+        await this.writeLog(
+          context.gameId,
+          'decideChatOnly',
+          llmInput,
+          responseContent,
+        );
+      }
     }
   }
 
@@ -443,6 +462,14 @@ export class LLMService implements OnModuleInit {
     params: Record<string, any>;
     reasoning?: string;
   }> {
+    let llmInput: {
+      messages: { role: 'user'; content: string }[];
+      responseFormat: 'json';
+      temperature: number;
+      maxTokens: number;
+    } | null = null;
+    let responseContent = '';
+
     try {
       if (!this.llmProvider || !(await this.llmProvider.isAvailable())) {
         return getDefaultAction(context);
@@ -452,18 +479,8 @@ export class LLMService implements OnModuleInit {
       const koreanContext = convertContextToKorean(context);
       const prompt = buildActionOnlyPrompt(koreanContext as GameContext);
 
-      const llmInput = {
+      llmInput = {
         messages: [
-          {
-            role: 'system' as const,
-            content: `당신은 숙주 추리 게임의 ${context.role === 'host' ? '숙주' : '생존자'} 봇 플레이어입니다.
-성격: ${context.personality.mbti} / ${context.personality.gender === 'male' ? '남성' : '여성'}
-
-현재 상황을 분석하여 최적의 행동을 JSON 형식으로 결정하세요.
-반드시 유효한 JSON 형식으로 응답하며, 모든 텍스트는 한글로 작성하세요.
-location은 "해안", "폐건물", "정글", "동굴", "산 정상", "개울" 중 하나여야 합니다.
-아이템명도 반드시 한글로 사용하세요.`,
-          },
           {
             role: 'user' as const,
             content: prompt,
@@ -475,19 +492,17 @@ location은 "해안", "폐건물", "정글", "동굴", "산 정상", "개울" �
       };
 
       const llmResponse = await this.llmProvider.generateCompletion(llmInput);
-      const content = llmResponse.content;
+      responseContent = llmResponse.content;
 
-      // 로그 기록
-      await this.writeLog(context.gameId, 'decideGameAction', llmInput, content);
-
-      if (!content) {
+      if (!responseContent) {
         this.logger.warn('LLM 응답이 비어있음, 기본 행동 반환');
         return getDefaultAction(context);
       }
 
       try {
         // 영어 아이템 코드를 한글로 변환
-        const convertedContent = this.convertEnglishItemCodesToKorean(content);
+        const convertedContent =
+          this.convertEnglishItemCodesToKorean(responseContent);
 
         // JSON 응답 파싱 시도
         let parsed: ParsedActionResponse;
@@ -555,7 +570,7 @@ location은 "해안", "폐건물", "정글", "동굴", "산 정상", "개울" �
             ? parseError.message
             : 'Unknown parsing error';
         this.logger.warn(`LLM 행동 결정 파싱 실패: ${errorMessage}`);
-        this.logger.warn(`파싱 실패한 응답: ${content}`);
+        this.logger.warn(`파싱 실패한 응답: ${responseContent}`);
         return getDefaultAction(context);
       }
     } catch (error: unknown) {
@@ -563,7 +578,21 @@ location은 "해안", "폐건물", "정글", "동굴", "산 정상", "개울" �
         error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(`게임 행동 결정 실패: ${errorMessage}`, errorStack);
+
+      // 에러 시에도 에러 내용을 응답으로 설정
+      responseContent = `ERROR: ${errorMessage}`;
+
       return getDefaultAction(context);
+    } finally {
+      // 성공/실패 여부와 관계없이 로그 기록
+      if (llmInput) {
+        await this.writeLog(
+          context.gameId,
+          'decideGameAction',
+          llmInput,
+          responseContent,
+        );
+      }
     }
   }
 
