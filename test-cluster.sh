@@ -34,7 +34,7 @@ npm run build || {
 
 # PM2로 클러스터 시작 (3개 인스턴스)
 echo "PM2 클러스터 시작 중 (3개 인스턴스)..."
-pm2 start ecosystem.dev.js --env development
+pm2 start ./dist/main.js --name "thehost-server-dev" -i 3 --env development
 
 # 상태 확인
 echo "클러스터 상태 확인:"

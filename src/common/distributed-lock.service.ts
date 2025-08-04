@@ -119,6 +119,125 @@ export class DistributedLockService {
   }
 
   /**
+   * 게임 소유권 획득 (게임 전체 기간 동안 유지)
+   * @param gameId 게임 ID
+   * @param maxGameDuration 최대 게임 지속 시간 (밀리초, 기본 3시간)
+   * @returns 소유권 획득 성공 여부
+   */
+  async acquireGameOwnership(
+    gameId: string,
+    maxGameDuration: number = 3 * 60 * 60 * 1000 // 3시간
+  ): Promise<boolean> {
+    const ownershipKey = `game_owner:${gameId}`;
+    const ownerValue = `${process.pid}_${Date.now()}`;
+
+    try {
+      // 게임 소유권을 획득 시도 (이미 존재하면 실패)
+      const result = await this.redisService.getClient().set(
+        ownershipKey,
+        ownerValue,
+        'PX',
+        maxGameDuration,
+        'NX',
+      );
+
+      if (result === 'OK') {
+        this.logger.log(`👑 Game ownership acquired: ${gameId} by process ${process.pid}`);
+        return true;
+      }
+
+      // 현재 소유자 확인
+      const currentOwner = await this.redisService.getClient().get(ownershipKey);
+      this.logger.warn(
+        `👑 Game ownership already held: ${gameId} by ${currentOwner} (current process: ${process.pid})`
+      );
+      return false;
+    } catch (error) {
+      this.logger.error(`Error acquiring game ownership for ${gameId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * 게임 소유권 확인
+   * @param gameId 게임 ID
+   * @returns 현재 프로세스가 소유권을 가지고 있는지 여부
+   */
+  async hasGameOwnership(gameId: string): Promise<boolean> {
+    const ownershipKey = `game_owner:${gameId}`;
+    
+    try {
+      const currentOwner = await this.redisService.getClient().get(ownershipKey);
+      if (!currentOwner) {
+        return false;
+      }
+
+      // 소유자 정보에서 프로세스 ID 추출
+      const [ownerPid] = currentOwner.split('_');
+      const isOwner = ownerPid === process.pid.toString();
+      
+      if (isOwner) {
+        this.logger.debug(`👑 Confirmed game ownership: ${gameId} by process ${process.pid}`);
+      }
+      
+      return isOwner;
+    } catch (error) {
+      this.logger.error(`Error checking game ownership for ${gameId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * 게임 소유권 해제
+   * @param gameId 게임 ID
+   */
+  async releaseGameOwnership(gameId: string): Promise<void> {
+    const ownershipKey = `game_owner:${gameId}`;
+    
+    try {
+      const currentOwner = await this.redisService.getClient().get(ownershipKey);
+      if (currentOwner) {
+        const [ownerPid] = currentOwner.split('_');
+        if (ownerPid === process.pid.toString()) {
+          await this.redisService.getClient().del(ownershipKey);
+          this.logger.log(`👑 Game ownership released: ${gameId} by process ${process.pid}`);
+        } else {
+          this.logger.warn(
+            `👑 Cannot release game ownership: ${gameId} is owned by process ${ownerPid}, not ${process.pid}`
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Error releasing game ownership for ${gameId}:`, error);
+    }
+  }
+
+  /**
+   * 게임 소유권 연장 (게임이 길어질 경우)
+   * @param gameId 게임 ID
+   * @param additionalTime 추가 시간 (밀리초)
+   */
+  async extendGameOwnership(gameId: string, additionalTime: number = 60 * 60 * 1000): Promise<boolean> {
+    const ownershipKey = `game_owner:${gameId}`;
+    
+    try {
+      const hasOwnership = await this.hasGameOwnership(gameId);
+      if (!hasOwnership) {
+        this.logger.warn(`👑 Cannot extend ownership: ${gameId} not owned by process ${process.pid}`);
+        return false;
+      }
+
+      // TTL 연장
+      await this.redisService.getClient().pexpire(ownershipKey, additionalTime);
+      this.logger.log(`👑 Game ownership extended: ${gameId} by ${additionalTime}ms`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Error extending game ownership for ${gameId}:`, error);
+      return false;
+    }
+  }
+
+  /**
    * 대기 함수
    */
   private sleep(ms: number): Promise<void> {

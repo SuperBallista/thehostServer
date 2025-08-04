@@ -32,6 +32,7 @@ interface ItemProbabilities {
 export class GameTurnService {
   private turnTimers = new Map<string, NodeJS.Timeout>();
   private summaryStarted = new Set<string>(); // 요약 생성 시작된 게임 ID 추적
+  private gameOwnerships = new Set<string>(); // 이 프로세스가 소유하고 있는 게임 ID들
 
   constructor(
     private readonly redisService: RedisService,
@@ -46,14 +47,22 @@ export class GameTurnService {
   ) {}
 
   async onTurnStart(gameId: string, currentTurn?: number): Promise<void> {
-    const lockKey = `turn_start_${gameId}`;
-    
-    await this.distributedLockService.executeWithLock(
-      lockKey,
-      () => this.executeOnTurnStart(gameId, currentTurn),
-      60000, // 60초 TTL
-      2, // 2회 재시도
-    );
+    // 게임 소유권 획득 시도 (첫 턴 시작 시에만)
+    if (!this.gameOwnerships.has(gameId)) {
+      const ownershipAcquired = await this.distributedLockService.acquireGameOwnership(gameId);
+      if (ownershipAcquired) {
+        this.gameOwnerships.add(gameId);
+        console.log(`👑 [GameTurn] 게임 ${gameId}의 턴 관리 소유권 획득 - Process ${process.pid}`);
+      } else {
+        console.log(`👑 [GameTurn] 게임 ${gameId}의 턴 관리는 다른 프로세스가 담당 - Process ${process.pid}`);
+        return; // 소유권이 없으면 아무것도 하지 않음
+      }
+    }
+
+    // 소유권을 가진 프로세스만 턴 시작 처리
+    if (this.gameOwnerships.has(gameId)) {
+      await this.executeOnTurnStart(gameId, currentTurn);
+    }
   }
 
   private async executeOnTurnStart(gameId: string, currentTurn?: number): Promise<void> {
@@ -118,6 +127,8 @@ export class GameTurnService {
       if (gameData) {
         const turnDuration = gameData.turn <= 4 ? 60 : 90;
         await this.setTurnEndTime(gameId, turnDuration);
+        
+        // 게임 소유권을 가진 프로세스만 타이머 시작
         this.startTurnTimer(gameId);
       }
     } catch (error) {
@@ -294,18 +305,21 @@ export class GameTurnService {
             this.turnTimers.delete(gameId);
             this.summaryStarted.delete(gameId);
 
-            // Redis에서 턴 종료 시간 삭제
-            await this.redisService.del(`game:${gameId}:turnEndTime`);
+            // 게임 소유권을 가진 프로세스만 턴 종료 이벤트 발행
+            if (this.gameOwnerships.has(gameId)) {
+              // Redis에서 턴 종료 시간 삭제
+              await this.redisService.del(`game:${gameId}:turnEndTime`);
 
-            // 턴 종료 이벤트 발행
-            const { InternalUpdateType } = await import(
-              '../../redis/pubsub.types'
-            );
-            await this.redisPubSubService.publishInternal({
-              type: InternalUpdateType.TURN_END,
-              data: { gameId },
-              timestamp: Date.now(),
-            });
+              // 턴 종료 이벤트 발행
+              const { InternalUpdateType } = await import(
+                '../../redis/pubsub.types'
+              );
+              await this.redisPubSubService.publishInternal({
+                type: InternalUpdateType.TURN_END,
+                data: { gameId },
+                timestamp: Date.now(),
+              });
+            }
           }
         } catch (error) {
           console.error(`[GameTurn] 타이머 체크 중 오류:`, error);
@@ -336,6 +350,13 @@ export class GameTurnService {
     this.clearTurnTimer(gameId);
     // Redis에서 턴 종료 시간도 삭제
     await this.redisService.del(`game:${gameId}:turnEndTime`);
+    
+    // 게임 소유권 해제
+    if (this.gameOwnerships.has(gameId)) {
+      await this.distributedLockService.releaseGameOwnership(gameId);
+      this.gameOwnerships.delete(gameId);
+      console.log(`👑 [GameTurn] 게임 ${gameId} 소유권 해제 및 정리 완료 - Process ${process.pid}`);
+    }
   }
 
   /**
@@ -357,14 +378,12 @@ export class GameTurnService {
    * 턴 요약 생성 시작 (15초 전부터 순차적으로)
    */
   private startTurnSummaryGeneration(gameId: string): void {
-    const lockKey = `turn_summary_${gameId}`;
-    
-    this.distributedLockService.executeWithLock(
-      lockKey,
-      () => this.executeStartTurnSummaryGeneration(gameId),
-      120000, // 120초 TTL (요약 생성은 시간이 오래 걸릴 수 있음)
-      1, // 1회 재시도
-    ).catch((error) => {
+    // 게임 소유권을 가진 프로세스만 요약 생성
+    if (!this.gameOwnerships.has(gameId)) {
+      return;
+    }
+
+    this.executeStartTurnSummaryGeneration(gameId).catch((error) => {
       console.error(`[GameTurn] 턴 요약 생성 시작 중 오류:`, error);
     });
   }

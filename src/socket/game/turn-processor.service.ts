@@ -61,14 +61,14 @@ export class TurnProcessorService {
    * 턴 종료 시 호출되는 메인 메서드
    */
   async processTurnEnd(gameId: string): Promise<void> {
-    const lockKey = `turn_end_${gameId}`;
-    
-    await this.distributedLockService.executeWithLock(
-      lockKey,
-      () => this.executeProcessTurnEnd(gameId),
-      120000, // 120초 TTL (턴 종료 처리는 복잡하므로 시간이 오래 걸릴 수 있음)
-      1, // 1회 재시도
-    );
+    // 게임 소유권을 가진 프로세스만 턴 종료 처리
+    const hasOwnership = await this.distributedLockService.hasGameOwnership(gameId);
+    if (!hasOwnership) {
+      console.log(`👑 [TurnProcessor] 게임 ${gameId} 턴 종료 처리 건너뜀 - 다른 프로세스가 담당 (Process ${process.pid})`);
+      return;
+    }
+
+    await this.executeProcessTurnEnd(gameId);
   }
 
   private async executeProcessTurnEnd(gameId: string): Promise<void> {
