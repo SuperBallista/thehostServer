@@ -14,6 +14,7 @@ import { userDataResponse } from '../payload.types';
 import { LLMService } from '../../bot/llm.service';
 import { MemoryService } from '../../bot/memory.service';
 import { GameTurnService } from './gameTurn.service';
+import { DistributedLockService } from '../../common/distributed-lock.service';
 
 const ANIMAL_NICKNAMES = [
   '호랑이',
@@ -53,12 +54,24 @@ export class TurnProcessorService {
     private readonly memoryService: MemoryService,
     private readonly gameStateService: GameStateService,
     private readonly gameTurnService: GameTurnService,
+    private readonly distributedLockService: DistributedLockService,
   ) {}
 
   /**
    * 턴 종료 시 호출되는 메인 메서드
    */
   async processTurnEnd(gameId: string): Promise<void> {
+    const lockKey = `turn_end_${gameId}`;
+    
+    await this.distributedLockService.executeWithLock(
+      lockKey,
+      () => this.executeProcessTurnEnd(gameId),
+      120000, // 120초 TTL (턴 종료 처리는 복잡하므로 시간이 오래 걸릴 수 있음)
+      1, // 1회 재시도
+    );
+  }
+
+  private async executeProcessTurnEnd(gameId: string): Promise<void> {
     console.log(`[TurnProcessor] 턴 종료 처리 시작 - gameId: ${gameId}`);
 
     try {

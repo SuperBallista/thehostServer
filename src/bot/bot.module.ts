@@ -6,6 +6,7 @@ import { LLMService } from './llm.service';
 import { LLMProviderFactory } from './llm-providers/llm-provider.factory';
 import { GameModule } from '../socket/game.module';
 import { RedisModule } from '../redis/redis.module';
+import { DistributedLockService } from '../common/distributed-lock.service';
 
 @Module({
   imports: [forwardRef(() => GameModule), RedisModule],
@@ -15,6 +16,7 @@ import { RedisModule } from '../redis/redis.module';
     MemoryService,
     LLMService,
     LLMProviderFactory,
+    DistributedLockService,
   ],
   exports: [
     BotService,
@@ -22,6 +24,7 @@ import { RedisModule } from '../redis/redis.module';
     MemoryService,
     LLMService,
     LLMProviderFactory,
+    DistributedLockService,
   ],
 })
 export class BotModule {}

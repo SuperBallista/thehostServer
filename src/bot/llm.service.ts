@@ -17,6 +17,7 @@ import {
 } from './constants/item-mappings';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import { DistributedLockService } from '../common/distributed-lock.service';
 
 /**
  * GameContext를 한글로 변환하는 헬퍼 함수
@@ -84,6 +85,7 @@ export class LLMService implements OnModuleInit {
   constructor(
     private readonly configService: ConfigService,
     private readonly llmProviderFactory: LLMProviderFactory,
+    private readonly distributedLockService: DistributedLockService,
   ) {}
 
   onModuleInit() {
@@ -371,6 +373,20 @@ export class LLMService implements OnModuleInit {
    */
   async decideChatOnly(
     context: GameContext,
+    botId?: number,
+  ): Promise<{ shouldChat: boolean; message?: string; reasoning: string }> {
+    const lockKey = `llm_chat_${context.gameId}_${botId || 'unknown'}`;
+    
+    return await this.distributedLockService.executeWithLock(
+      lockKey,
+      () => this.executeChatDecision(context),
+      15000, // 15초 TTL
+      2, // 2회 재시도
+    ) ?? getDefaultChatDecision();
+  }
+
+  private async executeChatDecision(
+    context: GameContext,
   ): Promise<{ shouldChat: boolean; message?: string; reasoning: string }> {
     let llmInput: {
       messages: { role: 'user'; content: string }[];
@@ -457,7 +473,25 @@ export class LLMService implements OnModuleInit {
   /**
    * 게임 액션 결정 (JSON 응답)
    */
-  async decideGameAction(context: GameContext): Promise<{
+  async decideGameAction(
+    context: GameContext,
+    botId?: number,
+  ): Promise<{
+    action: string;
+    params: Record<string, any>;
+    reasoning?: string;
+  }> {
+    const lockKey = `llm_action_${context.gameId}_${botId || 'unknown'}`;
+    
+    return await this.distributedLockService.executeWithLock(
+      lockKey,
+      () => this.executeGameAction(context),
+      20000, // 20초 TTL
+      2, // 2회 재시도
+    ) ?? getDefaultAction(context);
+  }
+
+  private async executeGameAction(context: GameContext): Promise<{
     action: string;
     params: Record<string, any>;
     reasoning?: string;
@@ -600,6 +634,20 @@ export class LLMService implements OnModuleInit {
    * 턴 요약
    */
   async summarizeTurn(
+    events: Array<{ message: string }>,
+    gameId: string,
+  ): Promise<{ summary: string }> {
+    const lockKey = `llm_summary_${gameId}`;
+    
+    return await this.distributedLockService.executeWithLock(
+      lockKey,
+      () => this.executeTurnSummary(events, gameId),
+      25000, // 25초 TTL
+      1, // 1회 재시도 (요약은 덜 중요하므로)
+    ) ?? { summary: '턴 요약을 생성할 수 없습니다.' };
+  }
+
+  private async executeTurnSummary(
     events: Array<{ message: string }>,
     gameId: string,
   ): Promise<{ summary: string }> {

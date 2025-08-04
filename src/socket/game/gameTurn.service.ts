@@ -16,6 +16,7 @@ import { BotService } from '../../bot/bot.service';
 import { LLMService } from '../../bot/llm.service';
 import { MemoryService } from '../../bot/memory.service';
 import { PlayerManagerService } from './player-manager.service';
+import { DistributedLockService } from '../../common/distributed-lock.service';
 
 interface ItemProbability {
   itemId: ItemCode | 'none';
@@ -41,9 +42,21 @@ export class GameTurnService {
     private readonly llmService: LLMService,
     private readonly memoryService: MemoryService,
     private readonly playerManagerService: PlayerManagerService,
+    private readonly distributedLockService: DistributedLockService,
   ) {}
 
   async onTurnStart(gameId: string, currentTurn?: number): Promise<void> {
+    const lockKey = `turn_start_${gameId}`;
+    
+    await this.distributedLockService.executeWithLock(
+      lockKey,
+      () => this.executeOnTurnStart(gameId, currentTurn),
+      60000, // 60초 TTL
+      2, // 2회 재시도
+    );
+  }
+
+  private async executeOnTurnStart(gameId: string, currentTurn?: number): Promise<void> {
     try {
       // 이전 타이머가 있으면 취소
       this.clearTurnTimer(gameId);
@@ -344,15 +357,27 @@ export class GameTurnService {
    * 턴 요약 생성 시작 (15초 전부터 순차적으로)
    */
   private startTurnSummaryGeneration(gameId: string): void {
+    const lockKey = `turn_summary_${gameId}`;
+    
+    this.distributedLockService.executeWithLock(
+      lockKey,
+      () => this.executeStartTurnSummaryGeneration(gameId),
+      120000, // 120초 TTL (요약 생성은 시간이 오래 걸릴 수 있음)
+      1, // 1회 재시도
+    ).catch((error) => {
+      console.error(`[GameTurn] 턴 요약 생성 시작 중 오류:`, error);
+    });
+  }
+
+  private executeStartTurnSummaryGeneration(gameId: string): Promise<void> {
     try {
       console.log(`[GameTurn] 턴 요약 생성 시작 - gameId: ${gameId}`);
 
       // 백그라운드에서 순차적으로 요약 처리
-      this.processTurnSummariesSequentially(gameId).catch((error) => {
-        console.error(`[GameTurn] 턴 요약 처리 중 오류:`, error);
-      });
+      return this.processTurnSummariesSequentially(gameId);
     } catch (error) {
       console.error(`[GameTurn] 턴 요약 생성 시작 중 오류:`, error);
+      throw error;
     }
   }
 

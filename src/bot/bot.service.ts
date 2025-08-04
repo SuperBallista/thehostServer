@@ -16,6 +16,7 @@ import { MemoryService } from './memory.service';
 import { ChatService } from '../socket/game/chat.service';
 import { GamePlayerInRedis, ITEM_NAMES } from '../socket/game/game.types';
 import { ANIMAL_NICKNAMES } from './constants/animal-nicknames';
+import { DistributedLockService } from '../common/distributed-lock.service';
 
 // 타입 정의 추가
 interface BotStateInRedis {
@@ -83,6 +84,7 @@ export class BotService implements OnModuleInit {
     private readonly memoryService: MemoryService,
     @Inject(forwardRef(() => ChatService))
     private readonly chatService: ChatService,
+    private readonly distributedLockService: DistributedLockService,
   ) {}
 
   onModuleInit() {
@@ -530,6 +532,17 @@ export class BotService implements OnModuleInit {
    * 봇 채팅 처리 (수정됨 - 채팅만 처리)
    */
   private async processBotChat(gameId: string, botId: number): Promise<void> {
+    const lockKey = `bot_chat_${gameId}_${botId}`;
+    
+    await this.distributedLockService.executeWithLock(
+      lockKey,
+      () => this.executeBotChat(gameId, botId),
+      30000, // 30초 TTL
+      1, // 1회 재시도
+    );
+  }
+
+  private async executeBotChat(gameId: string, botId: number): Promise<void> {
     try {
       // 플레이어 상태 확인
       const playerData = await this.playerManagerService.getPlayerDataByUserId(
@@ -537,7 +550,9 @@ export class BotService implements OnModuleInit {
         botId,
       );
       if (!playerData) {
-        this.logger.warn(`봇 플레이어 데이터를 찾을 수 없음: ${botId}`);
+        this.logger.warn(`봇 플레이어 데이터를 찾을 수 없음: ${botId} - 타이머 정지`);
+        this.stopBotChatTimer(gameId, botId);
+        this.stopBotActionTimer(gameId, botId);
         return;
       }
 
@@ -553,7 +568,7 @@ export class BotService implements OnModuleInit {
       const gameContext = await this.buildGameContext(botId, gameId);
 
       // LLM에 채팅 메시지 결정 요청 (새로운 분리된 함수 사용)
-      const chatDecision = await this.llmService.decideChatOnly(gameContext);
+      const chatDecision = await this.llmService.decideChatOnly(gameContext, botId);
 
       if (
         chatDecision.shouldChat &&
@@ -591,6 +606,17 @@ export class BotService implements OnModuleInit {
    * 봇 행동 처리 (새로 추가됨 - 행동만 처리)
    */
   private async processBotAction(gameId: string, botId: number): Promise<void> {
+    const lockKey = `bot_action_${gameId}_${botId}`;
+    
+    await this.distributedLockService.executeWithLock(
+      lockKey,
+      () => this.executeBotAction(gameId, botId),
+      45000, // 45초 TTL (액션은 더 복잡할 수 있음)
+      1, // 1회 재시도
+    );
+  }
+
+  private async executeBotAction(gameId: string, botId: number): Promise<void> {
     try {
       // 플레이어 상태 확인
       const playerData = await this.playerManagerService.getPlayerDataByUserId(
@@ -598,7 +624,9 @@ export class BotService implements OnModuleInit {
         botId,
       );
       if (!playerData) {
-        this.logger.warn(`봇 플레이어 데이터를 찾을 수 없음: ${botId}`);
+        this.logger.warn(`봇 플레이어 데이터를 찾을 수 없음: ${botId} - 타이머 정지`);
+        this.stopBotChatTimer(gameId, botId);
+        this.stopBotActionTimer(gameId, botId);
         return;
       }
 
@@ -613,7 +641,7 @@ export class BotService implements OnModuleInit {
 
       // LLM에 행동 결정 요청 (새로운 분리된 함수 사용)
       const actionDecision =
-        await this.llmService.decideGameAction(gameContext);
+        await this.llmService.decideGameAction(gameContext, botId);
 
       if (actionDecision.action) {
         // 행동 실행
