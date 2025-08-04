@@ -72,6 +72,17 @@ export class GameTurnService {
 
       const players = await this.getAllPlayersInGame(gameId);
 
+      // 봇만 남았는지 확인 (실제 플레이어가 없으면 게임 종료)
+      const realPlayers = players.filter(
+        (player) => player.userId > 0 && (player.state === 'alive' || player.state === 'host')
+      );
+
+      if (realPlayers.length === 0) {
+        console.log(`[GameTurn] 봇만 남은 게임 ${gameId} 자동 종료 처리`);
+        await this.endGameWithBots(gameId);
+        return;
+      }
+
       // 플레이어별로 아이템 지급
       for (const player of players) {
         if (player.state === 'alive' || player.state === 'host') {
@@ -530,6 +541,36 @@ export class GameTurnService {
     } catch (error) {
       console.error(`[GameTurn] 턴 이벤트 수집 중 오류:`, error);
       return [];
+    }
+  }
+
+  /**
+   * 봇만 남은 게임을 종료 처리
+   */
+  private async endGameWithBots(gameId: string): Promise<void> {
+    try {
+      console.log(`[GameTurn] 봇만 남은 게임 ${gameId} 종료 처리 시작`);
+
+      // 1. 게임 타이머 정리
+      await this.cleanupGame(gameId);
+
+      // 2. 남은 봇들에게 게임 종료 메시지 전송 (선택사항)
+      const bots = await this.playerManagerService.getBotPlayers(gameId);
+      for (const bot of bots) {
+        console.log(`[GameTurn] 봇 ${bot.userId} 게임 종료 처리`);
+      }
+
+      // 3. 봇들 정리
+      await this.botService.cleanupBotsForGame(gameId);
+
+      // 4. 게임 데이터 정리
+      await this.gameDataService.cleanupGameData(gameId);
+
+      // 5. 게임 종료 시스템 메시지 (로그용)
+      console.log(`[GameTurn] 봇만 남은 게임 ${gameId} 종료 완료 - 모든 실제 플레이어가 떠났습니다`);
+
+    } catch (error) {
+      console.error(`[GameTurn] 봇 게임 종료 처리 중 오류:`, error);
     }
   }
 }
